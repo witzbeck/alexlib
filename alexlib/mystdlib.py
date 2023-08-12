@@ -80,17 +80,11 @@ class timedelta(td):
             returns rounded dateti
             1. converts both to seconds
             2. calcs difference between both and epoch
-        self_s, td_s = self.timestamp(), td.total_seconds()   
-        dif = self_s - epoch_s      # dif = difference in seconds
-        mod = dif % td_s            # mod = modulus of dif and td_s
-        return self.fromtimestamp(epoch_s + (dif - mod))
         """
         dif = self.epoch_self_dif
         td_s = timedelta.get_td_s(td)
         mod = dif % td_s
         return self.fromtimestamp(epoch_s + dif - mod)
-        # returns rounded datetime
-        # self/delta in seconds
 
 
 def mk_date(dt_obj: dt):
@@ -140,13 +134,13 @@ class datetime(dt):
             self,
             td: td,
             epoch_s: dt = epoch_s,
-    ) -> dt:      
+    ) -> dt:
         """
         allows for rounding datetime to a timedel
             returns rounded dateti
             1. converts both datetime and timedelta to seconds
             2. calcs difference between datetime and epoch
-        self_s, td_s = self.timestamp(), td.total_seconds()   
+        self_s, td_s = self.timestamp(), td.total_seconds()
         dif = self_s - epoch_s      # dif = difference in seconds
         mod = dif % td_s            # mod = modulus of dif and td_s
         return self.fromtimestamp(epoch_s + (dif - mod))
@@ -155,13 +149,3 @@ class datetime(dt):
         td_s = datetime.get_td_s(td)
         mod = dif % td_s
         return self.fromtimestamp(epoch_s + dif - mod)
-
-
-
-
-
-
-now = datetime.now()
-delta = td(hours=36)
-print(now, round(now, delta))
-

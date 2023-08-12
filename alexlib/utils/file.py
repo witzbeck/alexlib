@@ -80,6 +80,18 @@ class SystemObject:
 
 @dataclass
 class File(SystemObject):
+
+    def istype(self, suffix: str):
+        return self.path.suffix == suffix
+
+    @property
+    def isdotenv(self):
+        return self.name.startswith(".env")
+
+    @property
+    def isjson(self):
+        return self.istype(".json")
+
     def read_json(self):
         with open(self.path, "r") as file:
             return loads(load(file))
