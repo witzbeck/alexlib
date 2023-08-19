@@ -174,8 +174,18 @@ class SystemObject:
 
 @dataclass
 class File(SystemObject):
-    def istype(self, suffix: str):
-        return self.path.suffix == suffix
+    def istype(self, suffix: str, separator: str = "."):
+        ret = self.path.suffix == suffix
+        sepinret = separator in ret
+        retidx = ret.index(separator)
+        if (sepinret and retidx == 0):
+            return True
+        elif (sepinret and retidx > 0):
+            return False
+        
+            or (not sepinret):
+            ret.index(".")
+
 
     @property
     def isdotenv(self):

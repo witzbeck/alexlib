@@ -2,6 +2,7 @@ from datetime import datetime as dt, timedelta as td
 from random import randint
 
 
+# reference datetime for difference calculation
 epoch = dt(
     year=2,
     month=1,
@@ -11,12 +12,15 @@ epoch = dt(
     second=0,
     microsecond=0,
 )
+
+# reference datetime as seconds
 epoch_s = epoch.timestamp()
 
+# helper function for states
 istrue = lambda x: x is True
 
-
 def mk_delta(td_obj: td):
+    """generates a random timedelta"""
     return td_obj(
         years=randint(0, 100),
         months=randint(0, 12),
@@ -28,7 +32,9 @@ def mk_delta(td_obj: td):
     )
 
 
+
 class timedelta(td):
+    """new timedelta class with extra methods"""
     @classmethod
     def as_rand(cls) -> td:
         return mk_delta(cls)
@@ -88,6 +94,7 @@ class timedelta(td):
 
 
 def mk_date(dt_obj: dt):
+    """generates a random datetime"""
     return dt_obj(
         year=randint(2, 3000),
         month=randint(1, 12),
@@ -100,6 +107,7 @@ def mk_date(dt_obj: dt):
 
 
 class datetime(dt):
+    """new datetime class with extra methods"""
     @classmethod
     def as_rand(cls) -> dt:
         return mk_date(cls)
