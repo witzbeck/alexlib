@@ -6,12 +6,15 @@ authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.11rc1"
 pandas = "^2.0.3"
 python-dotenv = "^1.0.0"
 decorator = "^5.1.1"
 numba = "^0.57.1"
 setuptools = "^68.0.0"
+jupyter = "^1.0.0"
+jedi-language-server = "^0.41.0"
+jupyterlab = "^4.0.5"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.25.0"
