@@ -1,26 +1,19 @@
 # standard library imports
 from dataclasses import dataclass, field
-from math import log
-from os import getenv
 from pathlib import Path
-import stat
 from subprocess import Popen, PIPE
 from typing import Any
-from attr import dataclass
 
 # third party imports
-from matplotlib.pyplot import xticks, subplots
 from numpy.random import choice
 from pandas import read_sql, DataFrame, Series
 from psycopg2 import connect
 from psycopg2.errors import UndefinedTable, ProgrammingError
-from seaborn import histplot
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from alexlib.df import get_distinct_col_vals, series_col, filter_df
 from alexlib.envs import ConfigFile, chkenv
 from alexlib.file import pathsearch
-from alexlib.maths import get_props
 
 config = ConfigFile(name=".env")
 
@@ -29,51 +22,97 @@ def onehot_case(col: str, val: str):
     return f"case when {col} = '{val}' then 1 else 0 end"
 
 
-
-
 def get_table_abrv(table_name: str):
     parts = table_name.split("_")
     firsts = [x[0] for x in parts]
     return "".join(firsts)
 
 
-def generate_select_query(schema: str,
-                          table: str,
-                          info_schema: DataFrame,
-                          destination: Path = "clipboard",
-                          overwrite: bool = False
-                          ) -> Path:
-    if len(info_schema) == 0:
-        raise ValueError("object does not exist")
-    abrv = get_table_abrv(table)
-    lines = ["select\n"]
-    cols = list(info_schema.loc[:, "column_name"])
-    for i, col in enumerate(cols):
-        if i == 0:
-            comma = " "
-        else:
-            comma = ","
-        line = f"{comma}{abrv}.{col}\n"
-        lines.append(line)
-    lines.append(f"from {schema}.{table} {abrv}")
-    text = "".join(lines)
-    if destination == "clipboard":
+def mk_info_sql(
+        schema=None,
+        table=None,
+        sql="select * from information_schema.columns"
+) -> str:
+    hasschema = schema is not None
+    hastable = table is not None
+    hasboth = (hasschema and hastable)
+    haseither = (hasschema or hastable)
+    stext = f"table_schema = '{schema}'" if hasschema else ""
+    ttext = f"table_name = '{table}'" if hastable else ""
+    sqllist = [
+        sql,
+        "where" if haseither else "",
+        stext,
+        "and" if hasboth else "",
+        ttext
+    ]
+    return " ".join(sqllist)
+
+
+@dataclass
+class SQL:
+    text: str | text = field()
+
+    @property
+    def isstr(self):
+        return isinstance(self.text, str)
+
+    def __post_init__(self):
+        if self.isstr:
+            self.text = text(self.text)
+
+    @staticmethod
+    def to_clipboard(text: str):
         p = Popen(["pbcopy"], stdin=PIPE)
         p.stdin.write(text.encode())
         p.stdin.close()
         retcode = p.wait()
         return True if retcode == 0 else False
-    else:
-        filename = f"select_{schema}_{table}.sql"
-        filepath = destination / filename
-        if (filepath.exists() and not overwrite):
+
+    @staticmethod
+    def mk_default_filename(
+        schema: str,
+        table: str,
+        prefix: str = "select",
+        suffix: str = ".sql"
+    ) -> str:
+        return f"{prefix}_{schema}_{table}{suffix}"
+
+    @staticmethod
+    def to_file(
+        text: str | text,
+        path: Path,
+        overwrite: bool = True
+    ):
+        if (path.exists() and not overwrite):
             raise FileExistsError("file already exists here. overwrite?")
-        filepath.write_text(text)
-        return filepath
+        path.write_text(text)
+        return path.exists()
+
+    @classmethod
+    def from_info_schema(
+        cls,
+        schema: str,
+        table: str,
+        info_schema: DataFrame,
+    ):
+        abrv = get_table_abrv(table)
+        lines = ["select\n"]
+        cols = list(info_schema.loc[:, "column_name"])
+        for i, col in enumerate(cols):
+            if i == 0:
+                comma = " "
+            else:
+                comma = ","
+            line = f"{comma}{abrv}.{col}\n"
+            lines.append(line)
+        lines.append(f"from {schema}.{table} {abrv}")
+        return cls("".join(lines))
 
 
 @dataclass
 class Connection:
+    _context: str = field(default=None)
     driver: str = field(default="postgresql+psycopg2://")
     engine: str = field(
         repr=False,
@@ -84,9 +123,20 @@ class Connection:
         init=False
     )
 
+    @_context.getter
+    def _context(self):
+        if self._context is None:
+            return chkenv("CONTEXT")
+        else:
+            return self._context
+
+    @_context.setter
+    def _context(self):
+        self._context = self._context()
+
     @property
     def context(self):
-        return chkenv("CONTEXT")
+        return self._context
 
     @property
     def dbname(self):
@@ -132,6 +182,11 @@ class Connection:
     def set_engine(self):
         self.engine = Connection.get_engine(self.enginestr)
 
+    def run_pd_sql(self, sql: str | text | SQL):
+        if isinstance(sql, SQL):
+            sql = sql.text
+        return read_sql(sql, self.engine)
+
     @property
     def connstr(self):
         deets = [
@@ -144,68 +199,67 @@ class Connection:
             deets.append(f"password={self.pw}")
         return " ".join(deets)
 
-    @staticmethod
-    def get_conn(connstr: str):
-        return connect(connstr)
+    @property
+    def conn(self):
+        return connect(self.connstr)
 
-    def set_conn(self):
-        self.conn = Connection.get_conn(self.connstr)
+    def get_info_schema(
+            self,
+            schema: str = None,
+            table: str = None,
+    ):
+        sql = mk_info_sql(schema=schema, table=table)
+        return self.run_pd_sql(sql)
 
-    def get_info_schema(self,
-                        schema=None,
-                        table=None):
-        sql = "select * from main.v_info_schema"
-        if (schema is not None and table is None):
-            sql = f"{sql} where table_schema = '{schema}'"
-        elif (schema is not None and table is not None):
-            sql = f"{sql} where table_schema = '{schema}'"
-            sql = f"{sql} and table_name = '{table}'"
-        elif (schema is None and table is not None):
-            sql = f"{sql} where table_name = '{table}'"
-        return read_sql(sql, self.engine)
-
-    def __post_init__(self, context: str) -> None:
-        self.set_user()
-        self.set_host()
-        self.set_port()
-        self.set_dbname()
-        self.set_context()
-
-        self.db_name = getenv("DBNAME")
-        self.engine = get_engine(context)
+    def set_info_schema(self):
         self.info_schema = self.get_info_schema()
 
-    def run_postgres_query(self, query):
-        with get_conn(self.context) as cnxn:
+    def run_pg_sql(
+            self,
+            sql: str | text,
+            todf: bool = True,
+    ) -> DataFrame | bool:
+        isselect = "select" in sql.lower()[:10]
+        if not isinstance(sql, text):
+            sql = text(sql)
+        with self.conn as cnxn:
             cnxn.autocommit = True
             cursor = cnxn.cursor()
-            cursor.execute(query)
-            if query[:6].lower() != "select":
-                return True
-            try:
-                res = cursor.fetchall()
+            cursor.execute(sql)
+            if isselect:
+                ret = cursor.fetchall()
+            if (isselect and todf):
                 cols = [desc[0] for desc in cursor.description]
-                df = DataFrame.from_records(res)
+                df = DataFrame.from_records(ret)
                 df.columns = cols
-                return df
-            except ProgrammingError:
-                return False
+                ret = df
+            elif not isselect:
+                ret = True
+            else:
+                raise ProgrammingError("invalid sql")
+            return ret
 
-    def obj_cmd(self,
-                cmd: str,
-                obj_type: str,
-                obj_schema: str,
-                obj_name: str,
-                addl_cmd: str = ""
-                ) -> None:
-        sql = f"{cmd} {obj_type} {obj_schema}.{obj_name} {addl_cmd};"
-        self.run_postgres_query(sql)
+    def __post_init__(self) -> None:
+        self.set_engine()
+        self.set_info_schema()
+
+    @staticmethod
+    def mk_cmd_sql(
+        cmd: str,
+        obj_type: str,
+        obj_schema: str,
+        obj_name: str,
+        addl_cmd: str = ""
+    ) -> None:
+        return f"{cmd} {obj_type} {obj_schema}.{obj_name} {addl_cmd};"
+
+    def obj_cmd(self, *args, **kwargs):
+        sql = Connection.mk_cmd_sql(*args, **kwargs)
+        self.run_pg_sql(sql)
 
     def drop_table(self, schema: str, table: str, cascade: bool = True):
-        if cascade:
-            self.obj_cmd("drop", "table", schema, table, addl_cmd="cascade")
-        else:
-            self.obj_cmd("drop", "table", schema, table)
+        addl_cmd = "cascade" if cascade else ""
+        self.obj_cmd("drop", "table", schema, table, addl_cmd)
 
     def drop_view(self, schema: str, view: str):
         self.obj_cmd("drop", "view", schema, view)
@@ -226,38 +280,46 @@ class Connection:
         for tab in tabs:
             self.trunc_table(schema, tab)
 
-    def run_pd_query(self, query: str):
-        return read_sql(query, self.engine)
-
-    def df_from_file(self,
-                     filename: str,
-                     path: Path = None
-                     ):
+    def df_from_sqlfile(
+        self,
+        filename: str,
+        path: Path = None
+    ) -> DataFrame:
         if path is None:
             path = pathsearch(filename)
         text = path.read_text()
-        return self.run_pd_query(text)
+        return self.run_pd_sql(text)
 
-    def df_to_db(self,
-                 df: DataFrame,
-                 schema: str,
-                 table: str,
-                 **kwargs
-                 ):
+    def df_to_db(
+        self,
+        df: DataFrame,
+        schema: str,
+        table: str,
+        **kwargs
+    ) -> None:
         df.to_sql(table,
                   self.engine,
                   schema=schema,
                   **kwargs)
+
+    def mk_select_sql(
+        schema: str,
+        table: str,
+        addl_sql: str = "",
+        nrows: int = None
+    ) -> SQL:
+        sql = f"select * from {schema}.{table}"
+        rows = f"limit {str(nrows)}" if nrows is not None else ""
+        parts = [sql, addl_sql, rows, ";"]
+        return SQL(" ".join(parts))
 
     def get_table(self,
                   schema: str,
                   table: str,
                   nrows: int = None
                   ):
-        query = f"select * from {schema}.{table}"
-        if (nrows is not None and nrows != 'None'):
-            query = f"{query} limit {str(nrows)};"
-        return self.run_pd_query(query)
+        sql = Connection.mk_select_sql(schema, table, nrows=nrows)
+        return self.run_pd_sql(sql)
 
     def get_last_id(self,
                     schema: str,
@@ -266,7 +328,7 @@ class Connection:
                     ) -> int:
         sql = f"select max({id_col}) from {schema}.{table}"
         try:
-            id = self.run_postgres_query(sql)
+            id = self.run_pg_sql(sql)
             id_int = id.iloc[0, 0]
             if id_int is None:
                 return 1
@@ -296,13 +358,17 @@ class Connection:
         last_rec = self.get_last_record(schema, table, id_col)
         return last_rec.loc[0, val_col]
 
+    @classmethod
+    def from_context(cls, context: str):
+        return cls(_context=context)
 
-def create_onehot_view(dbh: DbHelper,
+
+def create_onehot_view(dbh: Connection,
                        schema: str,
                        table: str,
                        command: str = "create view"
                        ) -> str:
-    df = dbh.run_pd_query(f"select * from {schema}.{table}")
+    df = dbh.run_pd_sql(f"select * from {schema}.{table}")
     dist_col = [x for x in df.columns if x[-2:] != "id"][0]
     id_col = [x for x in df.columns if x != dist_col][0]
     dist_vals = get_distinct_col_vals(df, dist_col)
@@ -327,199 +393,164 @@ def create_onehot_view(dbh: DbHelper,
     return "".join(lines)
 
 
+@dataclass
 class Column:
-    def is_id(col: str):
-        return False if col[-3:] != "_id" else True
+    name: str = field()
+    table: str = field()
+    schema: str = field()
+    series: Series = field(
+        repr=False,
+    )
+    distvals: list[str] = field(
+        init=False,
+        repr=False,
+    )
+    freqs: dict[list[float]] = field(
+        init=False,
+        repr=False,
+    )
+    props: dict[list[float]] = field(
+        init=False,
+        repr=False,
+    )
 
-    def auto_xtick_angle(self,
-                         ndist_min: int = 5,
-                         ndist_mult: int = 2,
-                         len_min: int = 50,
-                         len_mult: int = 2,
-                         range_min: int = 100,
-                         range_mult: int = 2,
-                         text_min: int = 30,
-                         text_mult: int = 2
-                         ):
-        uni = list(self.series.unique())
-        self.ndist = len(uni)
-        if self.ndist < ndist_min:
-            return 0
-        self.ndist_prod = ndist_mult * self.ndist
+    def __len__(self) -> int:
+        return len(self.series)
 
-        text_len = sum([len(str(x)) for x in uni])
-        if text_len > text_min:
-            logtext = log(text_len)
-            self.text_prod = text_mult * logtext
-        else:
-            return 0
+    def get_distvals(self):
+        return list(self.series.unique())
 
-        _len = len(self.series)
-        if _len > len_min:
-            _len = log(_len)
-            self.len_prod = len_mult * _len
-        else:
-            self.len_prod = 0
+    def set_distvals(self):
+        self.distvals = self.get_distvals()
 
-        freq_range = max(self.freqs) - min(self.freqs)
-        if freq_range > range_min:
-            _range = log(freq_range)
-        else:
-            _range = 0
-        self.logrange_prod = range_mult * _range
+    def get_ndistvals(self):
+        return len(self.distvals)
 
-        to_pyth = [
-            self.len_prod,
-            self.ndist_prod,
-            self.logrange_prod,
-            self.text_prod
-        ]
-        angle = int(pyth(to_pyth))
-        if angle > 45:
-            return 45
-        else:
-            return angle
+    def set_ndistvals(self):
+        self.ndistvals = self.get_ndistvals()
 
-    def __init__(self,
-                 schema: str,
-                 table: str,
-                 col_name: str,
-                 series: Series,
-                 calc_desc: bool = False
-                 ) -> None:
-        self.schema = schema
-        self.table = table
-        self.col_name = col_name
-        self.series = series
-        self.is_id = Column.is_id(self.col_name)
+    def get_freqs(self):
+        return {x: sum(self.series == x) for x in self.distvals}
 
-    def desc(self,
-             show_props: bool = False,
-             show_nulls: bool = False,
-             show_series_desc: bool = False,
-             show_hist: bool = False,
-             **kwargs
-             ):
-        try:
-            to_pyth = [
-                self.len_prod,
-                self.ndist_prod,
-                self.logrange_prod,
-                self.text_prod
-            ]
-        except AttributeError:
-            pass
-        db_col = self.col_name
-        if self.schema is not None:
-            db_col = f"{self.schema}.{self.table}.{db_col}"
-        print(f"Describing {db_col}\n")
-        if (ndist := len(list(self.series.unique()))) < 31:
-            self.props = get_props(self.series)
-            self.freqs = self.props["frequency"].values
-            self.distvals = self.props["value"].values
-            self.n_vals = sum(self.freqs)
-            if show_props:
-                print("Proportions:\n", self.props, "\n")
-        if show_nulls:
-            self.n_nulls = sum(self.series.isna())
-            print(f"Null count: {self.n_nulls}")
-        if show_series_desc:
-            print(self.series.describe(), "\n")
-        if (show_hist and not self.is_id and ndist <= 31):
-            try:
-                print([round(x, 4) for x in to_pyth])
-            except AttributeError:
-                pass
-            except UnboundLocalError:
-                pass
-            self.xtick_angle = self.auto_xtick_angle()
-        else:
-            self.xtick_angle = 0
-        if show_hist:
-            fig, ax = subplots(nrows=1,
-                               ncols=1,
-                               figsize=(5, 4),
-                               dpi=200,
-                               )
-            histplot(self.series,
-                     ax=ax,
-                     **kwargs
-                     )
-            xticks(rotation=self.xtick_angle)
-            return fig, ax
+    def set_freqs(self):
+        self.freqs = self.get_freqs()
+
+    def get_props(self):
+        freqs = self.freqs
+        n = len(self)
+        return {x: freqs[x] / n for x in self.distvals}
+
+    def set_props(self):
+        self.props = self.get_props()
+
+    def __post_init__(self):
+        self.set_distvals()
+        self.set_ndistvals()
+        self.set_freqs
+        self.set_props()
+
+    @property
+    def isid(self):
+        return False if self.name[-3:] != "_id" else True
+
+    @property
+    def nnulls(self):
+        return sum(self.series.isna())
 
 
+@dataclass
 class Table:
-    def set_cols(self):
-        self.col_names = self.df.columns
-        self.ncols = len(self.col_names)
-        self.col_series = {x: series_col(self.df, x) for x in self.col_names}
-        s, t, c = self.schema, self.table, self.col_series
-        d, n = self.calc_desc, self.col_names
-        self.cols = {x: Column(s, t, x, c[x], calc_desc=d) for x in n}
+    context: str = field()
+    schema: str = field()
+    table: str = field()
+    df: DataFrame = field(
+        default=None,
+        repr=False,
+    )
+    nrows: int = field(
+        default=None
+    )
+    col_series: DataFrame = field(
+        init=False,
+        repr=False,
+    )
+    col_objs: DataFrame = field(
+        init=False,
+        repr=False,
+    )
 
-    def set_funcs(self):
-        self.rand_col = lambda: choice(list(self.cols.values()))
-        self.head = lambda x: self.df.head(x)
+    @property
+    def cols(self):
+        return list(self.df.columns)
 
-    def __init__(self,
-                 context: str,
-                 schema: str,
-                 table: str,
-                 calc_desc: bool = False,
-                 df: DataFrame = None,
-                 nrows: int = None
-                 ) -> None:
-        self.schema = schema
-        self.table = table
-        if df is None:
-            dbh = DbHelper(context)
-            self.df = dbh.get_table(schema, table, nrows=nrows)
-        else:
-            self.df = df
-        self.calc_desc = calc_desc
-        self.set_cols()
-        self.set_funcs()
+    @property
+    def ncols(self):
+        return len(self.cols)
 
-    def desc_col(self, col: str, **kwargs):
-        col = self.cols[col]
-        col.desc(**kwargs)
+    def get_col_series(self):
+        return {x: series_col(self.df, x) for x in self.cols}
 
-    def desc_all_cols(self):
-        for i, col in enumerate(self.col_names):
-            print(f"({i+1}/{self.ncols})")
-            self.desc_col(col, show_hist=False)
+    def set_col_series(self):
+        self.col_series = self.get_col_series()
+
+    def get_col_objs(self):
+        s, t, c, n = self.schema, self.table, self.col_series, self.cols
+        self.col_objs = {x: Column(s, t, x, c[x],) for x in n}
+
+    def set_col_objs(self):
+        self.col_objs = self.get_col_objs()
+
+    def head(self, x: int) -> DataFrame:
+        return self.df.head(x)
+
+    @property
+    def rand_col(self) -> Column:
+        return choice(self.cols)
+
+    def __post_init__(self) -> None:
+        self.set_col_series()
+        self.set_col_objs()
 
     @classmethod
-    def from_df(cls,
-                df: DataFrame,
-                calc_desc: bool = False,
-                context: str = None,
-                schema: str = None,
-                table: str = None,
-                ):
-        return cls(context, schema, table, calc_desc=calc_desc, df=df)
+    def from_df(
+        cls,
+        df: DataFrame,
+        context: str = None,
+        schema: str = None,
+        table: str = None,
+    ):
+        return cls(context, schema, table, df=df)
 
 
 def update_host_table(schema: str,
                       table: str,
-                      source_context: str = "SERVER",
-                      dest_context: str = "LOCAL"
+                      source: str | Connection = "SERVER",
+                      dest: str | Connection = "LOCAL"
                       ):
-    source_dbh: str = DbHelper(source_context),
-    dest_dbh: str = DbHelper(dest_context)
-    trunc_sql = f"truncate table {schema}.{table};"
-    new_data = source_dbh.get_table(schema, table)
-    if len(new_data) == 0:
-        raise ValueError("did not grab data from source")
+    if isinstance(source, str):
+        source = Connection.from_context(source)
+    elif isinstance(source, Connection):
+        pass
+    else:
+        raise TypeError("source must be str or Connection")
+    if isinstance(dest, str):
+        dest = Connection.from_context(dest)
+    elif isinstance(dest, Connection):
+        pass
+    else:
+        raise TypeError("dest must be str or Connection")
+
+    source_data = source.get_table(schema, table)
+    if len(source_data) == 0:
+        raise ValueError("source is empty")
     else:
         try:
-            dest_dbh.run_postgres_query(trunc_sql)
+            dest.trunc_table(schema, table)
         except UndefinedTable:
             pass
-        new_data.to_sql(
+        source_data.to_sql(
             table,
-            dest_dbh.engine,
+            dest.engine,
             schema=schema,
             if_exists="append",
             index=False,
@@ -531,14 +562,17 @@ def update_host_schema(schema: str,
                        source_context: str = "SERVER",
                        dest_context: str = "LOCAL"
                        ):
-    source_dbh: str = DbHelper(source_context),
-    dest_dbh: str = DbHelper(dest_context)
-
-    schema_tables = source_dbh.get_all_schema_tables(schema)
+    source = Connection.from_context(
+        source_context
+    )
+    dest = Connection.from_context(
+        dest_context
+    )
+    schema_tables = source.get_all_schema_tables(schema)
     for table in schema_tables:
         update_host_table(
             schema,
             table,
-            source_dbh=source_dbh,
-            dest_dbh=dest_dbh
+            source=source,
+            dest=dest
         )
