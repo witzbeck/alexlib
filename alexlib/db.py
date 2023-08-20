@@ -1,9 +1,12 @@
 # standard library imports
-from math import log, sqrt
+from dataclasses import dataclass, field
+from math import log
 from os import getenv
 from pathlib import Path
+import stat
 from subprocess import Popen, PIPE
 from typing import Any
+from attr import dataclass
 
 # third party imports
 from matplotlib.pyplot import xticks, subplots
@@ -14,72 +17,18 @@ from psycopg2.errors import UndefinedTable, ProgrammingError
 from seaborn import histplot
 from sqlalchemy import create_engine
 
-from utils import get_distinct_col_vals, get_props, series_col
-from utils import set_envs, filter_df, pathsearch
+from alexlib.df import get_distinct_col_vals, series_col, filter_df
+from alexlib.envs import ConfigFile, chkenv
+from alexlib.file import pathsearch
+from alexlib.maths import get_props
 
-set_envs("db")
-
-if getenv("CONTEXT") is None:
-    set_envs("model")
+config = ConfigFile(name=".env")
 
 
 def onehot_case(col: str, val: str):
     return f"case when {col} = '{val}' then 1 else 0 end"
 
 
-def pyth(_list: list):
-    return sqrt(sum([x ** 2 for x in _list]))
-
-
-def get_deets(context: str):
-    context = context.upper()
-    dbname = "DBNAME"
-    vars = ["DBHOST", "DBPORT", "DBSUDO"]
-    deets = [dbname] + [context + x for x in vars]
-    deets = [getenv(x) for x in deets]
-    return deets[0], deets[1], deets[2], deets[3]
-
-
-def create_conn(dbname: str,
-                host: str,
-                port: str,
-                user: bool,
-                pw: str = None
-                ):
-    dbname = f"dbname={dbname}"
-    host = f"host={host}"
-    port = f"port={port}"
-    user = f"user={user}"
-    deets = [dbname, host, port, user]
-    if pw is not None:
-        deets.append(f"password={pw}")
-    con_str = " ".join(deets)
-    return connect(con_str)
-
-
-def get_conn(context: str):
-    return create_conn(*get_deets(context))
-
-
-def build_engine(dbname: str,
-                 host: str,
-                 port: str,
-                 user: bool,
-                 pw: str = None
-                 ):
-    pre_sqlalc = "postgresql+psycopg2://"
-    post_sqlalc = f"@{host}:{port}/{dbname}"
-    if pw is None:
-        login = user
-    else:
-        login = f"{user}:{pw}"
-
-    con_str = pre_sqlalc + login + post_sqlalc
-    return create_engine(con_str)
-
-
-def get_engine(context: str):
-    return build_engine(*get_deets(context))
 
 
 def get_table_abrv(table_name: str):
@@ -88,45 +37,119 @@ def get_table_abrv(table_name: str):
     return "".join(firsts)
 
 
-class DbHelper:
-    def generate_select_query(self,
-                              schema: str,
-                              table: str,
-                              destination: Path = "clipboard",
-                              overwrite: bool = False
-                              ) -> Path:
-        df = self.get_info_schema(schema=schema, table=table)
-        if len(df) == 0:
-            raise ValueError("object does not exist")
-        abrv = get_table_abrv(table)
-
-        lines = ["select\n"]
-
-        cols = list(df.loc[:, "column_name"])
-        for i, col in enumerate(cols):
-            if i == 0:
-                comma = " "
-            else:
-                comma = ","
-            line = f"{comma}{abrv}.{col}\n"
-            lines.append(line)
-        lines.append(f"from {schema}.{table} {abrv}")
-        text = "".join(lines)
-
-        if destination == "clipboard":
-            p = Popen(["pbcopy"], stdin=PIPE)
-            p.stdin.write(text.encode())
-            p.stdin.close()
-            retcode = p.wait()
-            return True if retcode == 0 else False
+def generate_select_query(schema: str,
+                          table: str,
+                          info_schema: DataFrame,
+                          destination: Path = "clipboard",
+                          overwrite: bool = False
+                          ) -> Path:
+    if len(info_schema) == 0:
+        raise ValueError("object does not exist")
+    abrv = get_table_abrv(table)
+    lines = ["select\n"]
+    cols = list(info_schema.loc[:, "column_name"])
+    for i, col in enumerate(cols):
+        if i == 0:
+            comma = " "
         else:
-            filename = f"select_{schema}_{table}.sql"
-            filepath = destination / filename
+            comma = ","
+        line = f"{comma}{abrv}.{col}\n"
+        lines.append(line)
+    lines.append(f"from {schema}.{table} {abrv}")
+    text = "".join(lines)
+    if destination == "clipboard":
+        p = Popen(["pbcopy"], stdin=PIPE)
+        p.stdin.write(text.encode())
+        p.stdin.close()
+        retcode = p.wait()
+        return True if retcode == 0 else False
+    else:
+        filename = f"select_{schema}_{table}.sql"
+        filepath = destination / filename
+        if (filepath.exists() and not overwrite):
+            raise FileExistsError("file already exists here. overwrite?")
+        filepath.write_text(text)
+        return filepath
 
-            if (filepath.exists() and not overwrite):
-                raise FileExistsError("file already exists here. overwrite?")
-            filepath.write_text(text)
-            return filepath
+
+@dataclass
+class Connection:
+    driver: str = field(default="postgresql+psycopg2://")
+    engine: str = field(
+        repr=False,
+        init=False
+    )
+    conn: str = field(
+        repr=False,
+        init=False
+    )
+
+    @property
+    def context(self):
+        return chkenv("CONTEXT")
+
+    @property
+    def dbname(self):
+        return chkenv("DBNAME")
+
+    @property
+    def issudo(self):
+        return chkenv("ISSUDO", type=bool)
+
+    @property
+    def usertype(self):
+        return "SUDO" if self.issudo else "USER"
+
+    @property
+    def host(self):
+        return chkenv(f"{self.context}DBHOST")
+
+    @property
+    def port(self):
+        return chkenv(f"{self.context}DBPORT")
+
+    @property
+    def user(self):
+        return chkenv(f"{self.context}DB{self.usertype}")
+
+    @property
+    def pw(self):
+        return chkenv(f"{self.context}DBPW")
+
+    @property
+    def login(self):
+        return self.user if self.pw is None else f"{self.user}:{self.pw}"
+
+    @property
+    def enginestr(self):
+        h, p = self.host, self.port
+        return f"{self.driver}{self.login}@{h}:{p}/{self.dbname}"
+
+    @staticmethod
+    def get_engine(enginestr):
+        return create_engine(enginestr)
+
+    def set_engine(self):
+        self.engine = Connection.get_engine(self.enginestr)
+
+    @property
+    def connstr(self):
+        deets = [
+            f"dbname={self.dbname}",
+            f"host={self.host}",
+            f"port={self.port}",
+            f"user={self.user}"
+        ]
+        if self.pw is not None:
+            deets.append(f"password={self.pw}")
+        return " ".join(deets)
+
+    @staticmethod
+    def get_conn(connstr: str):
+        return connect(connstr)
+
+    def set_conn(self):
+        self.conn = Connection.get_conn(self.connstr)
 
     def get_info_schema(self,
                         schema=None,
@@ -141,9 +164,13 @@ class DbHelper:
             sql = f"{sql} where table_name = '{table}'"
         return read_sql(sql, self.engine)
 
-    def __init__(self, context: str) -> None:
-        set_envs("db")
-        self.context = context
+    def __post_init__(self, context: str) -> None:
+        self.set_user()
+        self.set_host()
+        self.set_port()
+        self.set_dbname()
+        self.set_context()
+
         self.db_name = getenv("DBNAME")
         self.engine = get_engine(context)
         self.info_schema = self.get_info_schema()

@@ -2,17 +2,72 @@ from dataclasses import dataclass, field
 from datetime import datetime as dt, timedelta as td
 from json import load, loads, dump, dumps
 from pathlib import Path
-from os import environ, getenv
+from typing import Any, Callable
 
-from dotenv import load_dotenv
+from matplotlib.pyplot import savefig
+from pandas import DataFrame
+from pandas import read_csv, read_sql, read_excel
+from sqlalchemy import engine
+
+from alexlib.iters import link
 
 
-def pathsearch(pattern: str, start_path: Path = Path(__file__)):
+def figsave(
+        name: str,
+        dirpath: Path,
+        format: str = "png",
+        **kwargs,  # use bb_inches=tight if cutoff
+) -> bool:  # returns True if successful
+    path = dirpath / f"{name}.{format}"
+    savefig(path, format=format, **kwargs)
+    return path.exists()
+
+
+def pathsearch(
+        pattern: str,
+        start_path: Path = Path(__file__),
+        listok: bool = False,
+) -> Path | list[Path]:
     while True:
         try:
-            return [x for x in start_path.rglob(pattern)][0]
+            ret = [x for x in start_path.rglob(pattern)]
+            if listok:
+                return ret
+            else:
+                return ret[0]
         except IndexError:
             start_path = start_path.parent
+
+
+def path_list_to_dict(
+        path_list: list[Path],
+        func: Callable = None,
+) -> dict[Any]:
+    if func is not None:
+        return {x.stem: x for x in path_list}
+    else:
+        return {x.stem: func(x) for x in path_list}
+
+
+def df_to_db(
+        df: DataFrame,
+        engine: engine,
+        table_name: str,
+        schema: str = None,
+        if_exists: str = "replace",
+        index: bool = False,
+        chunksize: int = 10000,
+        method: str = "multi",
+):
+    df.to_sql(
+        table_name,
+        engine,
+        if_exists=if_exists,
+        schema=schema,
+        index=index,
+        chunksize=chunksize,
+        method=method,
+    )
 
 
 def get_date_str(
@@ -35,6 +90,14 @@ def get_date_str(
     return "_".join([date, time])
 
 
+def copy_csv_str(table_name, csv_path):
+    return f"""COPY {table_name}
+    FROM '{csv_path}'
+    DELIMITER ','
+    CSV HEADER
+    """
+
+
 def eval_td(dt1: dt, dt2: dt = dt.now()):
     if isinstance(dt1, float):
         dt1 = dt.fromtimestamp(dt1)
@@ -42,75 +105,18 @@ def eval_td(dt1: dt, dt2: dt = dt.now()):
 
 
 @dataclass
-class EnvVar:
-    key: str = field(default=None)
-    value: str = field(default=None)
-    type_: type = field(default=str)
-
-    @staticmethod
-    def astype(value: str, type_: type):
-        if issubclass(type_, list):
-            ret = value.split(",")
-        else:
-            ret = type_(value)
-        return ret
-
-    @property
-    def varisset(self):
-        return self.value is not None
-
-    @property
-    def envisset(self):
-        return self.key in environ
-
-    @property
-    def isnotstr(self):
-        return not isinstance(self.type_, str)
-
-    def __post_init__(self):
-        self.set_value()
-
-    @staticmethod
-    def setenv(key: str, value: str):
-        environ[key] = value
-
-    def get_value(self, key: str):
-        if self.varisset:
-            ret = self.value
-        elif self.envisset:
-            ret = getenv(self.key)
-        else:
-            raise ValueError(f"{key} not set in env or var")
-        if self.isnotstr:
-            ret = EnvVar.astype(ret, self.type_)
-        return ret
-
-    def set_value(self):
-        self.set_value_env()
-        self.value = self.get_value()
-
-    def set_value_env(self):
-        if not self.envisset:
-            self.setenv(self.key, self.value)
-
-    @classmethod
-    def from_pair(cls, key: str, value: str):
-        return cls(key=key, value=value)
-
-
-@dataclass
 class SystemObject:
     path: Path = field(default=None)
     name: str = field(default=None)
-    _parent: Path = field(default=None)
+
+    def __repr__(self):
+        clss = self.__class__.__name__
+        parent = self.parent
+        return f"{clss}({self.name}), parent: {str(parent)}"
 
     @property
     def parent(self):
-        return self._parent
-
-    @parent.setter
-    def parent(self, path: Path):
-        self._parent = path
+        return self.path.parent
 
     @property
     def stat(self):
@@ -149,7 +155,7 @@ class SystemObject:
             ret = self.path.name
         elif self.path.is_file():
             name = self.path.name
-            ext = self.path.suffix
+            ext = self.path.suffix.strip(".")
             ret = f"{name}.{ext}"
         else:
             raise ValueError("need path or name")
@@ -174,18 +180,23 @@ class SystemObject:
 
 @dataclass
 class File(SystemObject):
+    schema: str = field(default=None)
+
+    @property
+    def filetype(self):
+        return self.path.suffix.strip(".")
+
     def istype(self, suffix: str, separator: str = "."):
         ret = self.path.suffix == suffix
         sepinret = separator in ret
         retidx = ret.index(separator)
         if (sepinret and retidx == 0):
-            return True
+            ret = True
         elif (sepinret and retidx > 0):
-            return False
-        
-            or (not sepinret):
-            ret.index(".")
-
+            ret = False
+        else:
+            ret = False
+        return ret
 
     @property
     def isdotenv(self):
@@ -194,6 +205,18 @@ class File(SystemObject):
     @property
     def isjson(self):
         return self.istype(".json")
+
+    @property
+    def iscsv(self):
+        return self.istype(".csv")
+
+    @property
+    def isxlxs(self):
+        return self.istype(".xlsx")
+
+    @property
+    def issql(self):
+        return self.istype(".sql")
 
     def read_json(self):
         if not self.isjson:
@@ -210,61 +233,100 @@ class File(SystemObject):
             raise ValueError("not a json file")
         with open(self.path, "w") as f:
             dump(dumps(_dict), fp=f)
+        pass
+
+    @property
+    def read_func(self):
+        if self.iscsv:
+            ret = read_csv
+        elif self.isxlxs:
+            ret = read_excel
+        elif self.issql:
+            ret = read_sql
+        elif self.isjson:
+            ret = self.read_json
+        else:
+            raise ValueError("not a valid filetype")
+        return ret
+
+    @property
+    def df(self) -> DataFrame:
+        return self.read_func(self.path)
+
+    @property
+    def nrows(self):
+        return len(self.df)
+
+    def to_db(
+            self,
+            engine: engine,
+    ):
+        df_to_db(
+            df=self.df,
+            engine=engine,
+            table_name=self.name,
+            schema=self.schema,
+        )
 
 
 @dataclass
-class ConfigFile(File):
-    envdict: dict = field(default_factory=dict)
+class Directory(SystemObject):
+    @property
+    def contents(self):
+        return [x for x in self.path.iterdir()]
 
     @property
-    def nenvs(self):
-        return len(self.envdict)
+    def filepaths(self):
+        return [x for x in self.contents if x.is_file()]
 
-    def read_dotenv(self):
-        if not self.isdotenv:
-            raise ValueError("not a dotenv file")
-        try:
-            load_dotenv(self.path)
-        except FileNotFoundError:
-            load_dotenv()
+    @property
+    def files(self):
+        return [File(path=x) for x in self.filepaths]
 
-    def to_dotenv(self, _dict: dict):
-        if not self.isdotenv:
-            raise ValueError("not a dotenv file")
-        with open(self.path, "w") as f:
-            for key, value in _dict.items():
-                f.write(f"{key}={value}\n")
+    @property
+    def dirpaths(self):
+        return [x for x in self.contents if x.is_dir()]
 
-    @staticmethod
-    def setenvs(dict_: dict):
-        keys = list(dict_.keys())
-        [EnvVar.setenv(key, dict_[key]) for key in keys]
+    @property
+    def dirs(self):
+        return [Directory(path=x) for x in self.dirpaths]
 
-    def get_envdict(self):
-        if self.nenvs > 0:
-            return self.envdict
-        elif self.isjson:
-            self.envdict = self.read_json()
-            ConfigFile.setenvs(self.envdict)
-        elif self.isdotenv:
-            self.read_dotenv()
-        return environ
+    @property
+    def nfiles(self):
+        return len(self.filepaths)
 
-    def set_envdict(self):
-        self.envdict = self.get_envdict()
+    @property
+    def ndirs(self):
+        return len(self.dirpaths)
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.set_envdict()
+    @property
+    def ncontents(self):
+        return len(self.contents)
 
-    @classmethod
-    def from_path(cls, path: str | Path):
-        if isinstance(path, str):
-            path = Path(path)
-        if not path.exists():
-            return cls(name=f"{path.name}{path.suffix}")
-        return cls(path=path)
+    @property
+    def allchildfiles(self):
+        childfiles = [x.allchildfiles for x in self.dirs]
+        return self.files + link(childfiles)
 
-    @classmethod
-    def from_name(cls, name: str):
-        return cls(name=name)
+    @property
+    def allchilddirs(self):
+        childdirs = [x.allchilddirs for x in self.dirs]
+        return self.dirs + link(childdirs)
+
+    def insert_all_files(
+            self,
+            engine: engine,
+            schema: str = None
+    ) -> int:  # total rows inserted
+        total_rows = 0
+        if schema is None:
+            schema = self.parent.name
+
+        for file in self.files:
+            try:
+                file.to_db(engine, schema=schema)
+                total_rows += file.nrows
+            except ValueError:
+                """only adds files with read function"""
+
+        return total_rows

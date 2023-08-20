@@ -33,11 +33,3 @@ def timeit(
         dif *= 10e3
     print(f"{str(round(dif, roundto))} {UNITS[i]}")
     return ret
-
-
-@timeit
-def slep():
-    pass
-
-
-slep()

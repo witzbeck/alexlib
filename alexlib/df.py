@@ -4,6 +4,8 @@ from typing import Any
 from pandas import DataFrame, Series
 from pandas import Timestamp, to_datetime
 
+from ..alexlib.iters import rm_pattern
+
 
 def add_col(
         df: DataFrame,
@@ -71,3 +73,29 @@ def filter_df(df: DataFrame, col: str, val: str):
 
 def series_col(df: DataFrame, col: str):
     return Series(df.loc[:, col])
+
+
+def get_distinct_col_vals(df: DataFrame, col: str):
+    return list(df.loc[:, col].unique())
+
+
+def rm_df_col_pattern(pattern: str | tuple | list,
+                      df: DataFrame,
+                      end: bool = True
+                      ) -> DataFrame:
+    cols = df.columns
+    if (type(pattern) == str and end):
+        new_cols = rm_pattern(cols, pattern)
+    elif (type(pattern) == str and not end):
+        new_cols = rm_pattern(cols, pattern, end=False)
+    elif type(pattern) == tuple:
+        new_pattern = pattern[0]
+        end = pattern[-1]
+        new_cols = rm_pattern(cols, new_pattern, end=end)
+    elif type(pattern) == list:
+        for pat in pattern:
+            df = rm_df_col_pattern(pat, df)
+        return df
+    else:
+        raise ValueError("input not recognized")
+    return df.loc[:, new_cols]

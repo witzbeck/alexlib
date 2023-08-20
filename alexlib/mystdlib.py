@@ -2,6 +2,13 @@ from datetime import datetime as dt, timedelta as td
 from random import randint
 
 
+def invert_dict(_dict: dict):
+    """flips the keys and values of a dictionary"""
+    rng = range(len(_dict))
+    vals = list(_dict.values())
+    return {vals[i]: _dict[vals[i]] for i in rng}
+
+
 # reference datetime for difference calculation
 epoch = dt(
     year=2,
@@ -19,6 +26,7 @@ epoch_s = epoch.timestamp()
 # helper function for states
 istrue = lambda x: x is True
 
+
 def mk_delta(td_obj: td):
     """generates a random timedelta"""
     return td_obj(
@@ -30,7 +38,6 @@ def mk_delta(td_obj: td):
         seconds=randint(0, 60),
         microseconds=randint(0, 1000000),
     )
-
 
 
 class timedelta(td):
