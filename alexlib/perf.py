@@ -31,5 +31,14 @@ def timeit(
     while dif <= difthresh:
         i += 1
         dif *= 10e3
-    print(f"{str(round(dif, roundto))} {UNITS[i]}")
+    loopstr = f" in {niter} loops" if niter is not None else ""
+    res = f"{str(round(dif, roundto))} {UNITS[i]}"
+    print(f"{func.__name__} took {res}{loopstr}")
     return ret
+
+
+if __name__ == '__main__':
+    @timeit(niter=1000)
+    def test():
+        return 1 + 1
+    test()
