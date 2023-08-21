@@ -10,8 +10,9 @@ from pandas import read_sql, DataFrame, Series
 from psycopg2 import connect
 from psycopg2.errors import UndefinedTable, ProgrammingError
 from sqlalchemy import create_engine, text
+from sqlalchemy_utils import database_exists, create_database
 
-from alexlib.df import get_distinct_col_vals, series_col, filter_df
+from alexlib.df import get_distinct_col_vals, series_col
 from alexlib.envs import ConfigFile, chkenv
 from alexlib.file import pathsearch
 
@@ -52,14 +53,19 @@ def mk_info_sql(
 @dataclass
 class SQL:
     text: str = field()
+    toclip: bool = field(default=True)
 
     @property
     def isstr(self):
         return isinstance(self.text, str)
 
     def __post_init__(self):
-        if self.isstr:
-            self.text = text(self.text)
+        if self.toclip:
+            self.to_clipboard(self.text)
+
+    @property
+    def astext(self):
+        return text(self.text)
 
     @staticmethod
     def to_clipboard(text: str):
@@ -116,11 +122,11 @@ class Connection:
     driver: str = field(default="postgresql+psycopg2://")
     engine: str = field(
         repr=False,
-        init=False
+        default=None
     )
-    conn: str = field(
+    createdb: bool = field(
+        default=False,
         repr=False,
-        init=False
     )
 
     def get_context(self):
@@ -179,12 +185,16 @@ class Connection:
     @staticmethod
     def mk_text(sql: SQL):
         if isinstance(sql, SQL):
-            text = sql.text
+            ret = sql.text
         elif isinstance(sql, str):
-            text = text(sql)
-        return text
+            ret = text(sql)
+        else:
+            raise TypeError("sql must be SQL or str")
+        return ret
 
     def run_pd_sql(self, sql: SQL):
+        if self.engine is None:
+            self.set_engine()
         text = Connection.mk_text(sql)
         return read_sql(text, self.engine)
 
@@ -204,6 +214,18 @@ class Connection:
     def conn(self):
         return connect(self.connstr)
 
+    @property
+    def dbexists(self):
+        return database_exists(self.enginestr)
+
+    def create_db(self):
+        if self.dbexists:
+            raise ValueError("database already exists")
+        elif self.createdb:
+            create_database(self.enginestr)
+        else:
+            raise ValueError("createdb is False")
+
     def get_info_schema(
             self,
             schema: str = None,
@@ -212,8 +234,9 @@ class Connection:
         sql = mk_info_sql(schema=schema, table=table)
         return self.run_pd_sql(sql)
 
-    def set_info_schema(self):
-        self.info_schema = self.get_info_schema()
+    @property
+    def info_schema(self):
+        return self.get_info_schema()
 
     def run_pg_sql(
             self,
@@ -221,12 +244,11 @@ class Connection:
             todf: bool = True,
     ) -> DataFrame | bool:
         isselect = "select" in sql.lower()[:10]
-        text = Connection.mk_text(sql)
-
+        # text = Connection.mk_text(sql)
         with self.conn as cnxn:
             cnxn.autocommit = True
             cursor = cnxn.cursor()
-            cursor.execute(text)
+            cursor.execute(sql)
             if isselect:
                 ret = cursor.fetchall()
             if (isselect and todf):
@@ -241,40 +263,66 @@ class Connection:
             return ret
 
     def __post_init__(self) -> None:
-        self.set_engine()
-        self.set_info_schema()
+        if (self.createdb and not self.dbexists):
+            self.create_db()
+
+    @property
+    def allschemas(self):
+        return get_distinct_col_vals(
+            self.info_schema,
+            "table_schema"
+        )
+
+    @property
+    def alltables(self):
+        return get_distinct_col_vals(
+            self.info_schema,
+            "table_name"
+        )
 
     @staticmethod
     def mk_cmd_sql(
         cmd: str,
         obj_type: str,
-        obj_schema: str,
         obj_name: str,
+        obj_schema: str = None,
         addl_cmd: str = ""
     ) -> None:
-        return f"{cmd} {obj_type} {obj_schema}.{obj_name} {addl_cmd};"
+        if obj_type not in ["table", "view"]:
+            name = obj_name
+        elif obj_schema is None:
+            name = obj_name
+        else:
+            name = f"{obj_schema}.{obj_name}"
+        return f"{cmd} {obj_type} {name} {addl_cmd};"
 
     def obj_cmd(self, *args, **kwargs):
         sql = Connection.mk_cmd_sql(*args, **kwargs)
         self.run_pg_sql(sql)
 
+    def create_schema(self, schema: str):
+        self.obj_cmd("create", "schema", schema)
+
     def drop_table(self, schema: str, table: str, cascade: bool = True):
         addl_cmd = "cascade" if cascade else ""
-        self.obj_cmd("drop", "table", schema, table, addl_cmd)
+        self.obj_cmd(
+            "drop",
+            "table",
+            table,
+            schema=schema,
+            addl_cmd=addl_cmd
+        )
 
     def drop_view(self, schema: str, view: str):
-        self.obj_cmd("drop", "view", schema, view)
+        self.obj_cmd("drop", "view", view, schema=schema)
 
     def trunc_table(self, schema: str, table: str):
-        self.obj_cmd("truncate", "table", schema, table)
+        self.obj_cmd("truncate", "table", table, schema=schema)
 
     def get_all_schema_tables(self, schema: str):
-        info = self.info_schema
+        info = self.get_info_schema(schema=schema)
         table_col = "table_name"
-        schema_col = "table_schema"
-        schema_tabs = filter_df(info, schema_col, schema)
-        schema_tabs = filter_df(schema_tabs, "table_type", "BASE TABLE")
-        return get_distinct_col_vals(schema_tabs, table_col)
+        return get_distinct_col_vals(info, table_col)
 
     def trunc_schema(self, schema: str):
         tabs = self.get_all_schema_tables(schema)
@@ -303,7 +351,8 @@ class Connection:
                   schema=schema,
                   **kwargs)
 
-    def mk_select_sql(
+    @staticmethod
+    def mk_star_select(
         schema: str,
         table: str,
         addl_sql: str = "",
@@ -314,12 +363,21 @@ class Connection:
         parts = [sql, addl_sql, rows, ";"]
         return SQL(" ".join(parts))
 
-    def get_table(self,
-                  schema: str,
-                  table: str,
-                  nrows: int = None
-                  ):
-        sql = Connection.mk_select_sql(schema, table, nrows=nrows)
+    def mk_query(
+            self,
+            schema: str,
+            table: str,
+    ):
+        info = self.get_info_schema(schema=schema, table=table)
+        return SQL.from_info_schema(schema, table, info)
+
+    def get_table(
+            self,
+            schema: str,
+            table: str,
+            nrows: int = None
+    ) -> DataFrame:
+        sql = Connection.mk_star_select(schema, table, nrows=nrows)
         return self.run_pd_sql(sql)
 
     def get_last_id(self,
@@ -360,8 +418,8 @@ class Connection:
         return last_rec.loc[0, val_col]
 
     @classmethod
-    def from_context(cls, context: str):
-        return cls(_context=context)
+    def from_context(cls, context: str, **kwargs):
+        return cls(context=context, **kwargs)
 
 
 def create_onehot_view(dbh: Connection,
@@ -577,7 +635,3 @@ def update_host_schema(schema: str,
             source=source,
             dest=dest
         )
-
-
-if __name__ == "__main__":
-    Connection()
