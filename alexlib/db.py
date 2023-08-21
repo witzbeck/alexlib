@@ -51,7 +51,7 @@ def mk_info_sql(
 
 @dataclass
 class SQL:
-    text: str | text = field()
+    text: str = field()
 
     @property
     def isstr(self):
@@ -80,10 +80,10 @@ class SQL:
 
     @staticmethod
     def to_file(
-        text: str | text,
+        text: str,
         path: Path,
         overwrite: bool = True
-    ):
+    ) -> bool:
         if (path.exists() and not overwrite):
             raise FileExistsError("file already exists here. overwrite?")
         path.write_text(text)
@@ -112,7 +112,7 @@ class SQL:
 
 @dataclass
 class Connection:
-    _context: str = field(default=None)
+    context: str = field(default=None)
     driver: str = field(default="postgresql+psycopg2://")
     engine: str = field(
         repr=False,
@@ -123,20 +123,14 @@ class Connection:
         init=False
     )
 
-    @_context.getter
-    def _context(self):
-        if self._context is None:
+    def get_context(self):
+        if self.context is None:
             return chkenv("CONTEXT")
         else:
-            return self._context
+            return self.context
 
-    @_context.setter
-    def _context(self):
-        self._context = self._context()
-
-    @property
-    def context(self):
-        return self._context
+    def set_context(self, context: str):
+        self.context = context
 
     @property
     def dbname(self):
@@ -182,10 +176,17 @@ class Connection:
     def set_engine(self):
         self.engine = Connection.get_engine(self.enginestr)
 
-    def run_pd_sql(self, sql: str | text | SQL):
+    @staticmethod
+    def mk_text(sql: SQL):
         if isinstance(sql, SQL):
-            sql = sql.text
-        return read_sql(sql, self.engine)
+            text = sql.text
+        elif isinstance(sql, str):
+            text = text(sql)
+        return text
+
+    def run_pd_sql(self, sql: SQL):
+        text = Connection.mk_text(sql)
+        return read_sql(text, self.engine)
 
     @property
     def connstr(self):
@@ -216,16 +217,16 @@ class Connection:
 
     def run_pg_sql(
             self,
-            sql: str | text,
+            sql: SQL,
             todf: bool = True,
     ) -> DataFrame | bool:
         isselect = "select" in sql.lower()[:10]
-        if not isinstance(sql, text):
-            sql = text(sql)
+        text = Connection.mk_text(sql)
+
         with self.conn as cnxn:
             cnxn.autocommit = True
             cursor = cnxn.cursor()
-            cursor.execute(sql)
+            cursor.execute(text)
             if isselect:
                 ret = cursor.fetchall()
             if (isselect and todf):
@@ -576,3 +577,7 @@ def update_host_schema(schema: str,
             source=source,
             dest=dest
         )
+
+
+if __name__ == "__main__":
+    Connection()

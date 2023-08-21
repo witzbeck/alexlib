@@ -180,23 +180,25 @@ class SystemObject:
 
 @dataclass
 class File(SystemObject):
-    schema: str = field(default=None)
+    schema: str = field(
+        default=None,
+        repr=False,
+    )
+    sep: str = field(
+        default=".",
+        repr=False,
+    )
 
     @property
     def filetype(self):
-        return self.path.suffix.strip(".")
+        return self.path.suffix
 
-    def istype(self, suffix: str, separator: str = "."):
-        ret = self.path.suffix == suffix
-        sepinret = separator in ret
-        retidx = ret.index(separator)
-        if (sepinret and retidx == 0):
-            ret = True
-        elif (sepinret and retidx > 0):
-            ret = False
-        else:
-            ret = False
-        return ret
+    @property
+    def ext(self):
+        return self.path.suffix.strip(self.sep)
+
+    def istype(self, suffix: str):
+        return self.filetype.endswith(suffix)
 
     @property
     def isdotenv(self):
@@ -304,14 +306,26 @@ class Directory(SystemObject):
         return len(self.contents)
 
     @property
-    def allchildfiles(self):
-        childfiles = [x.allchildfiles for x in self.dirs]
-        return self.files + link(childfiles)
-
-    @property
     def allchilddirs(self):
         childdirs = [x.allchilddirs for x in self.dirs]
         return self.dirs + link(childdirs)
+
+    @property
+    def allchildfiles(self):
+        childfiles = [x.files for x in self.allchilddirs]
+        return self.files + link(childfiles)
+
+    def go_up(self, n: int | str = 1):
+        for _ in range(n):
+            try:
+                self.path = self.path.parent
+            except PermissionError:
+                break
+            if self.path == Path("/"):
+                break
+            elif self.path.name == n:
+                break
+        self.set_name()
 
     def insert_all_files(
             self,
@@ -330,3 +344,16 @@ class Directory(SystemObject):
                 """only adds files with read function"""
 
         return total_rows
+
+
+if __name__ == "__main__":
+    """
+    d = Directory(path=Path(__file__))
+    d.go_up(3)
+    print(d)
+    for f in d.allchildfiles:
+        if f.isdotenv:
+            print(f)
+    """
+    f = File(name=".env")
+    print(f)

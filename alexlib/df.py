@@ -4,7 +4,7 @@ from typing import Any
 from pandas import DataFrame, Series
 from pandas import Timestamp, to_datetime
 
-from ..alexlib.iters import rm_pattern
+from alexlib.iters import rm_pattern
 
 
 def add_col(
@@ -17,8 +17,9 @@ def add_col(
 
 
 add_timestamp_col = partial(
+    add_col,
     col="datetime",
-    val=Timestamp.now()
+    val=Timestamp.now(),
 )
 
 
