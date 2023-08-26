@@ -105,8 +105,37 @@ class ConfigFile(File):
     envdict: dict = field(default_factory=dict)
 
     @property
-    def nenvs(self):
+    def environ(self) -> dict:
+        return environ
+
+    @property
+    def nenvs(self) -> int:
         return len(self.envdict)
+
+    @property
+    def keys(self) -> list[str]:
+        return list(self.envdict.keys())
+
+    @property
+    def values(self) -> list[str]:
+        return list(self.envdict.values())
+
+    def add_pair(
+            self,
+            key: str,
+            value: str,
+            tofile: bool = True,
+            toenv: bool = True,
+            todict: bool = True,
+    ):
+        if toenv:
+            environ[key] = value
+        if todict:
+            self.envdict[key] = value
+        if (tofile and self.isdotenv):
+            self.append(f"{key}={value}")
+        elif tofile:
+            raise ValueError("only handles dotenvs rn")
 
     def read_dotenv(self):
         if not self.isdotenv:
@@ -156,3 +185,7 @@ class ConfigFile(File):
     @classmethod
     def from_name(cls, name: str):
         return cls(name=name)
+
+    @classmethod
+    def from_dotenv_name(cls, name: str):
+        return cls(name=f".env.{name}")

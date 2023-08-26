@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime as dt, timedelta as td
-from json import load, loads, dump, dumps
+from json import load, loads, dump, dumps, JSONDecodeError
 from pathlib import Path
 from typing import Any, Callable
 
@@ -119,6 +119,10 @@ class SystemObject:
         return self.path.parent
 
     @property
+    def parents(self):
+        return [x.name for x in self.path.parents]
+
+    @property
     def stat(self):
         return self.path.stat()
 
@@ -154,9 +158,7 @@ class SystemObject:
         elif self.path.is_dir():
             ret = self.path.name
         elif self.path.is_file():
-            name = self.path.name
-            ext = self.path.suffix.strip(".")
-            ret = f"{name}.{ext}"
+            ret = self.path.name
         else:
             raise ValueError("need path or name")
         return ret
@@ -165,10 +167,17 @@ class SystemObject:
         self.name = self.get_name()
 
     def get_path(self):
-        if self.path is not None:
+        notnone = self.path is not None
+        isstr = isinstance(self.path, str)
+        ispath = isinstance(self.path, Path)
+        if (notnone and ispath):
             return self.path
-        else:
+        elif (notnone and isstr):
+            return Path(self.path)
+        elif self.name is not None:
             return pathsearch(self.name)
+        else:
+            raise ValueError("need path or name")
 
     def set_path(self):
         self.path = self.get_path()
@@ -188,6 +197,80 @@ class File(SystemObject):
         default=".",
         repr=False,
     )
+    df: DataFrame = field(
+        default=None,
+        repr=False,
+    )
+
+    @property
+    def bytes(self):
+        return self.path.read_bytes()
+
+    @property
+    def text(self):
+        return self.path.read_text()
+
+    @property
+    def lines(self):
+        return self.text.split("\n")
+
+    def lineexists(self, line: str):
+        return line in self.lines
+
+    def write_lines(self, lines: list[str]):
+        self.path.write_text("\n".join(lines))
+
+    def filter_new_lines(self, tochk: str | list[str]):
+        if isinstance(tochk, str):
+            tochk = [tochk]
+        return [x for x in tochk if not self.lineexists(x)]
+
+    def get_toadd(
+            self,
+            toadd: list[str],
+            onlynew: bool
+    ):
+        if isinstance(toadd, str):
+            toadd = [toadd]
+        if onlynew:
+            toadd = self.filter_new_lines(toadd)
+        return toadd
+
+    def append(
+            self,
+            toadd: str | list[str],
+            onlynew: bool = True,
+    ) -> None:
+        lines = self.lines
+        toadd = self.get_toadd(toadd, onlynew)
+        lines.extend(toadd)
+        self.write_lines(lines)
+
+    def insert_line(
+            self,
+            index: int,
+            line: str,
+            onlynew: bool = True,
+    ) -> None:
+        if (onlynew and self.lineexists(line)):
+            pass
+        else:
+            lines = self.lines
+            lines.insert(index, line)
+            self.write_lines(lines)
+
+    def prepend(
+            self,
+            toadd: str | list[str],
+            onlynew: bool = True,
+    ) -> None:
+        lines = self.lines
+        toadd = self.get_toadd(toadd, onlynew)
+        toadd.extend(lines)
+        self.write_lines(toadd)
+
+    def __len__(self):
+        return len(self.lines)
 
     @property
     def filetype(self):
@@ -220,14 +303,23 @@ class File(SystemObject):
     def issql(self):
         return self.istype(".sql")
 
-    def read_json(self):
-        if not self.isjson:
+    def read_json(self, path: Path, asdf: bool = False):
+        if not path.suffix.endswith("json"):
             raise ValueError("not a json file")
-        with open(self.path, "r") as file:
+        ret = recs = None
+        with open(path, "r") as file:
             try:
                 ret = load(file)
             except TypeError:
                 ret = loads(load(file))
+            except JSONDecodeError:
+                recs = [loads(x) for x in self.lines if len(x) > 1]
+        if (ret is not None and asdf):
+            ret = DataFrame.from_dict(ret)
+        elif (recs is not None and asdf):
+            ret = DataFrame.from_records(recs)
+        elif recs is not None:
+            ret = recs
         return ret
 
     def to_json(self, _dict: dict):
@@ -251,24 +343,21 @@ class File(SystemObject):
             raise ValueError("not a valid filetype")
         return ret
 
-    @property
-    def df(self) -> DataFrame:
-        return self.read_func(self.path)
-
-    @property
-    def nrows(self):
-        return len(self.df)
-
-    def to_db(
+    def get_df(
             self,
-            engine: engine,
-    ):
-        df_to_db(
-            df=self.df,
-            engine=engine,
-            table_name=self.name,
-            schema=self.schema,
-        )
+            schema: str = None,
+            table: str = None,
+            **kwargs,
+    ) -> DataFrame:
+        torsisnone = (table is None or schema is None)
+        if (self.issql and torsisnone):
+            raise ValueError("need schema.table for sql file")
+        return self.read_func(
+            self.path,
+            *args,
+            **kwargs,
+    )
+
 
 
 @dataclass

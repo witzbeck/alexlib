@@ -1,6 +1,7 @@
 # standard library imports
 from dataclasses import dataclass, field
 from pathlib import Path
+from os import environ
 from subprocess import Popen, PIPE
 from typing import Any
 
@@ -115,11 +116,42 @@ class SQL:
         lines.append(f"from {schema}.{table} {abrv}")
         return cls("".join(lines))
 
+    def create_onehot_view(
+            df: DataFrame,
+            id_col: str,
+            dist_col: str,
+            schema: str,
+            table: str,
+            command: str = "create view"
+    ) -> str:
+        dist_col = [x for x in df.columns if x[-2:] != "id"][0]
+        id_col = [x for x in df.columns if x != dist_col][0]
+        dist_vals = get_distinct_col_vals(df, dist_col)
+
+        first_line = f"{command} {schema}.v_{table}_onehot as select\n"
+        lines = [first_line]
+        lines.append(f" {id_col}\n")
+        lines.append(f",{dist_col}\n")
+
+        for i in range(len(dist_vals)):
+            com = ","
+            val = dist_vals[i]
+            new_col = f"is_{val}".replace(" ", "_")
+            new_col = new_col.replace("%", "_percent")
+            new_col = new_col.replace("-", "_")
+            new_col = new_col.replace("<", "_less")
+            new_col = new_col.replace("=", "_equal")
+            new_col = new_col.replace(">", "_greater")
+            case_stmt = onehot_case(dist_col, val)
+            lines.append(f"{com}{case_stmt} {new_col}\n")
+        lines.append(f"from {schema}.{table}")
+        return "".join(lines)
+
 
 @dataclass
 class Connection:
-    context: str = field(default=None)
-    driver: str = field(default="postgresql+psycopg2://")
+    context: str = field(default="LOCAL")
+    driver: str = field(default="postgresql+psycopg://")
     engine: str = field(
         repr=False,
         default=None
@@ -346,6 +378,8 @@ class Connection:
         table: str,
         **kwargs
     ) -> None:
+        if schema not in self.allschemas:
+            self.create_schema(schema)
         df.to_sql(table,
                   self.engine,
                   schema=schema,
@@ -356,10 +390,10 @@ class Connection:
         schema: str,
         table: str,
         addl_sql: str = "",
-        nrows: int = None
+        nrows: int = -1,
     ) -> SQL:
         sql = f"select * from {schema}.{table}"
-        rows = f"limit {str(nrows)}" if nrows is not None else ""
+        rows = f"limit {str(nrows)}" if nrows > 0 else ""
         parts = [sql, addl_sql, rows, ";"]
         return SQL(" ".join(parts))
 
@@ -375,7 +409,7 @@ class Connection:
             self,
             schema: str,
             table: str,
-            nrows: int = None
+            nrows: int = -1,
     ) -> DataFrame:
         sql = Connection.mk_star_select(schema, table, nrows=nrows)
         return self.run_pd_sql(sql)
@@ -418,38 +452,26 @@ class Connection:
         return last_rec.loc[0, val_col]
 
     @classmethod
-    def from_context(cls, context: str, **kwargs):
-        return cls(context=context, **kwargs)
+    def from_context(
+        cls,
+        context: str,
+        createdb: bool = False,
+        **kwargs
+    ):
+        return cls(
+            context=context,
+            createdb=createdb,
+            **kwargs,
+        )
 
-
-def create_onehot_view(dbh: Connection,
-                       schema: str,
-                       table: str,
-                       command: str = "create view"
-                       ) -> str:
-    df = dbh.run_pd_sql(f"select * from {schema}.{table}")
-    dist_col = [x for x in df.columns if x[-2:] != "id"][0]
-    id_col = [x for x in df.columns if x != dist_col][0]
-    dist_vals = get_distinct_col_vals(df, dist_col)
-
-    first_line = f"{command} {schema}.v_{table}_onehot as select\n"
-    lines = [first_line]
-    lines.append(f" {id_col}\n")
-    lines.append(f",{dist_col}\n")
-
-    for i in range(len(dist_vals)):
-        com = ","
-        val = dist_vals[i]
-        new_col = f"is_{val}".replace(" ", "_")
-        new_col = new_col.replace("%", "_percent")
-        new_col = new_col.replace("-", "_")
-        new_col = new_col.replace("<", "_less")
-        new_col = new_col.replace("=", "_equal")
-        new_col = new_col.replace(">", "_greater")
-        case_stmt = onehot_case(dist_col, val)
-        lines.append(f"{com}{case_stmt} {new_col}\n")
-    lines.append(f"from {schema}.{table}")
-    return "".join(lines)
+    @classmethod
+    def from_db(
+        cls,
+        dbname: str,
+        **kwargs,
+    ):
+        environ["DBNAME"] = dbname
+        return cls(**kwargs)
 
 
 @dataclass
@@ -574,11 +596,27 @@ class Table:
     def from_df(
         cls,
         df: DataFrame,
-        context: str = None,
-        schema: str = None,
-        table: str = None,
+        context: str,
+        schema: str,
+        table: str,
     ):
         return cls(context, schema, table, df=df)
+
+    @classmethod
+    def from_db(
+        cls,
+        context: str,
+        schema: str,
+        table: str,
+    ):
+        c = Connection.from_context(context)
+        df = c.get_table(schema, table)
+        return cls(
+            context,
+            schema,
+            table,
+            df=df,
+        )
 
 
 def update_host_table(schema: str,
