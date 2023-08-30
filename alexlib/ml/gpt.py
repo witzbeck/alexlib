@@ -6,7 +6,7 @@ from pandas import DataFrame
 import openai
 
 import alexlib as al
-from alexlib.envs import ConfigFile, chkenv
+from alexlib.cnfg import ConfigFile, chkenv
 from alexlib.db import Table, Connection
 
 if __name__ == '__main__':

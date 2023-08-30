@@ -1,13 +1,40 @@
 from dataclasses import dataclass, field
 from math import sqrt
 from typing import Callable
+from random import choice
 
-from pandas import DataFrame, Series
 from numpy import array
+from pandas import DataFrame, Series
+
+from alexlib.perf import timeit
 
 
-def pyth(_list: list):
-    return sqrt(sum([x ** 2 for x in _list]))
+def randbool(asint: bool = False):
+    if asint:
+        choices = [0, 1]
+    else:
+        choices = [True, False]
+    return choice(choices)
+
+
+def euclidean_distance(lst: list):
+    return sqrt(sum([x ** 2 for x in lst]))
+
+
+def discrete_exp_dist(
+        exp_min: int,
+        exp_max: int,
+        exp_int: int = 10,
+        exp_inc: int = 1,
+        numerator: int = 1
+) -> list[float]:
+    exp_max += 1
+    rng = range(exp_min, exp_max, exp_inc)
+    return [numerator / (exp_int ** i) for i in rng]
+
+
+def isintorfloat(x: int | float) -> bool:
+    return (isinstance(x, int) or isinstance(x, float))
 
 
 def interpolate(
@@ -16,36 +43,47 @@ def interpolate(
         x2: int | float,
         y1: int | float | Callable,
         y2: int | float | Callable,
+        e: float = 1e-6
 ) -> float | int:
-    if x1 == x2:
-        return y1
-    if isinstance(y1, Callable):
+    ret = None
+    y1isnum = isintorfloat(y1)
+    y2isnum = isintorfloat(y2)
+    xsarezero = (x1 == 0. and x2 == 0.)
+    xsareequal = (x1 == x2)
+    xsbelowe = (x2 - x1) <= e
+    rety1 = (xsarezero or xsareequal or xsbelowe)
+    if rety1:
+        ret = y1
+    elif x == x1:
+        ret = y1
+    elif x == x2:
+        ret = y2
+
+    if y1isnum:
+        pass
+    elif issubclass(y1, Callable):
         y1 = y1(x1)
-    if isinstance(y2, Callable):
+    else:
+        raise TypeError("y1 must be a number or a function")
+
+    if y2isnum:
+        pass
+    elif issubclass(y2, Callable):
         y2 = y2(x2)
-    m = (y2 - y1) / (x2 - x1)
-    b = y2 - (m * x2)
-    return (m * x) + b
+    else:
+        raise TypeError("y2 must be a number or a function")
 
-
-def fib(a: int = 0, b: int = 1):
-    while True:
-        c = a + b
-        a = b
-        b = c
-        yield c
+    if ret is None:
+        m = (y2 - y1) / (x2 - x1)
+        b = y2 - (m * x2)
+        ret = (m * x) + b
+    return ret
 
 
 @dataclass
 class GoldenRatio:
-    n: int = field(default=0)
-    est: float = field(default=None)
-    fib1: int = field(
-        default=fib(),
-        repr=False
-    )
-    fib2: int = field(
-        default=fib(a=1),
+    phi: float = field(
+        default=None,
         repr=False
     )
     e: float = field(
@@ -53,70 +91,57 @@ class GoldenRatio:
         repr=False
     )
 
-    @property
-    def a(self):
-        return next(self.fib1)
-
-    @property
-    def b(self):
-        return next(self.fib2)
-
-    @property
-    def ratio(self):
-        self.n += 1
-        self.est = self.b / self.a
-        return self.est
-
-    def loop(self, n: int):
-        return [self.ratio for _ in range(n)][-1]
-
-    def get_est(self):
-        if self.n > 0:
-            return self.loop(self.n)
-        else:
-            return self.estimate()
-
-    def set_est(self):
-        self.est = self.get_est
-
-    def get_error(self):
-        if self.est is None:
-            return 1
-        x = self.est
-        y = self.ratio
-        return abs(x - y)
-
-    def estimate(self):
-        error = self.get_error()
-        while error >= self.e:
-            error = self.get_error()
-        return self.est
-
     def __post_init__(self):
-        self.est = self.ratio
-        self.set_est()
+        self.phi = self.fast(e=self.e)
+
+    @staticmethod
+    def get_error(*args):
+        return abs(args[0] - args[1])
+
+    @staticmethod
+    def phigen(phi: int = 1):
+        while True:
+            yield (phi := 1 + (1 / phi))
+
+    @staticmethod
+    def fibgen(a: int = 0, b: int = 1):
+        while True:
+            c = a + b
+            a = b
+            b = c
+            yield c
+
+    @staticmethod
+    @timeit
+    def fast(
+        e: float = 1e-6,
+        phi: int = 1,
+    ) -> float:
+        while True:
+            if abs(phi - (phi := 1 + (1 / phi))) <= e:
+                return phi
 
 
-def get_quantiles(_list: list, tiles: int = 100):
-    _list = list(_list)
-    _list.sort(key=lambda x: int(x))
-    _len = len(_list)
-    out_dict = {}
+def get_quantiles(lst: list, tiles: int = 100):
+    if not isinstance(lst, list):
+        lst = list(lst)
+    lst.sort(key=lambda x: int(x))
     tile_ratio = (1 / tiles)
-    idx_ratio = _len * tile_ratio
-
-    out_dict['0'] = _list[0]
-    for i in range(1, tiles):
-        tile_idx = int(i * idx_ratio)
-        out_dict[i] = _list[tile_idx]
-
-    out_dict[tiles] = _list[-1]
+    idx_ratio = len(lst) * tile_ratio
+    tile_idx = lambda i: int(i * idx_ratio)
+    rng = range(1, tiles)
+    out_dict = {
+        i: lst[tile_idx(i)]
+        for i in rng
+    }
+    out_dict[0] = lst[0]
+    out_dict[tiles] = lst[-1]
     return out_dict
 
 
-def get_list_difs(_list):
-    _range = range(len(_list))
-    return [_list[i - 1] - _list[i] for i in _range if i > 0]
+def get_list_difs(lst: list[float]):
+    rng = range(len(lst))
+    return [lst[i - 1] - lst[i] if i > 0 else lst[0] for i in rng]
 
 
 def get_list_mids(_list: list):
@@ -135,11 +160,18 @@ def get_rect_area(heights: list,
     return sum(rect_areas)
 
 
-def combine_domains(x1: list, x2: list):
-    x = list(set(list(x1) + list(x2)))
-    domain = x * 2
+def combine_domains(
+        x1: list,
+        x2: list,
+        toarray: bool = True
+) -> array:
+    x1.extend(x2)
+    if toarray:
+        domain = array(x1).unique()
+    else:
+        domain = list(set(x1))
     domain.sort()
-    return array(domain)
+    return domain
 
 
 def get_props(series: Series):

@@ -3,10 +3,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from os import environ
 from subprocess import Popen, PIPE
+from random import choice
 from typing import Any
 
 # third party imports
-from numpy.random import choice
 from pandas import read_sql, DataFrame, Series
 from psycopg2 import connect
 from psycopg2.errors import UndefinedTable, ProgrammingError
@@ -14,10 +14,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists, create_database
 
 from alexlib.df import get_distinct_col_vals, series_col
-from alexlib.envs import ConfigFile, chkenv
+from alexlib.cnfg import ConfigFile, chkenv
 from alexlib.file import pathsearch
-
-config = ConfigFile(name=".env")
 
 
 def onehot_case(col: str, val: str):
@@ -160,6 +158,10 @@ class Connection:
         default=False,
         repr=False,
     )
+    dotenv_name: str = field(
+        default=".env",
+        repr=False,
+    )
 
     def get_context(self):
         if self.context is None:
@@ -172,11 +174,11 @@ class Connection:
 
     @property
     def dbname(self):
-        return chkenv("DBNAME")
+        return chkenv("DBNAME", required=False)
 
     @property
     def issudo(self):
-        return chkenv("ISSUDO", type=bool)
+        return chkenv("ISSUDO", type=bool, required=False)
 
     @property
     def usertype(self):
@@ -184,11 +186,19 @@ class Connection:
 
     @property
     def host(self):
-        return chkenv(f"{self.context}DBHOST")
+        try:
+            ret = chkenv(f"{self.context}DBHOST")
+        except ValueError:
+            ret = chkenv("DBHOST")
+        return ret
 
     @property
     def port(self):
-        return chkenv(f"{self.context}DBPORT")
+        try:
+            ret = chkenv(f"{self.context}DBPORT")
+        except ValueError:
+            ret = chkenv("DBPORT")
+        return ret
 
     @property
     def user(self):
@@ -248,11 +258,15 @@ class Connection:
 
     @property
     def dbexists(self):
+        if self.dbname is None:
+            return False
         return database_exists(self.enginestr)
 
     def create_db(self):
         if self.dbexists:
             raise ValueError("database already exists")
+        elif self.dbname is None:
+            raise ValueError("dbname is None")
         elif self.createdb:
             create_database(self.enginestr)
         else:
@@ -295,6 +309,8 @@ class Connection:
             return ret
 
     def __post_init__(self) -> None:
+        if self.dbname is None:
+            ConfigFile(name=self.dotenv_name)
         if (self.createdb and not self.dbexists):
             self.create_db()
 
@@ -317,15 +333,15 @@ class Connection:
         cmd: str,
         obj_type: str,
         obj_name: str,
-        obj_schema: str = None,
+        schema: str = None,
         addl_cmd: str = ""
     ) -> None:
         if obj_type not in ["table", "view"]:
             name = obj_name
-        elif obj_schema is None:
+        elif schema is None:
             name = obj_name
         else:
-            name = f"{obj_schema}.{obj_name}"
+            name = f"{schema}.{obj_name}"
         return f"{cmd} {obj_type} {name} {addl_cmd};"
 
     def obj_cmd(self, *args, **kwargs):
@@ -348,7 +364,11 @@ class Connection:
     def drop_view(self, schema: str, view: str):
         self.obj_cmd("drop", "view", view, schema=schema)
 
-    def trunc_table(self, schema: str, table: str):
+    def truncate_table(
+            self,
+            schema: str,
+            table: str
+    ) -> None:
         self.obj_cmd("truncate", "table", table, schema=schema)
 
     def get_all_schema_tables(self, schema: str):
@@ -356,10 +376,10 @@ class Connection:
         table_col = "table_name"
         return get_distinct_col_vals(info, table_col)
 
-    def trunc_schema(self, schema: str):
+    def truncate_schema(self, schema: str):
         tabs = self.get_all_schema_tables(schema)
         for tab in tabs:
-            self.trunc_table(schema, tab)
+            self.truncate_table(schema, tab)
 
     def df_from_sqlfile(
         self,
@@ -392,10 +412,15 @@ class Connection:
         addl_sql: str = "",
         nrows: int = -1,
     ) -> SQL:
-        sql = f"select * from {schema}.{table}"
-        rows = f"limit {str(nrows)}" if nrows > 0 else ""
+        if nrows is None:
+            rows = ""
+        elif nrows <= 0:
+            rows = ""
+        else:
+            rows = f"limit {str(nrows)}"
+        sql = f"select * from {schema}.{table} "
         parts = [sql, addl_sql, rows, ";"]
-        return SQL(" ".join(parts))
+        return SQL("".join(parts))
 
     def mk_query(
             self,
@@ -442,12 +467,25 @@ class Connection:
         sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
         return self.run_pd_query(sql)
 
-    def get_last_val(self,
-                     schema: str,
-                     table: str,
-                     id_col: str,
-                     val_col: str,
-                     ) -> Any:
+    def get_record_count(
+            self,
+            schema: str,
+            table: str,
+            print_: bool = True
+    ) -> int:
+        sql = f"select count(*) from {schema}.{table};"
+        val = self.run_pg_sql(sql).values[0][0]
+        if print_:
+            print(f"{schema}.{table} record count: {val}")
+        return val
+
+    def get_last_val(
+            self,
+            schema: str,
+            table: str,
+            id_col: str,
+            val_col: str,
+    ) -> Any:
         last_rec = self.get_last_record(schema, table, id_col)
         return last_rec.loc[0, val_col]
 
@@ -541,7 +579,7 @@ class Column:
 
 @dataclass
 class Table:
-    context: str = field()
+    cnxn: Connection = field()
     schema: str = field()
     table: str = field()
     df: DataFrame = field(
@@ -576,7 +614,7 @@ class Table:
 
     def get_col_objs(self):
         s, t, c, n = self.schema, self.table, self.col_series, self.cols
-        self.col_objs = {x: Column(s, t, x, c[x],) for x in n}
+        self.col_objs = {x: Column(s, t, x, c[x]) for x in n}
 
     def set_col_objs(self):
         self.col_objs = self.get_col_objs()
@@ -589,6 +627,7 @@ class Table:
         return choice(self.cols)
 
     def __post_init__(self) -> None:
+        self.df = self.cnxn.get_table(self.schema, self.table)
         self.set_col_series()
         self.set_col_objs()
 
@@ -603,7 +642,7 @@ class Table:
         return cls(context, schema, table, df=df)
 
     @classmethod
-    def from_db(
+    def from_context(
         cls,
         context: str,
         schema: str,
@@ -642,7 +681,7 @@ def update_host_table(schema: str,
         raise ValueError("source is empty")
     else:
         try:
-            dest.trunc_table(schema, table)
+            dest.truncate_table(schema, table)
         except UndefinedTable:
             pass
         source_data.to_sql(
@@ -673,3 +712,8 @@ def update_host_schema(schema: str,
             source=source,
             dest=dest
         )
+
+
+if __name__ == "__main__":
+    c = Connection()
+    print(c.info_schema)

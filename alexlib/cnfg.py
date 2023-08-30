@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
+from logging import INFO, basicConfig, info
 from os import environ, getenv
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 
-from alexlib.file import File
+from alexlib.file import File, Directory
 
 
 def istrue(w: str):
@@ -44,10 +45,16 @@ def chkenv(
         required: bool = True,
 ) -> Any:
     val = getenv(key)
-    if type is not None:
-        val = astype(val, type)
-    if (required and isnone(val)):
+    typeisnone = type is None
+    valisnone = isnone(val)
+    if (not valisnone and typeisnone):
+        val = val
+    elif (required and valisnone):
         raise ValueError("value required")
+    elif (not required and valisnone):
+        val = None
+    elif not typeisnone:
+        val = astype(val, type)
     return val
 
 
@@ -103,6 +110,13 @@ class EnvVar:
 @dataclass
 class ConfigFile(File):
     envdict: dict = field(default_factory=dict)
+    logdirname: str = field(default="logs")
+    loglevel: int = field(default=INFO)
+    eventlevel: int = field(default=INFO)
+    logformat: str = field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    dateformat: str = field(default="%m/%d/%Y %I:%M:%S %p")
 
     @property
     def environ(self) -> dict:
@@ -173,6 +187,7 @@ class ConfigFile(File):
     def __post_init__(self):
         super().__post_init__()
         self.set_envdict()
+        self.set_basic_config()
 
     @classmethod
     def from_path(cls, path: str | Path):
@@ -183,9 +198,81 @@ class ConfigFile(File):
         return cls(path=path)
 
     @classmethod
-    def from_name(cls, name: str):
-        return cls(name=name)
+    def from_name(
+        cls,
+        name: str,
+        **kwargs,
+    ):
+        return cls(name=name, **kwargs)
 
     @classmethod
-    def from_dotenv_name(cls, name: str):
-        return cls(name=f".env.{name}")
+    def from_dotenv(
+        cls,
+        name: str = None,
+        **kwargs,
+    ):
+        clsname = ".env"
+        clsname = clsname if name is None else f"{clsname}.{name}"
+        return cls.from_name(name=clsname, **kwargs)
+
+    def __add__(self, other: object):
+        self.envdict.update(other.envdict)
+        return self
+
+    @classmethod
+    def from_name_list(cls, names: list[str], **kwargs):
+        first = names.pop(0)
+        return sum([
+            cls.from_name(name, **kwargs)
+            for name in names],
+            cls(name=first)
+        )
+
+    @classmethod
+    def from_dotenv_name_list(cls, names: list[str], **kwargs):
+        names = [f".env.{name}" for name in names]
+        return cls.from_name_list(names, **kwargs)
+
+    def mkdir(
+            self,
+            name: str,
+            exist_ok: bool = True
+    ):
+        d = self / name
+        d.path.mkdir(name, exist_ok=exist_ok)
+        return d
+
+    @property
+    def logdir(self) -> Directory:
+        d = Directory(path=self.parent) / self.logdirname
+        d.path.mkdir(exist_ok=True)
+        return d
+
+    @property
+    def curfile(self) -> str:
+        return eval("__file__")
+
+    @property
+    def curpath(self) -> Path:
+        return Path(self.curfile)
+
+    @property
+    def curname(self) -> str:
+        return self.curpath.name
+
+    def set_basic_config(self):
+        logdir = self.logdir
+        name = self.curname
+        logfile = logdir.path / f"{name}.log"
+        basicConfig(
+            filename=logfile,
+            format=self.logformat,
+            datefmt=self.dateformat,
+            level=self.loglevel,
+        )
+
+
+if __name__ == "__main__":
+    c = ConfigFile.from_dotenv()
+    c.set_basic_config()
+    info("this is a logging test")

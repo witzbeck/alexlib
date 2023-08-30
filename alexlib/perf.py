@@ -33,7 +33,16 @@ def timeit(
         dif *= 10e3
     loopstr = f" in {niter} loops" if niter is not None else ""
     res = f"{str(round(dif, roundto))} {UNITS[i]}"
-    print(f"{func.__name__} took {res}{loopstr}")
+    msg = f"{func.__name__} took {res}{loopstr}"
+    try:
+        if niter is None:
+            nres = len(ret)
+        else:
+            nres = sum([len(x) for x in ret])
+        msg = f"{msg} and returned {nres} results"
+    except TypeError:
+        pass
+    print(msg)
     return ret
 
 

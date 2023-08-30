@@ -23,14 +23,40 @@ def figsave(
     return path.exists()
 
 
+def eval_parents(
+        path: Path,
+        to_include: list[str],
+        to_exclude: list[str],
+):
+    ninclude = len(to_include)
+    parts = path.parts
+
+    nincluded = sum([x in to_include for x in parts])
+    incpass = (nincluded == ninclude or to_include is None)
+
+    nexcluded = sum([x in to_exclude for x in parts])
+    excpass = (nexcluded == 0 or to_exclude is None)
+    return (incpass and excpass)
+
+
 def pathsearch(
         pattern: str,
         start_path: Path = Path(__file__),
         listok: bool = False,
+        to_include: list[str] = None,
+        to_exclude: list[str] = None,
 ) -> Path | list[Path]:
+    if isinstance(to_exclude, str):
+        to_exclude = [to_exclude]
+    if isinstance(to_include, str):
+        to_include = [to_include]
     while True:
         try:
             ret = [x for x in start_path.rglob(pattern)]
+            ret = [
+                x for x in ret
+                if eval_parents(x, to_include, to_exclude)
+            ]
             if listok:
                 return ret
             else:
@@ -108,6 +134,8 @@ def eval_td(dt1: dt, dt2: dt = dt.now()):
 class SystemObject:
     path: Path = field(default=None)
     name: str = field(default=None)
+    to_include: list[str] = field(default_factory=list)
+    to_exclude: list[str] = field(default_factory=list)
 
     def __repr__(self):
         clss = self.__class__.__name__
@@ -152,6 +180,11 @@ class SystemObject:
         else:
             return False
 
+    def mk_subdir(self, name: str):
+        path = self.path / name
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
     def get_name(self):
         if self.name is not None:
             ret = self.name
@@ -175,7 +208,11 @@ class SystemObject:
         elif (notnone and isstr):
             return Path(self.path)
         elif self.name is not None:
-            return pathsearch(self.name)
+            return pathsearch(
+                self.name,
+                to_include=self.to_include,
+                to_exclude=self.to_exclude,
+            )
         else:
             raise ValueError("need path or name")
 
@@ -354,10 +391,8 @@ class File(SystemObject):
             raise ValueError("need schema.table for sql file")
         return self.read_func(
             self.path,
-            *args,
             **kwargs,
-    )
-
+        )
 
 
 @dataclass
@@ -416,6 +451,16 @@ class Directory(SystemObject):
                 break
         self.set_name()
 
+    def go_down(self, name: str | list[str]):
+        if isinstance(name, str):
+            ret = self / name
+        elif isinstance(name, list):
+            ret = self
+            for n in name:
+                ret = ret / n
+        else:
+            raise ValueError("invalid type")
+
     def insert_all_files(
             self,
             engine: engine,
@@ -434,15 +479,46 @@ class Directory(SystemObject):
 
         return total_rows
 
+    def __div__(self, other: SystemObject | str):
+        oisfile = isinstance(other, File)
+        oisdir = isinstance(other, Directory)
+        oispath = isinstance(other, Path)
+        fdp = (oisfile or oisdir or oispath)
+        oisstr = isinstance(other, str)
+        oisnum = (isinstance(other, int) or isinstance(other, float))
 
-if __name__ == "__main__":
-    """
-    d = Directory(path=Path(__file__))
-    d.go_up(3)
-    print(d)
-    for f in d.allchildfiles:
-        if f.isdotenv:
-            print(f)
-    """
-    f = File(name=".env")
-    print(f)
+        if fdp:
+            path, name = self.path, other.name
+        elif oisstr:
+            path, name = self.path, other
+        elif oisnum:
+            path, name = self.path, str(other)
+        else:
+            raise ValueError("invalid type")
+
+        self.path = path / name
+        self.set_name()
+
+        if not self.exists:
+            return SystemObject(
+                path=self.path,
+                name=self.name,
+            )
+        elif self.isfile:
+            return File(
+                path=self.path,
+                name=self.name,
+            )
+        elif self.isdir:
+            return Directory(
+                path=self.path,
+                name=self.name,
+            )
+        else:
+            raise ValueError("invalid path")
+
+    def __truediv__(self, other: SystemObject | str):
+        return self.__div__(other)
+
+    def __floordiv__(self, other: SystemObject | str):
+        return self.__div__(other)
