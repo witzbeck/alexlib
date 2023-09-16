@@ -2,6 +2,39 @@ from datetime import datetime as dt, timedelta as td
 from random import randint
 
 
+class Object:
+    @property
+    def reg_attrs(self):
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k[0] != "_"
+        }
+
+    @property
+    def reg_attrs_keys(self):
+        return list(self.reg_attrs.keys())
+
+    def set_hasattr(self, attr: str):
+        def hasattr_func(
+                self,
+                attr: str,
+        ) -> bool:
+            if not hasattr(self, attr):
+                ret = False
+            else:
+                ret = getattr(self, attr) is not None
+            return ret
+        newattr = f"has{attr}"
+        if not hasattr(self, newattr):
+            setattr(self, newattr, property(hasattr_func))
+
+    def set_hasattrs(self):
+        for k in self.reg_attrs_keys:
+            if not k.startswith("has"):
+                self.set_hasattr(k)
+
+
 def invert_dict(_dict: dict):
     """flips the keys and values of a dictionary"""
     rng = range(len(_dict))

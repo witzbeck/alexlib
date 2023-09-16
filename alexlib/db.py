@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists, create_database
 
 from alexlib.df import get_distinct_col_vals, series_col
-from alexlib.cnfg import ConfigFile, chkenv
+from alexlib.config import ConfigFile, chkenv
 from alexlib.file import pathsearch
 
 
@@ -369,7 +369,10 @@ class Connection:
             schema: str,
             table: str
     ) -> None:
-        self.obj_cmd("truncate", "table", table, schema=schema)
+        if table.startswith("v_"):
+            pass
+        else:
+            self.obj_cmd("truncate", "table", table, schema=schema)
 
     def get_all_schema_tables(self, schema: str):
         info = self.get_info_schema(schema=schema)
@@ -390,6 +393,17 @@ class Connection:
             path = pathsearch(filename)
         text = path.read_text()
         return self.run_pd_sql(text)
+
+    def run_sqlfile(
+        self,
+        path: Path,
+    ) -> DataFrame:
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not path.exists():
+            raise FileExistsError(path)
+        text = path.read_text()
+        return self.run_pg_sql(text)
 
     def df_to_db(
         self,

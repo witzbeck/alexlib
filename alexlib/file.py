@@ -25,17 +25,17 @@ def figsave(
 
 def eval_parents(
         path: Path,
-        to_include: list[str],
-        to_exclude: list[str],
+        include: list[str],
+        exclude: list[str],
 ):
-    ninclude = len(to_include)
+    ninclude = len(include)
     parts = path.parts
 
-    nincluded = sum([x in to_include for x in parts])
-    incpass = (nincluded == ninclude or to_include is None)
+    nincluded = sum([x in include for x in parts])
+    incpass = (nincluded == ninclude or include is None)
 
-    nexcluded = sum([x in to_exclude for x in parts])
-    excpass = (nexcluded == 0 or to_exclude is None)
+    nexcluded = sum([x in exclude for x in parts])
+    excpass = (nexcluded == 0 or exclude is None)
     return (incpass and excpass)
 
 
@@ -43,19 +43,19 @@ def pathsearch(
         pattern: str,
         start_path: Path = Path(__file__),
         listok: bool = False,
-        to_include: list[str] = None,
-        to_exclude: list[str] = None,
+        include: list[str] = [],
+        exclude: list[str] = [],
 ) -> Path | list[Path]:
-    if isinstance(to_exclude, str):
-        to_exclude = [to_exclude]
-    if isinstance(to_include, str):
-        to_include = [to_include]
+    if isinstance(exclude, str):
+        exclude = [exclude]
+    if isinstance(include, str):
+        include = [include]
     while True:
         try:
             ret = [x for x in start_path.rglob(pattern)]
             ret = [
                 x for x in ret
-                if eval_parents(x, to_include, to_exclude)
+                if eval_parents(x, include, exclude)
             ]
             if listok:
                 return ret
@@ -134,8 +134,8 @@ def eval_td(dt1: dt, dt2: dt = dt.now()):
 class SystemObject:
     path: Path = field(default=None)
     name: str = field(default=None)
-    to_include: list[str] = field(default_factory=list)
-    to_exclude: list[str] = field(default_factory=list)
+    include: list[str] = field(default_factory=list)
+    exclude: list[str] = field(default_factory=list)
 
     def __repr__(self):
         clss = self.__class__.__name__
@@ -210,8 +210,8 @@ class SystemObject:
         elif self.name is not None:
             return pathsearch(
                 self.name,
-                to_include=self.to_include,
-                to_exclude=self.to_exclude,
+                include=self.include,
+                exclude=self.exclude,
             )
         else:
             raise ValueError("need path or name")

@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from alexlib.core import datetime as dt
 from alexlib.db import Connection
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.cnfg import chkenv, ConfigFile
+from alexlib.config import chkenv, ConfigFile
 from alexlib.iters import keys, link
 from alexlib.maths import discrete_exp_dist
 
