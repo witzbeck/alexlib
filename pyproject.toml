@@ -1,31 +1,23 @@
 [tool.poetry]
 name = "alexlib"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11rc1"
+python = "^3.10"
 pandas = "^2.0.3"
 python-dotenv = "^1.0.0"
 decorator = "^5.1.1"
-setuptools = "^68.0.0"
-datashader = "^0.15.2"
 sqlalchemy = "^2.0.20"
-master-proj = {path = "../master_proj", develop = true}
 sqlalchemy-utils = "^0.41.1"
-pandas-datareader = "^0.10.0"
-openai = "^0.27.8"
-black = "^23.7.0"
 psycopg = "^3.1.10"
-py-algorand-sdk = "^2.4.0"
 
 [tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+coverage = "^7.3.1"
 ipykernel = "^6.25.0"
-jedi-language-server = "^0.41.0"
-jupyter = "^1.0.0"
-jupyterlab = "^4.0.5"
 
 [build-system]
 requires = ["poetry-core"]
