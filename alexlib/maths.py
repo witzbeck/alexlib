@@ -1,12 +1,23 @@
 from dataclasses import dataclass, field
 from math import sqrt
-from typing import Callable
+from functools import cached_property
+from typing import Callable, Iterable
+from string import ascii_uppercase
 from random import choice
 
 from numpy import array
 from pandas import DataFrame, Series
 
 from alexlib.perf import timeit
+
+
+def get_primes(n):
+    """ Returns  a list of primes < n """
+    sieve = [True] * n
+    for i in range(3, int(n**0.5) + 1, 2):
+        if sieve[i]:
+            sieve[i * i:: 2 * i] = [False] * ((n - i * i - 1) // (2 * i) + 1)
+    return [2] + [i for i in range(3, n, 2) if sieve[i]]
 
 
 def randbool(asint: bool = False):
@@ -17,8 +28,8 @@ def randbool(asint: bool = False):
     return choice(choices)
 
 
-def euclidean_distance(lst: list):
-    return sqrt(sum([x ** 2 for x in lst]))
+def euclidean_distance(itr: Iterable):
+    return sqrt(sum([x ** 2 for x in itr]))
 
 
 def discrete_exp_dist(
@@ -191,3 +202,148 @@ def make_prop_dict(df: DataFrame):
     non_id_cols = [x for x in df.columns if x[-3:] != "_id"]
     all_series = [Series(df.loc[:, x]) for x in non_id_cols]
     return {col: get_props(col) for col in all_series}
+
+
+@dataclass
+class VariableBaseNumber:
+    base10_val: float
+    base: int
+    error: float = 10e-8
+    usexchar: bool = True
+    exp_dict: dict[int: int] = field(
+        repr=False,
+        default_factory=dict
+    )
+
+    @cached_property
+    def isnegative(self) -> bool:
+        return self.base10_val < 0
+
+    @cached_property
+    def sign(self) -> str:
+        return "-" if self.isnegative else ""
+
+    @cached_property
+    def base10_str(self) -> bool:
+        return str(self.base10_val)
+
+    @cached_property
+    def hasdecimal(self) -> bool:
+        return "." in self.base10_str
+
+    @cached_property
+    def roundto(self) -> int:
+        if self.hasdecimal:
+            return len(self.base10_str.split(".")[-1])
+        else:
+            return int(self.error ** -1)
+
+    @cached_property
+    def chars(self) -> dict[int: str]:
+        if self.usexchar:
+            els = "x" * len(ascii_uppercase)
+        else:
+            els = ascii_uppercase
+        return {
+            i: str(i) if i < 10 else els[i - 10]
+            for i in range(10 + len(ascii_uppercase))
+        }
+
+    def get_char(self, key: int):
+        try:
+            return self.chars[key]
+        except KeyError:
+            return "x"
+
+    def get_unit(self, exp: int) -> int:
+        return self.base ** exp
+
+    def get_highest_exp(self) -> int:
+        exp = 0
+        unit = self.get_unit(exp)
+        while unit < abs(self.base10_val):
+            exp += 1
+            unit = self.get_unit(exp)
+        return exp - 1
+
+    @cached_property
+    def highest_exp(self) -> int:
+        return self.get_highest_exp()
+
+    @cached_property
+    def highest_unit(self) -> int:
+        return self.get_unit(self.highest_exp)
+
+    def __post_init__(self) -> None:
+        n = abs(self.base10_val)
+        exp, unit = self.highest_exp, self.highest_unit
+        while n != 0:
+            val = n // unit
+            n = round(n % unit, self.roundto)
+            self.exp_dict[exp] = val
+            exp -= 1
+            unit = self.get_unit(exp)
+        toupdate = {
+            i: 0
+            for i in range(self.highest_exp)
+            if i not in self.exponents
+        }
+        self.exp_dict.update(toupdate)
+
+    @property
+    def exponents(self):
+        return list(self.exp_dict.keys())
+
+    @property
+    def vals(self):
+        return list(self.exp_dict.values())
+
+    @property
+    def exp_items(self):
+        return list(self.exp_dict.items())
+
+    @property
+    def unit_dict(self):
+        return {
+            self.get_unit(exp): unit
+            for exp, unit in self.exp_items
+        }
+
+    @property
+    def units(self):
+        return list(self.unit_dict.keys())
+
+    @property
+    def unit_items(self):
+        return list(self.unit_dict.items())
+
+    @property
+    def lowest_exp(self):
+        return min(self.exponents)
+
+    @property
+    def lowest_unit(self):
+        return self.get_unit(self.lowest_exp)
+
+    def __str__(self):
+        left = "".join([
+            self.get_char(val) for
+            exp, val in self.exp_items
+            if exp >= 0
+        ])
+        if self.hasdecimal:
+            right = "." + "".join([
+                self.get_char(val) for
+                exp, val in self.exp_items
+                if exp < 0
+            ])
+        else:
+            right = ""
+        return self.sign + left + right
+
+    @property
+    def clsname(self):
+        return self.__class__.__name__
+
+    def __repr__(self) -> str:
+        return f"{self.clsname}({str(self)})"
