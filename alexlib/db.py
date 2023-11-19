@@ -8,8 +8,9 @@ from typing import Any
 
 # third party imports
 from pandas import read_sql, DataFrame, Series
-from psycopg2 import connect
-from psycopg2.errors import UndefinedTable, ProgrammingError
+from psycopg import connect
+from psycopg.errors import UndefinedTable, ProgrammingError
+from psycopg.errors import DuplicateSchema
 from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists, create_database
 
@@ -413,7 +414,10 @@ class Connection:
         **kwargs
     ) -> None:
         if schema not in self.allschemas:
-            self.create_schema(schema)
+            try:
+                self.create_schema(schema)
+            except DuplicateSchema:
+                pass
         df.to_sql(table,
                   self.engine,
                   schema=schema,

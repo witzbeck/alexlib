@@ -41,7 +41,7 @@ def eval_parents(
 
 def pathsearch(
         pattern: str,
-        start_path: Path = Path(__file__),
+        start_path: Path = eval("Path(__file__)"),
         listok: bool = False,
         include: list[str] = [],
         exclude: list[str] = [],
