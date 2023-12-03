@@ -1,4 +1,11 @@
+!.gitignore 
+# envs
+.env.*
+!*.json
+
+
 /data
+poetry.lock
 /technical_refs
 tests/fixtures/cached_*_text.txt
 .idea
@@ -12,10 +19,8 @@ proc_data
 *.env
 .*.swp
 /examples/runs
-.env.*
 .ruff_cache
 /wandb
-!.gitignore 
 lang_code_data/
 .vscode
 lightning_logs/
@@ -24,7 +29,6 @@ lightning_logs/
 serialization_dir
 /research
 *.[eE][nN][vV]*
-!*.json
 .vs
 !*.txt
 my_txs/
