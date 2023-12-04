@@ -1,30 +1,16 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from hashlib import sha256
 from itertools import chain
 from logging import debug
 from os import getenv
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
-from typing import Any
-from random import randint
+from typing import Any, Hashable
 from subprocess import check_output
 
 """ core functions & objects must only use the standard lib
 """
-# reference datetime for difference calculation
-epoch = datetime(
-    year=2,
-    month=1,
-    day=1,
-    hour=0,
-    minute=0,
-    second=0,
-    microsecond=0,
-)
-
-# reference datetime as seconds
-epoch_s = epoch.timestamp()
 
 
 def chktext(
@@ -188,9 +174,11 @@ class Object(object):
                 self.set_hasattr(k)
 
 
-def mk_dictvals_distinct(_dict: dict[Any:Any]) -> dict[Any:Any]:
-    keys = list(_dict.keys())
-    return {key: list(set(_dict[key])) for key in keys}
+def mk_dictvals_distinct(
+    dict_: dict[Hashable: Hashable]
+) -> dict[Any:Any]:
+    keys = list(dict_.keys())
+    return {key: list(set(dict_[key])) for key in keys}
 
 
 def invert_dict(_dict: dict):
@@ -198,147 +186,6 @@ def invert_dict(_dict: dict):
     rng = range(len(_dict))
     vals = list(_dict.values())
     return {vals[i]: _dict[vals[i]] for i in rng}
-
-
-def mk_delta(td_obj: timedelta) -> timedelta:
-    """generates a random timedelta"""
-    return td_obj(
-        years=randint(0, 100),
-        months=randint(0, 12),
-        days=randint(0, 30),
-        hours=randint(0, 24),
-        minutes=randint(0, 60),
-        seconds=randint(0, 60),
-        microseconds=randint(0, 1000000),
-    )
-
-
-class timedelta(timedelta):
-    """new timedelta class with extra methods"""
-
-    @classmethod
-    def as_rand(cls) -> timedelta:
-        return mk_delta(cls)
-
-    @property
-    def epoch(self):
-        return epoch
-
-    @property
-    def epoch_s(self):
-        return epoch_s
-
-    @property
-    def self_s(self):
-        return self.total_seconds()
-
-    @property
-    def epoch_self_dif(self):
-        return self.self_s - self.epoch_s
-
-    @classmethod
-    def _find_smallest_unit(cls):
-        # write a function that
-        # returns the smallest
-        # unit of time in a
-        # dt datetime or
-        # td timedelta
-        print(dir(timedelta(days=1)))
-
-        pass
-
-    @staticmethod
-    def get_td_s(td: timedelta) -> float:
-        return td.total_seconds()
-
-    def get_epoch_self_divmod(self, td_s: timedelta):
-        return divmod(self.epoch_self_dif, timedelta.get_td_s(td_s))
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def __round__(
-        self,
-        td: timedelta,
-        epoch_s: datetime = epoch_s,
-    ) -> timedelta:
-        """
-        allows for rounding timedelta to a timedelta
-            returns rounded dateti
-            1. converts both to seconds
-            2. calcs difference between both and epoch
-        """
-        dif = self.epoch_self_dif
-        td_s = timedelta.get_td_s(td)
-        mod = dif % td_s
-        return self.fromtimestamp(epoch_s + dif - mod)
-
-
-def mk_date(dt_obj: datetime) -> datetime:
-    """generates a random datetime"""
-    return dt_obj(
-        year=randint(2, 3000),
-        month=randint(1, 12),
-        day=randint(1, 28),
-        hour=randint(0, 24),
-        minute=randint(0, 60),
-        second=randint(0, 60),
-        microsecond=randint(0, 1000000),
-    )
-
-
-class datetime(datetime):
-    """new datetime class with extra methods"""
-
-    @classmethod
-    def as_rand(cls) -> datetime:
-        return mk_date(cls)
-
-    @property
-    def epoch(self) -> datetime:
-        return epoch
-
-    @property
-    def epoch_s(self) -> int:
-        return epoch_s
-
-    @property
-    def self_s(self) -> int:
-        return self.timestamp()
-
-    @property
-    def epoch_self_dif(self):
-        return self.self_s - self.epoch_s
-
-    @staticmethod
-    def get_td_s(td: timedelta) -> float:
-        return td.total_seconds()
-
-    def get_epoch_self_divmod(self, td_s: timedelta) -> tuple[float, float]:
-        return divmod(self.epoch_self_dif, datetime.get_td_s(td_s))
-
-    def __init__(self):
-        super().__init__()
-
-    def __round__(
-        self,
-        td: timedelta,
-        epoch_s: datetime = epoch_s,
-    ) -> datetime:
-        """
-        allows for rounding datetime to a timedel
-            returns rounded dateti
-            1. converts both datetime and timedelta to seconds
-            2. calcs difference between datetime and epoch
-        self_s, td_s = self.timestamp(), td.total_seconds()
-        dif = self_s - epoch_s      # dif = difference in seconds
-        mod = dif % td_s            # mod = modulus of dif and td_s
-        return self.fromtimestamp(epoch_s + (dif - mod))
-        """
-        dif = self.epoch_self_dif
-        td_s = datetime.get_td_s(td)
-        mod = dif % td_s
-        return self.fromtimestamp(epoch_s + dif - mod)
 
 
 def sha256sum(

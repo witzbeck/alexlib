@@ -1,22 +1,443 @@
-# standard library imports
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
+from queue import Queue
+from sqlite3 import Connection as LiteConnection, Cursor
+from sqlite3 import DatabaseError, connect as s3_connect
+from string import ascii_letters
+from threading import Thread
+from typing import Any
+from dataclasses import dataclass, field
 from os import environ
 from subprocess import Popen, PIPE
 from random import choice
 from typing import Any
 
-# third party imports
 from pandas import read_sql, DataFrame, Series
-from psycopg import connect
+from psycopg import connect as pg_connect
 from psycopg.errors import UndefinedTable, ProgrammingError
 from psycopg.errors import DuplicateSchema
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, Engine
+from sqlalchemy.sql import text
 from sqlalchemy_utils import database_exists, create_database
 
+from alexlib.core import chkenv, ping
+from alexlib.config import ConfigFile
 from alexlib.df import get_distinct_col_vals, series_col
-from alexlib.config import ConfigFile, chkenv
-from alexlib.file import pathsearch
+from alexlib.file import path_search, File, Directory
+
+NUMBERS = "0987654321"
+SQL_CHARS = f"{ascii_letters} _{NUMBERS}"
+QG_SUBS = {
+    " ": "_",
+    "-": "_",
+    "#": "NUMBER",
+    "&": "AND",
+    "/": "_",
+    "%": "PERCENT",
+    ".": "",
+}
+QG_KEYS = list(QG_SUBS.keys())
+
+
+def execute_query(
+    name: str,
+    file: File,
+    engine: Engine,
+    result_queue: Queue = None,
+    replace: tuple[str, str] = None,
+) -> None:
+    print(f"getting {name}")
+    df = file.get_df(eng=engine, replace=replace)
+    res = {name: df}
+    result_queue.put(res)
+    print(f"got {name}")
+    return result_queue
+
+
+def get_dfs_threaded(
+    files: dict[str:File],
+    engine: Engine | LiteConnection,
+    replace: tuple[str, str] = None,
+) -> dict[str:DataFrame]:
+    if isinstance(engine, Engine):
+        result_queue = Queue()
+        threads = [
+            Thread(
+                target=execute_query,
+                args=[name, file, engine],
+                kwargs=dict(result_queue=result_queue, replace=replace),
+            )
+            for name, file in files.items()
+        ]
+        [thread.start() for thread in threads]
+        results = {}
+        while not result_queue.empty() or len(results) < len(files):
+            results.update(result_queue.get())
+        return results
+    else:
+        return {
+            name: file.get_df(eng=engine, replace=replace)
+            for name, file in files.items()
+        }
+
+
+def get_data_dict_series(
+    files: dict[str:File],
+    engine: Engine | LiteConnection,
+    replace: tuple[str, str] = None,
+) -> dict[str:DataFrame]:
+    return {
+        name: file.get_df(
+            eng=engine,
+            replace=replace,
+        )
+        for name, file in files.items()
+    }
+
+
+@dataclass
+class Curl:
+    username: str = field(
+        default=None,
+    )
+    password: str = field(
+        default=None,
+        repr=False,
+    )
+    host: str = field(
+        default=None,
+    )
+    port: int = field(
+        default=None,
+        repr=False,
+    )
+    database: str = field(
+        default=None,
+    )
+    dialect: str = field(default="postgresql", repr=False)
+    driver: str = field(default="psycopg", repr=False)
+    sid: str = field(default=None, repr=False)
+
+    @property
+    def system(self):
+        return f"{self.dialect}+{self.driver}"
+
+    @property
+    def login(self):
+        if self.username and self.password:
+            ret = f"{self.username}:{self.password}"
+        elif self.username:
+            ret = self.username
+        else:
+            ret = ""
+        return ret
+
+    @property
+    def hostport(self):
+        if not self.host:
+            ret = None
+        elif not self.port:
+            ret = self.host
+        else:
+            ret = f"{self.host}:{self.port}"
+        return ret
+
+    @property
+    def dbstr(self):
+        if self.database:
+            return f"/{self.database}"
+        else:
+            return ""
+
+    @property
+    def driverstr(self):
+        if self.dialect == "mssql":
+            return "?driver=SQL+Server"
+        elif self.dialect == "oracle":
+            return ""
+        else:
+            raise ValueError
+
+    def __str__(self):
+        return "".join(
+            [
+                self.system,
+                "://",
+                self.login,
+                "@",
+                self.hostport,
+                self.dbstr,
+                self.driverstr,
+            ]
+        )
+
+
+@dataclass
+class Connection:
+    curl: str = field(
+        repr=False,
+    )
+    engine: Engine = field(
+        repr=False,
+        init=False,
+    )
+
+    @staticmethod
+    def oracle_mod() -> None:
+        """only used for sqlalchemy <=1.4"""
+        eval("from sys import modules")
+        eval("import oracledb as odb")
+        eval('modules["cx_Oracle"] = odb')
+
+    def __post_init__(self) -> None:
+        if isinstance(self.curl, Curl):
+            self.curl = str(self.curl)
+        self.engine = create_engine(self.curl)
+
+    @property
+    def canping(self):
+        return not (self.host is None or self.port is None)
+
+    @property
+    def isopen(self) -> bool:
+        if not self.canping:
+            raise ValueError("need host and port to ping")
+        return ping(self.host, self.port)
+
+    @staticmethod
+    def mk_view_text(name: str, sql: str):
+        return f"""CREATE VIEW {name} AS {sql}"""
+
+    def get_df(self, sql: str) -> DataFrame:
+        """plugs connection and sql into pandas to produce dataframe"""
+        statement = text(sql)
+        with self.engine.connect() as con:
+            return read_sql(statement, con)
+
+    def get_table(
+        self,
+        table: str,
+        schema: str = None,
+        db: str = None,
+    ) -> DataFrame:
+        tbl = ".".join([x for x in [db, schema, table] if x])
+        return self.get_df(f"select * from {tbl}")
+
+    def exe_sql(self, sql: str):
+        statement = text(sql)
+        with self.engine.connect() as con:
+            return con.execute(statement)
+
+    def mk_view(self, name: str, sql: str):
+        statement = Connection.mk_view_text(name, sql)
+        return self.exe_sql(statement)
+
+    def file_to_db(
+        self,
+        file: File,
+        schema: str,
+        table: str,
+        eng: Engine = None,
+        if_exists: str = "replace",
+    ) -> None:
+        if file.issql:
+            eng = self.engine
+        df = file.get_df(eng=eng)
+        df.to_sql(table, self.engine, schema=schema, if_exists=if_exists)
+
+    def sql_to_file(
+        self,
+        sqlfile: File,
+        writepath: Path,
+    ) -> None:
+        df = sqlfile.get_df(eng=self.engine)
+        return File.df_to_file(df, writepath)
+
+    def update_test_files(
+        self,
+        sql_files: list[File],
+        test_paths: list[Path],
+    ):
+        for i, sqlfile in enumerate(sql_files):
+            self.sql_to_file(sqlfile, test_paths[i])
+
+    @classmethod
+    def from_curl_parts(
+        cls,
+        username: str,
+        password: str,
+        host: str,
+        port: int,
+        database: str,
+        dialect: str = "postgres",
+        driver: str = "pyodbc",
+        sid: str = None,
+    ):
+        curl = Curl(
+            username=username,
+            password=password,
+            host=host,
+            port=port,
+            database=database,
+            dialect=dialect,
+            driver=driver,
+            sid=sid,
+        )
+        return cls(str(curl))
+
+
+@dataclass
+class LocalETL:
+    remote_engine: Engine = field()
+    resources_dir: Directory = field()
+    landing_prefix: str = field(default="landing", repr=False)
+    main_prefix: str = field(default="main", repr=False)
+    localdb_name: str = field(default=":memory:")
+    replace: tuple[str, str] = field(default=None, repr=False)
+
+    @cached_property
+    def localdb(self) -> LiteConnection:
+        return s3_connect(self.localdb_name)
+
+    @property
+    def cursor(self) -> Cursor:
+        return self.localdb.cursor()
+
+    def get_local_table(self, name: str) -> list[Any]:
+        return self.cursor.execute(f"select * from {name};").fetchall()
+
+    @cached_property
+    def sql_files(self) -> list[File]:
+        return [
+            x for x in self.resources_dir.filelist
+            if x.name.endswith(".sql")
+        ]
+
+    @cached_property
+    def landing_files(self) -> dict[str:File]:
+        return {
+            "_".join(x.path.stem.split("_")[1:]): x
+            for x in self.sql_files
+            if x.name.startswith(self.landing_prefix)
+        }
+
+    @cached_property
+    def main_files(self) -> dict[str:File]:
+        return {
+            "_".join(x.path.stem.split("_")[1:]): x
+            for x in self.sql_files
+            if x.name.startswith(self.main_prefix)
+        }
+
+    @cached_property
+    def landing_tables(self) -> list[str]:
+        return list(self.landing_files.keys())
+
+    @cached_property
+    def main_tables(self) -> list[str]:
+        return list(self.main_files.keys())
+
+    @staticmethod
+    def get_data_dict(
+        files: dict[str:File],
+        engine: Engine | LiteConnection,
+        replace: tuple[str, str] = None,
+    ) -> dict[str:DataFrame]:
+        return get_dfs_threaded(files, engine, replace=replace)
+
+    @cached_property
+    def landing_data(self) -> dict[str:DataFrame]:
+        return get_dfs_threaded(
+            self.landing_files, self.remote_engine, replace=self.replace
+        )
+
+    def get_main_data(self) -> dict[str:DataFrame]:
+        return get_dfs_threaded(
+            self.main_files,
+            self.localdb,
+            replace=self.replace,
+        )
+
+    @property
+    def main_data(self) -> dict[str:DataFrame]:
+        try:
+            return self.get_main_data()
+        except DatabaseError as e:
+            raise NotImplementedError(f"{e} - landing data not inserted")
+
+    @staticmethod
+    def get_df_dict_lens(data_dict: dict[DataFrame]) -> dict[str:int]:
+        return {k: len(v) for k, v in data_dict.items()}
+
+    @cached_property
+    def landing_lens(self) -> dict[str:int]:
+        return LocalETL.get_df_dict_lens(self.landing_data)
+
+    @property
+    def main_lens(self) -> dict[str:int]:
+        return LocalETL.get_df_dict_lens(self.main_data)
+
+    @staticmethod
+    def insert_table(
+        name: str,
+        df: DataFrame,
+        cnxn: LiteConnection,
+        index: bool = False,
+        if_exists: str = "replace",
+    ) -> None:
+        df.to_sql(name, cnxn, index=index, if_exists=if_exists)
+
+    @staticmethod
+    def insert_data(
+        data_dict: dict[str:DataFrame],
+        cnxn: LiteConnection,
+        index: bool = False,
+        if_exists: str = "replace",
+    ) -> None:
+        [
+            LocalETL.insert_table(
+                name, data, cnxn=cnxn, index=index, if_exists=if_exists
+            )
+            for name, data in data_dict.items()
+        ]
+
+    def insert_landing_data(self, **kwargs):
+        try:
+            LocalETL.insert_data(
+                self.landing_data,
+                self.localdb,
+                **kwargs,
+            )
+        except AttributeError:
+            self.insert_landing_data(**kwargs)
+
+    def steps(self):
+        self.insert_landing_data()
+        return self.main_data
+
+    @staticmethod
+    def to_csv(
+        data_dict: dict[str:DataFrame],
+        dirpath: Path | Directory
+    ) -> None:
+        if isinstance(dirpath, Directory):
+            path = dirpath.path
+        elif isinstance(dirpath, Path):
+            path = dirpath
+        else:
+            raise TypeError(f"got {dirpath} but need path/directory")
+        env = chkenv("environment", need=None)
+        if env:
+            env = env + "_"
+        else:
+            env = ""
+        for name, df in data_dict.items():
+            csv_path = path / (env + name + ".csv")
+            df.to_csv(csv_path, index=False)
+
+    def main_to_csv(self, dirpath: Path | Directory) -> None:
+        LocalETL.to_csv(self.main_data, dirpath)
 
 
 def onehot_case(col: str, val: str):
@@ -30,14 +451,12 @@ def get_table_abrv(table_name: str):
 
 
 def mk_info_sql(
-        schema=None,
-        table=None,
-        sql="select * from information_schema.columns"
+    schema=None, table=None, sql="select * from information_schema.columns"
 ) -> str:
     hasschema = schema is not None
     hastable = table is not None
-    hasboth = (hasschema and hastable)
-    haseither = (hasschema or hastable)
+    hasboth = hasschema and hastable
+    haseither = hasschema or hastable
     stext = f"table_schema = '{schema}'" if hasschema else ""
     ttext = f"table_name = '{table}'" if hastable else ""
     sqllist = [
@@ -45,7 +464,7 @@ def mk_info_sql(
         "where" if haseither else "",
         stext,
         "and" if hasboth else "",
-        ttext
+        ttext,
     ]
     return " ".join(sqllist)
 
@@ -77,20 +496,13 @@ class SQL:
 
     @staticmethod
     def mk_default_filename(
-        schema: str,
-        table: str,
-        prefix: str = "select",
-        suffix: str = ".sql"
+        schema: str, table: str, prefix: str = "select", suffix: str = ".sql"
     ) -> str:
         return f"{prefix}_{schema}_{table}{suffix}"
 
     @staticmethod
-    def to_file(
-        text: str,
-        path: Path,
-        overwrite: bool = True
-    ) -> bool:
-        if (path.exists() and not overwrite):
+    def to_file(text: str, path: Path, overwrite: bool = True) -> bool:
+        if path.exists() and not overwrite:
             raise FileExistsError("file already exists here. overwrite?")
         path.write_text(text)
         return path.exists()
@@ -116,12 +528,12 @@ class SQL:
         return cls("".join(lines))
 
     def create_onehot_view(
-            df: DataFrame,
-            id_col: str,
-            dist_col: str,
-            schema: str,
-            table: str,
-            command: str = "create view"
+        df: DataFrame,
+        id_col: str,
+        dist_col: str,
+        schema: str,
+        table: str,
+        command: str = "create view",
     ) -> str:
         dist_col = [x for x in df.columns if x[-2:] != "id"][0]
         id_col = [x for x in df.columns if x != dist_col][0]
@@ -151,10 +563,7 @@ class SQL:
 class Connection:
     context: str = field(default="LOCAL")
     driver: str = field(default="postgresql+psycopg://")
-    engine: str = field(
-        repr=False,
-        default=None
-    )
+    engine: str = field(repr=False, default=None)
     createdb: bool = field(
         default=False,
         repr=False,
@@ -247,7 +656,7 @@ class Connection:
             f"dbname={self.dbname}",
             f"host={self.host}",
             f"port={self.port}",
-            f"user={self.user}"
+            f"user={self.user}",
         ]
         if self.pw is not None:
             deets.append(f"password={self.pw}")
@@ -255,7 +664,7 @@ class Connection:
 
     @property
     def conn(self):
-        return connect(self.connstr)
+        return pg_connect(self.connstr)
 
     @property
     def dbexists(self):
@@ -274,9 +683,9 @@ class Connection:
             raise ValueError("createdb is False")
 
     def get_info_schema(
-            self,
-            schema: str = None,
-            table: str = None,
+        self,
+        schema: str = None,
+        table: str = None,
     ):
         sql = mk_info_sql(schema=schema, table=table)
         return self.run_pd_sql(sql)
@@ -286,9 +695,9 @@ class Connection:
         return self.get_info_schema()
 
     def run_pg_sql(
-            self,
-            sql: SQL,
-            todf: bool = True,
+        self,
+        sql: SQL,
+        todf: bool = True,
     ) -> DataFrame | bool:
         isselect = "select" in sql.lower()[:10]
         # text = Connection.mk_text(sql)
@@ -298,7 +707,7 @@ class Connection:
             cursor.execute(sql)
             if isselect:
                 ret = cursor.fetchall()
-            if (isselect and todf):
+            if isselect and todf:
                 cols = [desc[0] for desc in cursor.description]
                 df = DataFrame.from_records(ret)
                 df.columns = cols
@@ -312,22 +721,16 @@ class Connection:
     def __post_init__(self) -> None:
         if self.dbname is None:
             ConfigFile(name=self.dotenv_name)
-        if (self.createdb and not self.dbexists):
+        if self.createdb and not self.dbexists:
             self.create_db()
 
     @property
     def allschemas(self):
-        return get_distinct_col_vals(
-            self.info_schema,
-            "table_schema"
-        )
+        return get_distinct_col_vals(self.info_schema, "table_schema")
 
     @property
     def alltables(self):
-        return get_distinct_col_vals(
-            self.info_schema,
-            "table_name"
-        )
+        return get_distinct_col_vals(self.info_schema, "table_name")
 
     @staticmethod
     def mk_cmd_sql(
@@ -354,22 +757,12 @@ class Connection:
 
     def drop_table(self, schema: str, table: str, cascade: bool = True):
         addl_cmd = "cascade" if cascade else ""
-        self.obj_cmd(
-            "drop",
-            "table",
-            table,
-            schema=schema,
-            addl_cmd=addl_cmd
-        )
+        self.obj_cmd("drop", "table", table, schema=schema, addl_cmd=addl_cmd)
 
     def drop_view(self, schema: str, view: str):
         self.obj_cmd("drop", "view", view, schema=schema)
 
-    def truncate_table(
-            self,
-            schema: str,
-            table: str
-    ) -> None:
+    def truncate_table(self, schema: str, table: str) -> None:
         if table.startswith("v_"):
             pass
         else:
@@ -385,13 +778,9 @@ class Connection:
         for tab in tabs:
             self.truncate_table(schema, tab)
 
-    def df_from_sqlfile(
-        self,
-        filename: str,
-        path: Path = None
-    ) -> DataFrame:
+    def df_from_sqlfile(self, filename: str, path: Path = None) -> DataFrame:
         if path is None:
-            path = pathsearch(filename)
+            path = path_search(filename)
         text = path.read_text()
         return self.run_pd_sql(text)
 
@@ -406,22 +795,13 @@ class Connection:
         text = path.read_text()
         return self.run_pg_sql(text)
 
-    def df_to_db(
-        self,
-        df: DataFrame,
-        schema: str,
-        table: str,
-        **kwargs
-    ) -> None:
+    def df_to_db(self, df: DataFrame, schema: str, table: str, **kwargs) -> None:
         if schema not in self.allschemas:
             try:
                 self.create_schema(schema)
             except DuplicateSchema:
                 pass
-        df.to_sql(table,
-                  self.engine,
-                  schema=schema,
-                  **kwargs)
+        df.to_sql(table, self.engine, schema=schema, **kwargs)
 
     @staticmethod
     def mk_star_select(
@@ -441,27 +821,28 @@ class Connection:
         return SQL("".join(parts))
 
     def mk_query(
-            self,
-            schema: str,
-            table: str,
+        self,
+        schema: str,
+        table: str,
     ):
         info = self.get_info_schema(schema=schema, table=table)
         return SQL.from_info_schema(schema, table, info)
 
     def get_table(
-            self,
-            schema: str,
-            table: str,
-            nrows: int = -1,
+        self,
+        schema: str,
+        table: str,
+        nrows: int = -1,
     ) -> DataFrame:
         sql = Connection.mk_star_select(schema, table, nrows=nrows)
         return self.run_pd_sql(sql)
 
-    def get_last_id(self,
-                    schema: str,
-                    table: str,
-                    id_col: str,
-                    ) -> int:
+    def get_last_id(
+        self,
+        schema: str,
+        table: str,
+        id_col: str,
+    ) -> int:
         sql = f"select max({id_col}) from {schema}.{table}"
         try:
             id = self.run_pg_sql(sql)
@@ -476,21 +857,17 @@ class Connection:
     def get_next_id(self, *args) -> int:
         return self.get_last_id(*args) + 1
 
-    def get_last_record(self,
-                        schema: str,
-                        table: str,
-                        id_col: str,
-                        ) -> DataFrame:
+    def get_last_record(
+        self,
+        schema: str,
+        table: str,
+        id_col: str,
+    ) -> DataFrame:
         last_id = self.get_last_id(schema, table, id_col)
         sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
         return self.run_pd_query(sql)
 
-    def get_record_count(
-            self,
-            schema: str,
-            table: str,
-            print_: bool = True
-    ) -> int:
+    def get_record_count(self, schema: str, table: str, print_: bool = True) -> int:
         sql = f"select count(*) from {schema}.{table};"
         val = self.run_pg_sql(sql).values[0][0]
         if print_:
@@ -498,22 +875,17 @@ class Connection:
         return val
 
     def get_last_val(
-            self,
-            schema: str,
-            table: str,
-            id_col: str,
-            val_col: str,
+        self,
+        schema: str,
+        table: str,
+        id_col: str,
+        val_col: str,
     ) -> Any:
         last_rec = self.get_last_record(schema, table, id_col)
         return last_rec.loc[0, val_col]
 
     @classmethod
-    def from_context(
-        cls,
-        context: str,
-        createdb: bool = False,
-        **kwargs
-    ):
+    def from_context(cls, context: str, createdb: bool = False, **kwargs):
         return cls(
             context=context,
             createdb=createdb,
@@ -604,9 +976,7 @@ class Table:
         default=None,
         repr=False,
     )
-    nrows: int = field(
-        default=None
-    )
+    nrows: int = field(default=None)
     col_series: DataFrame = field(
         init=False,
         repr=False,
@@ -676,11 +1046,12 @@ class Table:
         )
 
 
-def update_host_table(schema: str,
-                      table: str,
-                      source: str | Connection = "SERVER",
-                      dest: str | Connection = "LOCAL"
-                      ):
+def update_host_table(
+    schema: str,
+    table: str,
+    source: str | Connection = "SERVER",
+    dest: str | Connection = "LOCAL",
+):
     if isinstance(source, str):
         source = Connection.from_context(source)
     elif isinstance(source, Connection):
@@ -708,28 +1079,18 @@ def update_host_table(schema: str,
             schema=schema,
             if_exists="append",
             index=False,
-            method="multi"
+            method="multi",
         )
 
 
-def update_host_schema(schema: str,
-                       source_context: str = "SERVER",
-                       dest_context: str = "LOCAL"
-                       ):
-    source = Connection.from_context(
-        source_context
-    )
-    dest = Connection.from_context(
-        dest_context
-    )
+def update_host_schema(
+    schema: str, source_context: str = "SERVER", dest_context: str = "LOCAL"
+):
+    source = Connection.from_context(source_context)
+    dest = Connection.from_context(dest_context)
     schema_tables = source.get_all_schema_tables(schema)
     for table in schema_tables:
-        update_host_table(
-            schema,
-            table,
-            source=source,
-            dest=dest
-        )
+        update_host_table(schema, table, source=source, dest=dest)
 
 
 if __name__ == "__main__":
