@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
 from itertools import chain
+from logging import debug
 from os import getenv
 from pathlib import Path
+from socket import AF_INET, SOCK_STREAM, socket
 from typing import Any
 from random import randint
 from subprocess import check_output
@@ -396,3 +398,16 @@ class Version:
 
     def __repr__(self) -> str:
         return str(self)
+
+
+def ping(
+    host: str,
+    port: int,
+    astext: bool = False
+) -> bool | str:
+    with socket(AF_INET, SOCK_STREAM) as sock:
+        isopen = sock.connect_ex((host, port)) == 0
+        text = "" if isopen else "not "
+        text = f"{host}:{port} is {text}open"
+        debug(text)
+        return text if astext else isopen

@@ -1,14 +1,20 @@
+from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime as dt, timedelta as td
-from json import load, loads, dump, dumps, JSONDecodeError
+from datetime import datetime, timedelta
+from functools import cached_property, partial
+from json import load, loads, dump, dumps
+from logging import info
+from os import getenv
 from pathlib import Path
-from typing import Any, Callable
+from random import choice
+from typing import Callable, Any
 
 from matplotlib.pyplot import savefig
 from pandas import DataFrame
-from pandas import read_csv, read_sql, read_excel
-from sqlalchemy import engine
+from sqlalchemy import Engine
 
+from alexlib.constants import date_format, datetime_format
+from alexlib.core import sha256sum, chkenv, Version
 from alexlib.iters import link
 
 
@@ -24,10 +30,10 @@ def figsave(
 
 
 def eval_parents(
-        path: Path,
-        include: list[str],
-        exclude: list[str],
-):
+    path: Path,
+    include: list[str],
+    exclude: list[str],
+) -> bool:
     ninclude = len(include)
     parts = path.parts
 
@@ -39,7 +45,7 @@ def eval_parents(
     return (incpass and excpass)
 
 
-def pathsearch(
+def path_search(
         pattern: str,
         start_path: Path = eval("Path(__file__)"),
         listok: bool = False,
@@ -65,419 +71,778 @@ def pathsearch(
             start_path = start_path.parent
 
 
-def path_list_to_dict(
-        path_list: list[Path],
-        func: Callable = None,
-) -> dict[Any]:
-    if func is not None:
-        return {x.stem: x for x in path_list}
-    else:
-        return {x.stem: func(x) for x in path_list}
-
-
-def df_to_db(
-        df: DataFrame,
-        engine: engine,
-        table_name: str,
-        schema: str = None,
-        if_exists: str = "replace",
-        index: bool = False,
-        chunksize: int = 10000,
-        method: str = "multi",
-):
-    df.to_sql(
-        table_name,
-        engine,
-        if_exists=if_exists,
-        schema=schema,
-        index=index,
-        chunksize=chunksize,
-        method=method,
-    )
-
-
-def get_date_str(
-        usedate: bool = True,
-        usetime: bool = True,
-        usenow: bool = True,
-        datetime: dt = None,
-) -> str:
-    _dt = datetime
-    dparts = []
-    tparts = []
-    if usenow:
-        _dt = dt.now()
-    if usedate:
-        dparts = [_dt.year, _dt.month, _dt.day]
-    if usetime:
-        tparts = [_dt.hour, _dt.minute, _dt.second]
-    date = "-".join([str(x) for x in dparts])
-    time = ":".join([str(x) for x in tparts])
-    return "_".join([date, time])
-
-
-def copy_csv_str(table_name, csv_path):
-    return f"""COPY {table_name}
-    FROM '{csv_path}'
+def copy_csv_str(table_name: str, csv_path: Path) -> str:
+    return f"""COPY {table_name} FROM '{csv_path}'
     DELIMITER ','
     CSV HEADER
     """
 
 
-def eval_td(dt1: dt, dt2: dt = dt.now()):
-    if isinstance(dt1, float):
-        dt1 = dt.fromtimestamp(dt1)
-    return dt2 - dt1
-
-
 @dataclass
 class SystemObject:
-    path: Path = field(default=None)
     name: str = field(default=None)
-    include: list[str] = field(default_factory=list)
-    exclude: list[str] = field(default_factory=list)
-
-    def __repr__(self):
-        clss = self.__class__.__name__
-        parent = self.parent
-        return f"{clss}({self.name}), parent: {str(parent)}"
+    path: Path = field(default=None)
+    include: list[str] = field(
+        default_factory=list,
+        repr=False,
+    )
+    exclude: list[str] = field(
+        default_factory=list,
+        repr=False,
+    )
+    max_ascends: int = field(
+        repr=False,
+        default=8
+    )
 
     @property
-    def parent(self):
+    def sysobj_names(self):
+        return ["Directory", "File", "SystemObject"]
+
+    @property
+    def haspath(self):
+        return self.path is not None
+
+    @property
+    def hasname(self):
+        return self.name is not None
+
+    @property
+    def user(self):
+        return getenv("USERNAME")
+
+    @property
+    def hasuser(self):
+        return self.user is not None
+
+    @staticmethod
+    def add_path_cond(
+        cur_list: list[str],
+        toadd: str | list[str]
+    ) -> list[str]:
+        if isinstance(toadd, str):
+            toadd = [toadd]
+        elif not toadd:
+            toadd = []
+        if isinstance(cur_list, str):
+            cur_list = [cur_list]
+        return cur_list + toadd
+
+    def get_path(
+        self,
+        include: list[str] | str = None,
+        exclude: list[str] | str = None,
+        start_path: Path = None,
+    ) -> Path:
+        if include or self.include:
+            include = SystemObject.add_path_cond(self.include, include)
+        if exclude or self.exclude:
+            exclude = SystemObject.add_path_cond(self.exclude, exclude)
+        if isinstance(self.path, Path):
+            ret = self.path
+        elif self.haspath and isinstance(self.path, str):
+            ret = Path(self.path)
+        elif self.haspath and self.__class__.__name__ in self.sysobj_names:
+            ret = self.path.path
+        elif self.name is not None:
+            ret = path_search(
+                self.name,
+                include=include,
+                exclude=exclude,
+                start_path=start_path,
+                max_ascends=self.max_ascends
+            )
+        else:
+            raise ValueError(
+                f"need name cur={self.name} or path cur={self.path}"
+            )
+        return ret
+
+    def set_path(self):
+        self.path = self.get_path(include=self.include)
+
+    def get_name(self):
+        if self.hasname:
+            ret = self.name
+        elif self.haspath and self.__class__.__name__ in self.sysobj_names:
+            ret = self.path.name
+        elif self.haspath:
+            ret = self.path.stem
+        elif self.name is None and self.path is None:
+            raise ValueError("need name or path")
+        else:
+            ret = self.name
+        return ret
+
+    def set_name(self):
+        self.name = self.get_name()
+
+    def __post_init__(self):
+        self.set_path()
+        if not isinstance(self.path, Path):
+            raise TypeError(f"{self.path} is not Path")
+        self.set_name()
+        if not isinstance(self.name, str):
+            raise TypeError(f"{self.name} is not str")
+
+    @property
+    def parent(self) -> Path:
         return self.path.parent
 
     @property
-    def parents(self):
-        return [x.name for x in self.path.parents]
+    def parents(self) -> list[Path]:
+        return [x for x in self.path.parents]
+
+    @property
+    def parts(self) -> list[Path]:
+        return self.path.parts
+
+    def get_parent(self, name: str) -> Path:
+        if name not in self.parts:
+            raise ValueError(f"{name} not in parents[{self.parts}]")
+        else:
+            return [x for x in self.parents if x.name == name][-1]
+
+    @property
+    def nparents(self) -> int:
+        return len(self.parents)
 
     @property
     def stat(self):
         return self.path.stat()
 
     @property
-    def exists(self):
-        return self.path.exists()
+    def uid(self):
+        return self.stat.st_uid
 
     @property
-    def isfile(self):
-        return self.path.is_file()
+    def gid(self):
+        return self.stat.st_gid
 
     @property
-    def isdir(self):
-        return self.path.is_dir()
+    def uidiszero(self):
+        return self.uid == 0
 
     @property
-    def ctime_age(self):
-        return eval_td(self.stat.st_ctime)
+    def gidiszero(self):
+        return self.gid == 0
 
     @property
-    def mtime_age(self):
-        return eval_td(self.stat.st_mtime)
-
-    def isnewenough(self, limit: td):
-        if self.mtime_age < limit:
-            return True
+    def owner(self):
+        if not (self.gidiszero and self.uidiszero):
+            ret = f"{self.gid}:{self.uid}"
+        elif not self.uidiszero:
+            ret = self.uid
         else:
-            return False
-
-    def mk_subdir(self, name: str):
-        path = self.path / name
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    def get_name(self):
-        if self.name is not None:
-            ret = self.name
-        elif self.path.is_dir():
-            ret = self.path.name
-        elif self.path.is_file():
-            ret = self.path.name
-        else:
-            raise ValueError("need path or name")
+            ret = self.user
         return ret
 
-    def set_name(self):
-        self.name = self.get_name()
+    @staticmethod
+    def get_path_attr(path: Path, attr: str) -> Any:
+        try:
+            ret = getattr(path.stat(), attr)
+        except AttributeError:
+            ret = getattr(path, attr)
+        return ret
 
-    def get_path(self):
-        notnone = self.path is not None
-        isstr = isinstance(self.path, str)
-        ispath = isinstance(self.path, Path)
-        if (notnone and ispath):
-            return self.path
-        elif (notnone and isstr):
-            return Path(self.path)
-        elif self.name is not None:
-            return pathsearch(
-                self.name,
-                include=self.include,
-                exclude=self.exclude,
-            )
+    @property
+    def modified_timestamp(self) -> float:
+        return self.stat.st_mtime
+
+    @property
+    def created_timestamp(self) -> float:
+        return self.stat.st_ctime
+
+    @property
+    def modified_datetime(self) -> datetime:
+        return datetime.fromtimestamp(self.modified_timestamp)
+
+    @property
+    def created_datetime(self) -> datetime:
+        return datetime.fromtimestamp(self.created_timestamp)
+
+    @property
+    def modified_strfdate(self) -> str:
+        return self.modified_datetime.strftime(date_format)
+
+    @property
+    def created_strfdate(self) -> str:
+        return self.created_datetime.strftime(date_format)
+
+    @property
+    def modified_strfdatetime(self) -> str:
+        return self.modified_datetime.strftime(datetime_format)
+
+    @property
+    def created_strfdatetime(self) -> str:
+        return self.created_datetime.strftime(datetime_format)
+
+    @property
+    def modified_delta(self) -> timedelta:
+        return datetime.now() - self.modified_datetime
+
+    @property
+    def created_delta(self) -> timedelta:
+        return datetime.now() - self.created_datetime
+
+    def is_new_enough(
+        self,
+        min_delta: timedelta,
+    ) -> bool:
+        return self.created_delta < min_delta
+
+    @cached_property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def exists(self):
+        if not self.haspath:
+            ret = False
         else:
-            raise ValueError("need path or name")
+            ret = self.path.exists()
+        return ret
 
-    def set_path(self):
-        self.path = self.get_path()
+    def chk_exists(self):
+        if not self.exists:
+            raise FileNotFoundError(f"no {self.clsname} @ {self.path}")
 
-    def __post_init__(self):
-        self.set_path()
-        self.set_name()
+    @classmethod
+    def from_path(cls, path: Path, **kwargs):
+        if isinstance(path, str):
+            path = Path(path)
+        return cls(path=path, **kwargs)
+
+    @classmethod
+    def from_name(cls, name: str, **kwargs):
+        return cls(name=name, **kwargs)
+
+    def eval_method(
+        self,
+        method: str,
+        *args,
+        **kwargs,
+    ) -> Any:
+        func = getattr(self, method)
+        return func(*args, **kwargs)
+
+    @classmethod
+    def find(cls, name: str, **kwargs):
+        return cls(path=path_search(name, **kwargs))
+
+
+def eval_method_list(
+    method: str, lst: list[SystemObject], *args, **kwargs
+) -> list[Any]:
+    return [x.eval_method(method, *args, **kwargs) for x in lst]
 
 
 @dataclass
 class File(SystemObject):
-    schema: str = field(
+    name: str = field(default=None)
+    path: Path = field(
         default=None,
         repr=False,
     )
-    sep: str = field(
-        default=".",
-        repr=False,
-    )
-    df: DataFrame = field(
-        default=None,
+    encrypted: bool = field(
+        default=False,
         repr=False,
     )
 
     @property
-    def bytes(self):
-        return self.path.read_bytes()
+    def hash(path: Path):
+        return sha256sum(path)
 
-    @property
-    def text(self):
-        return self.path.read_text()
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name})"
 
-    @property
-    def lines(self):
-        return self.text.split("\n")
+    def rm(self):
+        self.path.unlink()
 
-    def lineexists(self, line: str):
-        return line in self.lines
-
-    def write_lines(self, lines: list[str]):
-        self.path.write_text("\n".join(lines))
-
-    def filter_new_lines(self, tochk: str | list[str]):
-        if isinstance(tochk, str):
-            tochk = [tochk]
-        return [x for x in tochk if not self.lineexists(x)]
-
-    def get_toadd(
-            self,
-            toadd: list[str],
-            onlynew: bool
-    ):
-        if isinstance(toadd, str):
-            toadd = [toadd]
-        if onlynew:
-            toadd = self.filter_new_lines(toadd)
-        return toadd
-
-    def append(
-            self,
-            toadd: str | list[str],
-            onlynew: bool = True,
-    ) -> None:
-        lines = self.lines
-        toadd = self.get_toadd(toadd, onlynew)
-        lines.extend(toadd)
-        self.write_lines(lines)
-
-    def insert_line(
-            self,
-            index: int,
-            line: str,
-            onlynew: bool = True,
-    ) -> None:
-        if (onlynew and self.lineexists(line)):
-            pass
-        else:
-            lines = self.lines
-            lines.insert(index, line)
-            self.write_lines(lines)
-
-    def prepend(
-            self,
-            toadd: str | list[str],
-            onlynew: bool = True,
-    ) -> None:
-        lines = self.lines
-        toadd = self.get_toadd(toadd, onlynew)
-        toadd.extend(lines)
-        self.write_lines(toadd)
-
-    def __len__(self):
-        return len(self.lines)
-
-    @property
-    def filetype(self):
-        return self.path.suffix
-
-    @property
-    def ext(self):
-        return self.path.suffix.strip(self.sep)
+    def rename(self, name: str, overwrite: bool = False):
+        newpath = self.path.parent / name
+        if overwrite and newpath.exists():
+            newpath.unlink()
+        self.path.rename(self.path.parent / name)
+        self.path = newpath
+        self.set_name()
 
     def istype(self, suffix: str):
-        return self.filetype.endswith(suffix)
+        low = self.path.suffix.lower()
+        other = suffix.strip(".").lower()
+        return low.endswith(other)
 
     @property
-    def isdotenv(self):
-        return self.name.startswith(".env")
-
-    @property
-    def isjson(self):
-        return self.istype(".json")
-
-    @property
-    def iscsv(self):
-        return self.istype(".csv")
-
-    @property
-    def isxlxs(self):
+    def isxlsx(self):
         return self.istype(".xlsx")
 
     @property
     def issql(self):
         return self.istype(".sql")
 
-    def read_json(self, path: Path, asdf: bool = False):
-        if not path.suffix.endswith("json"):
-            raise ValueError("not a json file")
-        ret = recs = None
-        with open(path, "r") as file:
-            try:
-                ret = load(file)
-            except TypeError:
-                ret = loads(load(file))
-            except JSONDecodeError:
-                recs = [loads(x) for x in self.lines if len(x) > 1]
-        if (ret is not None and asdf):
-            ret = DataFrame.from_dict(ret)
-        elif (recs is not None and asdf):
-            ret = DataFrame.from_records(recs)
-        elif recs is not None:
-            ret = recs
-        return ret
+    @property
+    def iscsv(self):
+        return self.istype(".csv")
 
-    def to_json(self, _dict: dict):
-        if not self.isjson:
-            raise ValueError("not a json file")
-        with open(self.path, "w") as f:
-            dump(dumps(_dict), fp=f)
+    @property
+    def isjson(self):
+        return self.istype(".json")
+
+    @property
+    def istxt(self):
+        return self.istype(".txt")
+
+    @property
+    def ispy(self):
+        return self.istype(".py")
+
+    @property
+    def isipynb(self):
+        return self.istype(".ipynb")
+
+    @property
+    def text(self) -> str:
+        try:
+            return self.path.read_text()
+        except UnicodeDecodeError:
+            return self.path.read_text(encoding="utf8")
+
+    @property
+    def lines(self) -> list[str]:
+        return self.text.split("\n")
+
+    @staticmethod
+    def filter_lines(
+        lines: list[str],
+        startchar: int,
+        endchar: int,
+    ):
+        pass
+
+    def get_filter_lines(self):
         pass
 
     @property
-    def read_func(self):
-        if self.iscsv:
-            ret = read_csv
-        elif self.isxlxs:
-            ret = read_excel
+    def line_counter(self) -> Counter:
+        return Counter(self.lines)
+
+    @property
+    def nlines(self) -> int:
+        return len(self.lines)
+
+    @property
+    def line_indexes(self) -> dict[str: list[int]]:
+        lines, rng = self.lines, range(self.nlines)
+        return {
+            line: [i + 1 for i in rng if line == lines[i]]
+            for line in self.line_counter.keys()
+        }
+
+    @property
+    def line_repeats(self) -> dict[str: list[int]]:
+        return {
+            k: v
+            for k, v in self.line_indexes.items()
+            if (len(v) > 1 and len(k) > 0)
+        }
+
+    @property
+    def line_lengths(self) -> list[int]:
+        return [len(x) for x in self.lines]
+
+    def write_lines(self, lines: list[str]) -> None:
+        self.path.write_text("\n".join(lines))
+
+    def append_lines(self, lines: list[str]) -> None:
+        self.write_lines(self.lines + lines)
+
+    def prepend_lines(self, lines: list[str]) -> None:
+        self.write_lines(lines + self.lines)
+
+    def replace_text(self, old: str, new: str) -> None:
+        self.path.write_text(self.text.replace(old, new))
+
+    @staticmethod
+    def use_majprod(
+        sql: str,
+        old: str = "EDW.dbo.",
+        new: str = "MAJESCOPROD.EDW.dbo.",
+    ) -> str:
+        return sql.replace(old, new)
+
+    @property
+    def start_val(self) -> str:
+        env = "report_start"
+        val = chkenv(env, need=False)
+        if val:
+            return f"'{val}'"
+
+    @property
+    def end_val(self) -> str:
+        env = "report_end"
+        val = chkenv(env, need=False)
+        if val:
+            return f"'{val}'"
+
+    @property
+    def start_text(self) -> str:
+        return chkenv("report_start_text", need=False)
+
+    @property
+    def end_text(self) -> str:
+        return chkenv("report_end_text", need=False)
+
+    def get_sql(
+        self,
+        replace: list[tuple[str, str]] = None
+    ) -> str:
+        sql = self.text
+        if isinstance(replace, tuple):
+            sql = sql.replace(*replace)
+        elif isinstance(replace, list):
+            for tup in replace:
+                sql = sql.replace(*tup)
+        elif replace is not None:
+            raise ValueError(
+                f"{replace} must be tuple | list[tuple] but is {type(replace)}"
+            )
+        if self.start_text and self.start_val and not replace:
+            sql = sql.replace(self.start_text, self.start_val)
+        if self.end_text and self.end_val and not replace:
+            sql = sql.replace(self.end_text, self.end_val)
+        if chkenv("use_majprod", need=False, ifnull=False):
+            sql = File.use_majprod(sql)
+        return sql
+
+    @cached_property
+    def read_func(self) -> Callable:
+        if self.isxlsx:
+            from pandas import read_excel
+
+            ret = partial(read_excel, self.path)
+        elif self.iscsv:
+            from pandas import read_csv
+
+            ret = partial(read_csv, self.path)
         elif self.issql:
+            from pandas import read_sql
+
             ret = read_sql
         elif self.isjson:
-            ret = self.read_json
+            from pandas import read_json
+
+            ret = partial(read_json, self.text)
+        elif self.istxt:
+            return self.path.read_text
         else:
-            raise ValueError("not a valid filetype")
+            raise TypeError(f"read func not loaded for {self.path.suffix}")
         return ret
 
     def get_df(
-            self,
-            schema: str = None,
-            table: str = None,
-            **kwargs,
+        self,
+        engine: Engine = None,
+        replace: tuple[str, str] = None,
+        **kwargs,
     ) -> DataFrame:
-        torsisnone = (table is None or schema is None)
-        if (self.issql and torsisnone):
-            raise ValueError("need schema.table for sql file")
-        return self.read_func(
-            self.path,
-            **kwargs,
+        if self.issql and engine is None:
+            raise ValueError("need engine to get df from db")
+        elif not self.issql:
+            return self.read_func(**kwargs)
+        sql = self.get_sql(replace=replace)
+        return self.read_func(sql, engine)
+
+    def load_json(self) -> dict:
+        if not self.isjson:
+            raise TypeError("this method is reserved for json files")
+        else:
+            with open(self.path, "r") as file:
+                json = load(file)
+        if isinstance(json, dict):
+            ret = json
+        elif isinstance(json, str):
+            ret = loads(json)
+        else:
+            raise TypeError("failed to correctly load json")
+        return ret
+
+    @classmethod
+    def to_json(cls, _dict: dict, path: Path) -> object:
+        json_str = dumps(_dict)
+        with open(path, "w") as file:
+            dump(json_str, file)
+        return cls(path=path)
+
+    @classmethod
+    def from_df(cls, df: DataFrame, path: Path):
+        funcname = f"to_{path.suffix}"
+        func = getattr(df, funcname)
+        func(path)
+        return cls(path=path)
+
+    @cached_property
+    def comment_chars(self):
+        if self.issql:
+            line = "--"
+            multi = ["/*", """*/"""]
+        elif self.ispy:
+            line = """#"""
+            multi = ['''"""''', '''"""''']
+        elif self.isps1:
+            line = """#"""
+            multi = ["""<#""", """#>"""]
+        else:
+            line = ""
+            multi = ["", ""]
+        return {"line": line, "multi": multi}
+
+    @cached_property
+    def comment_line_chars(self):
+        return self.comment_chars["line"]
+
+    @cached_property
+    def comment_lines_chars(self):
+        return self.comment_chars["multi"]
+
+    @staticmethod
+    def mk_header_lines(
+        created_by: str,
+        created_on: str,
+        comment_lines_chars: list[str],
+    ) -> str:
+        lc, rc = comment_lines_chars
+        return [
+            lc,
+            f"\tCreated By: {created_by}",
+            f"\tCreated On: {created_on}\n",
+            "\tModified By:",
+            "\tModified On:\n",
+            rc,
+        ]
+
+    def get_header_lines(self):
+        return File.mk_header_lines(
+            self.user, self.created_strfdatetime, self.comment_lines_chars
         )
+
+    @property
+    def hasheader(self):
+        ssmspart = "command from SSMS"
+        leftchar = self.comment_lines_chars[0]
+        firstline = self.text.split("\n")[0]
+        return leftchar in firstline and ssmspart not in firstline
+
+    def add_header(self):
+        if not self.isheadertype:
+            info(f"{self.path} not in header types")
+        elif self.hasheader:
+            info(f"{self.path} already has header")
+        else:
+            self.prepend_lines(self.get_header_lines())
+            info(f"header written to {self.path}")
+
+    def get_alir_date_from_name(self):
+        if not self.name.startswith("cvgver"):
+            raise ValueError("this doesn't seem like an alir output file")
+        elif not self.istxt:
+            raise TypeError("output files should be text files")
+        datestr = self.name.split(".")[1]
+        return datetime(datestr[:4], datestr[4:6], datestr[6:8])
+
+    def copy_to(self, destination: Path, overwrite: bool = False):
+        destexists = destination.exists()
+        if destexists and not overwrite:
+            raise FileExistsError(
+                f"{destination} exists - if intentional, set overwrite=True"
+            )
+        elif destexists:
+            destination.unlink()
+        destination.write_bytes(self.path.read_bytes())
+        return File.from_path(destination)
 
 
 @dataclass
 class Directory(SystemObject):
-    @property
-    def contents(self):
-        return [x for x in self.path.iterdir()]
+    name: str = field(default=None)
+    path: Path = field(default=None, repr=False)
+    test: bool = field(default=False)
+    levels: int = field(default=1, repr=False)
 
     @property
-    def filepaths(self):
-        return [x for x in self.contents if x.is_file()]
+    def contents(self) -> list[Path]:
+        return list(self.path.iterdir())
 
     @property
-    def files(self):
-        return [File(path=x) for x in self.filepaths]
+    def dirlist(self) -> list[SystemObject]:
+        return [Directory.from_path(x) for x in self.contents if x.is_dir()]
 
     @property
-    def dirpaths(self):
-        return [x for x in self.contents if x.is_dir()]
+    def filelist(self) -> list[File]:
+        return [File.from_path(x) for x in self.contents if x.is_file()]
 
     @property
-    def dirs(self):
-        return [Directory(path=x) for x in self.dirpaths]
+    def objlist(self) -> list[SystemObject]:
+        return self.dirlist + self.filelist
+
+    @staticmethod
+    def tree_item(obj: SystemObject) -> dict[str:SystemObject]:
+        return obj if obj.path.is_file() else obj.tree
 
     @property
-    def nfiles(self):
-        return len(self.filepaths)
+    def tree(self):
+        return {
+            self.name: {
+                obj.name: Directory.tree_item(obj) for obj in self.objlist
+            }
+        }
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name})"
+
+    def get_type_filelist(self, type_: str) -> list[File]:
+        return [
+            x for x in self.filelist
+            if x.istype(type_) and isinstance(x, File)
+        ]
 
     @property
-    def ndirs(self):
-        return len(self.dirpaths)
+    def sql_filelist(self) -> list[File]:
+        return self.get_type_filelist("sql")
 
     @property
-    def ncontents(self):
-        return len(self.contents)
+    def nfiles(self) -> int:
+        return len(self.filelist)
 
     @property
-    def allchilddirs(self):
-        childdirs = [x.allchilddirs for x in self.dirs]
-        return self.dirs + link(childdirs)
+    def ndirs(self) -> int:
+        return len(self.dirlist)
 
     @property
-    def allchildfiles(self):
-        childfiles = [x.files for x in self.allchilddirs]
-        return self.files + link(childfiles)
+    def hasnofiles(self) -> bool:
+        return self.nfiles == 0
 
-    def go_up(self, n: int | str = 1):
-        for _ in range(n):
-            try:
-                self.path = self.path.parent
-            except PermissionError:
-                break
-            if self.path == Path("/"):
-                break
-            elif self.path.name == n:
-                break
-        self.set_name()
+    @property
+    def hasnodirs(self) -> bool:
+        return self.ndirs == 0
 
-    def go_down(self, name: str | list[str]):
-        if isinstance(name, str):
-            ret = self / name
-        elif isinstance(name, list):
-            ret = self
-            for n in name:
-                ret = ret / n
+    @property
+    def dirswithfiles(self):
+        d = self.dirlist
+        return [x for x in d if not x.hasnofiles]
+
+    @property
+    def isempty(self) -> bool:
+        return self.hasnodirs and self.hasnofiles
+
+    @property
+    def nchildfiles(self) -> int:
+        dirfiles = sum([x.nchildfiles for x in self.dirlist])
+        return dirfiles + self.nfiles
+
+    @property
+    def nchilddirs(self) -> int:
+        dirdirs = sum([x.nchilddirs for x in self.dirlist])
+        return dirdirs + self.ndirs
+
+    @property
+    def allchildfiles(self) -> list[File]:
+        return self.filelist + link([
+            x.allchildfiles for x in self.dirlist
+        ])
+
+    @property
+    def allchilddirs(self) -> list[SystemObject]:
+        return self.dirlist + link([
+            x.allchilddirs for x in self.dirlist
+        ])
+
+    @property
+    def childdirswithfiles(self):
+        return [x for x in self.allchilddirs if not x.hasnofiles]
+
+    def get_latest_file(self):
+        """gets last produced file object"""
+        try:
+            dates = [x.modified_datetime for x in self.filelist]
+            idx = dates.index(max(dates))
+        except PermissionError("can't get last mod time"):
+            names = [x.name for x in self.filelist]
+            idx = names.index(max(names))
+        return self.filelist[idx]
+
+    def rm_files(self) -> None:
+        for file in self.filelist:
+            file.rm()
+
+    def teardown(self, warn: bool = True) -> None:
+        if warn:
+            msg = """
+            this is a dangerous method
+            only set warn=False if you really want
+            to destroy this
+        """
+            raise ValueError(msg)
+        for d in self.dirlist:
+            d.teardown(warn=warn)
+            d.rm_files()
+        self.rm_files()
+        self.path.rmdir()
+
+    def apply_to_files(
+        self,
+        method,
+        *args,
+        **kwargs,
+    ) -> list[File]:
+        eval_method_list(
+            method,
+            self.filelist,
+            *args,
+            **kwargs,
+        )
+
+    def add_header_to_files(
+        self,
+        method: str = "add_header",
+        cascade: bool = True,
+    ) -> None:
+        self.apply_to_files(method)
+        if cascade:
+            for dir in self.dirlist:
+                dir.add_header_to_files()
+
+    @property
+    def randfile(self):
+        return choice(self.filelist)
+
+    @property
+    def randdir(self):
+        return choice(self.dirlist)
+
+    @property
+    def randchildfile(self):
+        return choice(self.allchildfiles)
+
+    @property
+    def randchilddir(self):
+        return choice(self.allchilddirs)
+
+    @property
+    def randdirwithfiles(self):
+        return choice(self.dirswithfiles)
+
+    @property
+    def maxtreedepth(self):
+        if self.isempty:
+            ret = self.nparents
         else:
-            raise ValueError("invalid type")
+            maxdirp = max([x.nparents for x in self.allchilddirs])
+            maxfilep = max([x.nparents for x in self.allchildfiles])
+            ret = max(maxdirp, maxfilep)
+        return 1 + ret
 
-    def insert_all_files(
-            self,
-            engine: engine,
-            schema: str = None
-    ) -> int:  # total rows inserted
-        total_rows = 0
-        if schema is None:
-            schema = self.parent.name
-
-        for file in self.files:
-            try:
-                file.to_db(engine, schema=schema)
-                total_rows += file.nrows
-            except ValueError:
-                """only adds files with read function"""
-
-        return total_rows
+    @property
+    def maxchilddepth(self):
+        return self.maxtreedepth - self.nparents
 
     def __div__(self, other: SystemObject | str):
         oisfile = isinstance(other, File)
@@ -522,3 +887,30 @@ class Directory(SystemObject):
 
     def __floordiv__(self, other: SystemObject | str):
         return self.__div__(other)
+
+
+def update_file_version(
+    version: str,
+    path: Path,
+) -> None:
+    file = File.from_path(path)
+    newline = f"version = {version}"
+    newlines = [
+        newline if x.startswith("version") else x
+        for x in file.lines
+    ]
+    file.write_lines(newlines)
+
+
+update_path_with_tag = partial(
+    update_file_version,
+    str(Version.from_tag()),
+)
+update_setup_with_tag = partial(
+    update_path_with_tag,
+    path_search(
+        "setup.cfg",
+        start_path=Path.cwd(),
+        exclude=[".venv", "Lib"]
+    )
+)

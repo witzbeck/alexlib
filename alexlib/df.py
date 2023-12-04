@@ -100,3 +100,23 @@ def rm_df_col_pattern(pattern: str | tuple | list,
     else:
         raise ValueError("input not recognized")
     return df.loc[:, new_cols]
+
+def df_to_db(
+    df: DataFrame,
+    engine: engine,
+    table_name: str,
+    schema: str = None,
+    if_exists: str = "replace",
+    index: bool = False,
+    chunksize: int = 10000,
+    method: str = "multi",
+):
+    df.to_sql(
+        table_name,
+        engine,
+        if_exists=if_exists,
+        schema=schema,
+        index=index,
+        chunksize=chunksize,
+        method=method,
+    )
