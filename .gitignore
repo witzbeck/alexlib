@@ -1,28 +1,23 @@
 !.gitignore 
+
 # envs
 .env.*
+*.env
 !*.json
 
+debug.env
+*.code-workspace
+*.lock
+.vscode/
 
-/data
-poetry.lock
-/technical_refs
+.vscode
 tests/fixtures/cached_*_text.txt
-.idea
 tags
-/runs_old
-/examples/rag/sweep
-tensorflow_code
 /my_txs
-/examples/**/*.args
-proc_data
-*.env
 .*.swp
 /examples/runs
-.ruff_cache
 /wandb
 lang_code_data/
-.vscode
 lightning_logs/
 *.*~
 .python-version
@@ -44,14 +39,11 @@ runs
 pip-wheel-metadata/
 /USDC
 temp*
-debug.env
 .pre-commit*
 /mlruns
 !*.tsv
 .DS_Store
-*.code-workspace
-*.lock
-.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
