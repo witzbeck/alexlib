@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from functools import cached_property, partial
+from itertools import chain, product
 from json import JSONDecodeError, dumps, load, loads
 from logging import debug, info
+from multiprocessing import Value
 from pathlib import Path
 from typing import Callable
 from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
@@ -10,7 +12,11 @@ from cryptography.fernet import Fernet
 
 from alexlib.db import Curl
 from alexlib.file import File, Directory, path_search
+"""
+make entry script for auth that generates a csv to fill in after producing product of details for scaffolding from input.txt
+generates all auth objects, creates store, then deletes self
 
+"""
 
 @dataclass(slots=True, frozen=True)
 class SecretValue:
@@ -299,6 +305,85 @@ class SecretStore(File):
             k: str(v) for k, v in self.secrets.items()
         }
 
+
+@dataclass
+class Auth:
+    username: SecretValue = field(
+        default=None,
+        repr=False
+    )
+    password: SecretValue = field(
+        default=None,
+        repr=False
+    )
+    host: SecretValue = field(
+        default=None,
+        repr=False
+    )
+    port: SecretValue = field(
+        default=None,
+        repr=False
+    )
+    database: SecretValue = field(
+        default=None,
+        repr=False
+    )
+
+    @property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def hostparts(self) -> list[str]:
+        return self.host.split(".") if self.host else []
+
+    @property
+    def hashost(self) -> bool:
+        return bool(self.host)
+
+    @property
+    def env(self) -> str:
+        try:
+            return self.hostparts[1]
+        except IndexError:
+            return self.hostparts[0] if self.hashost else ""
+
+    def __repr__(self):
+        lines = [x for x in [self.username, self.env, self.database] if x]
+        return f"{self.clsname}(\n{"\n\t".join(lines)}\n)"
+
+
+    @cached_property
+    def curl(self) -> str:
+        return str(
+            Curl(
+                username=self.username,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+                database=self.database,
+            )
+        )
+
+    @cached_property
+    def basicauth(self):
+        return HTTPBasicAuthHandler(
+            self.username,
+            self.password,
+        )
+
+    @cached_property
+    def digestauth(self):
+        return HTTPDigestAuthHandler(self.username, self.password)
+
+
+@dataclass
+class TrustedAuth(Auth):
+    def __post_init__(self):
+        if self.username:
+            raise ValueError(f"{self.clsname} cannot have username")
+        if self.password:
+            raise ValueError(f"{self.clsname} cannot have password")
 
 @dataclass
 class AuthHandler:
