@@ -1,22 +1,258 @@
+
 from dataclasses import dataclass, field
 from functools import cached_property, partial
-from itertools import chain, product
-from json import JSONDecodeError, dumps, load, loads
+from json import JSONDecodeError, dumps, load, loads, dump
 from logging import debug, info
-from multiprocessing import Value
 from pathlib import Path
+from string import ascii_lowercase
 from typing import Callable
 from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
+from random import choice, randint
 
 from cryptography.fernet import Fernet
 
 from alexlib.db import Curl
+from alexlib.fake import RandGen
 from alexlib.file import File, Directory, path_search
 """
-make entry script for auth that generates a csv to fill in after producing product of details for scaffolding from input.txt
-generates all auth objects, creates store, then deletes self
+Generator
+make entry script for auth
+generates a json to fill in
+product of details for scaffolding
+
+Executor
+generates all auth objects,
+creates store,
+then deletes self
 
 """
+
+vowels = "aeiou"
+n = ascii_lowercase[13]
+ndevs = 2
+
+envs = [f"dev{x}" for x in ascii_lowercase[-ndevs:]] + ["test", "prod"]
+databases = ["Landing", "Staging", "Main", "Sandbox"]
+systems = ["postgres", "sqlite", "proget"]
+
+rand_system = partial(choice, systems)
+rand_env = partial(choice, envs)
+rand_db = partial(choice, databases)
+
+
+@dataclass
+class AuthPart:
+    name: str
+    length: int = field(default=10)
+    randsrc: Callable = field(default=RandGen.randlet)
+
+    @property
+    def randfunc(self):
+        return partial(self.randsrc, n=self.length)
+
+    @classmethod
+    def rand(cls):
+        return cls(cls.randfunc())
+
+    @property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    def __repr__(self):
+        return f"{self.clsname}({self.name}, {self.length})"
+
+
+@dataclass
+class Username(AuthPart):
+    length: int = field(default=6)
+
+
+@dataclass
+class Password(AuthPart):
+    length: int = field(default=12)
+    randsrc: Callable = field(default=RandGen.randprint)
+
+
+@dataclass
+class Login:
+    user: Username
+    pw: Password
+
+    @classmethod
+    def rand(cls):
+        return cls(Username.rand(), Password.rand())
+
+
+@dataclass
+class Server:
+    host: str
+    port: int
+
+    @property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    @staticmethod
+    def rand_ip() -> str:
+        return ".".join([
+            str(randint(180, 199)),
+            str(randint(160, 179)),
+            RandGen.randintstr(n=1),
+            RandGen.randintstr(n=3),
+        ])
+
+    @staticmethod
+    def rand_addr() -> str:
+        return ".".join([
+            choice(systems),
+            choice(envs),
+            RandGen.randlet(n=6),
+            choice(["local", "remote"])
+        ])
+
+    @staticmethod
+    def rand_host() -> str:
+        return choice([Server.rand_ip, Server.rand_addr])()
+
+    @staticmethod
+    def rand_port() -> int:
+        return randint(1000, 9999)
+
+    @classmethod
+    def rand(cls):
+        return cls(cls.rand_host(), cls.rand_port())
+
+    def __repr__(self) -> str:
+        return f"{self.clsname}({self.host}:{self.port})"
+
+
+@dataclass
+class Auth:
+    system: str
+    env: str
+    login: Login
+    server: Server
+    database: str
+
+    @property
+    def def_attrs(self) -> list[str]:
+        return ["name", "env"]
+
+    @property
+    def defname(self) -> str:
+        return f"{self.env}.{self.name}"
+
+    @cached_property
+    def curl(self) -> Curl:
+        return Curl(
+            username=self.login.user,
+            password=self.login.pw,
+            host=self.server.host,
+            port=self.server.port,
+            database=self.database,
+        )
+
+    @classmethod
+    def rand(cls):
+        return cls(
+            system=rand_system(),
+            env=rand_env(),
+            login=Login.rand(),
+            server=Server.rand(),
+            database=rand_db(),
+        )
+
+    @property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def hostparts(self) -> list[str]:
+        host = self.server.host
+        return host.split(".") if host else []
+
+    @property
+    def hashost(self) -> bool:
+        return bool(self.host)
+
+    @property
+    def env(self) -> str:
+        try:
+            return self.hostparts[1]
+        except IndexError:
+            return self.hostparts[0] if self.hashost else ""
+
+    def __repr__(self):
+        lines = [x for x in [self.username, self.env, self.database] if x]
+        return f"{self.clsname}(\n{"\n\t".join(lines)}\n)"
+
+    @cached_property
+    def basicauth(self):
+        return HTTPBasicAuthHandler(
+            self.username,
+            self.password,
+        )
+
+    @cached_property
+    def digestauth(self):
+        return HTTPDigestAuthHandler(self.username, self.password)
+
+
+@dataclass
+class AuthGenerator:
+    name: str = field(
+        default="auth_template",
+    )
+    path: Path = field(
+        default=None,
+        repr=False,
+    )
+    envs: list[str] = field(
+        default=envs,
+        repr=False,
+    )
+    systems: list[str] = field(
+        default=systems,
+        repr=False,
+    )
+    from_user: bool = field(
+        default=True,
+        repr=False,
+    )
+    """ generates all auth objects, creates store, then deletes self
+    """
+
+    @property
+    def auth_template():
+        return {
+            "username": "",
+            "password": "",
+            "host": "",
+            "port": "",
+        }
+
+    @staticmethod
+    def mk_all_templates(
+        envs: list[str],
+        systems: list[str],
+    ) -> dict[str:dict]:
+        tmp = AuthGenerator.auth_template
+        return {s: {e: tmp for e in envs} for s in systems}
+
+    @cached_property
+    def here(self):
+        return Path(eval("__file__")).parent
+
+    def write_template_file(self) -> None:
+        templates = AuthGenerator.mk_all_templates(self.envs, self.systems)
+        self.path.write_bytes(dump(templates))
+
+    def __post_init__(self) -> None:
+        if self.path is None:
+            self.path = self.here / f"{self.name}.json"
+        if not self.path.exists():
+            self.write_template_file()
+
 
 @dataclass(slots=True, frozen=True)
 class SecretValue:
@@ -307,77 +543,6 @@ class SecretStore(File):
 
 
 @dataclass
-class Auth:
-    username: SecretValue = field(
-        default=None,
-        repr=False
-    )
-    password: SecretValue = field(
-        default=None,
-        repr=False
-    )
-    host: SecretValue = field(
-        default=None,
-        repr=False
-    )
-    port: SecretValue = field(
-        default=None,
-        repr=False
-    )
-    database: SecretValue = field(
-        default=None,
-        repr=False
-    )
-
-    @property
-    def clsname(self) -> str:
-        return self.__class__.__name__
-
-    @property
-    def hostparts(self) -> list[str]:
-        return self.host.split(".") if self.host else []
-
-    @property
-    def hashost(self) -> bool:
-        return bool(self.host)
-
-    @property
-    def env(self) -> str:
-        try:
-            return self.hostparts[1]
-        except IndexError:
-            return self.hostparts[0] if self.hashost else ""
-
-    def __repr__(self):
-        lines = [x for x in [self.username, self.env, self.database] if x]
-        return f"{self.clsname}(\n{"\n\t".join(lines)}\n)"
-
-
-    @cached_property
-    def curl(self) -> str:
-        return str(
-            Curl(
-                username=self.username,
-                password=self.password,
-                host=self.host,
-                port=self.port,
-                database=self.database,
-            )
-        )
-
-    @cached_property
-    def basicauth(self):
-        return HTTPBasicAuthHandler(
-            self.username,
-            self.password,
-        )
-
-    @cached_property
-    def digestauth(self):
-        return HTTPDigestAuthHandler(self.username, self.password)
-
-
-@dataclass
 class TrustedAuth(Auth):
     def __post_init__(self):
         if self.username:
@@ -385,8 +550,10 @@ class TrustedAuth(Auth):
         if self.password:
             raise ValueError(f"{self.clsname} cannot have password")
 
+
 @dataclass
 class AuthHandler:
+    env: str = field()
     name: str = field()
     store: SecretStore = field(default=None, repr=False)
     crypt: Cryptographer = field(init=False, repr=False)
@@ -399,7 +566,7 @@ class AuthHandler:
         clsname = self.__class__.__name__
         lines = "\n\t".join(
             [
-                f"\tname =  {self.name}",
+                f"\tenv:name =  {self.env}{self.name}",
                 f"nsecrets =  {len(self.store)}",
                 f"storepath =  {self.storepath}",
             ]
@@ -407,23 +574,23 @@ class AuthHandler:
         return f"{clsname}(\n{lines}\n)"
 
     @property
-    def hasname(self):
+    def hasname(self) -> bool:
         return self.name is not None
 
     @property
-    def haskey(self):
+    def haskey(self) -> bool:
         return self.key is not None
 
     @property
-    def hasstore(self):
+    def hasstore(self) -> bool:
         return self.store is not None
 
     @property
-    def hascrypt(self):
+    def hascrypt(self) -> bool:
         return hasattr(self, "crypt")
 
     @cached_property
-    def keyname(self):
+    def keyname(self) -> str:
         end = ".key"
         if self.name.endswith(end):
             ret = self.name
@@ -432,7 +599,7 @@ class AuthHandler:
         return ret
 
     @cached_property
-    def keypath(self):
+    def keypath(self) -> Path:
         return self.dirpath / self.keyname
 
     @cached_property

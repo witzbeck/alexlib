@@ -1,17 +1,15 @@
 from dataclasses import dataclass, field
 from functools import cached_property
-from pathlib import Path
 from queue import Queue
 from sqlite3 import Connection as LiteConnection, Cursor
 from sqlite3 import DatabaseError, connect as s3_connect
-from string import ascii_letters
+from string import ascii_letters, digits
 from threading import Thread
 from typing import Any
-from dataclasses import dataclass, field
 from os import environ
 from subprocess import Popen, PIPE
 from random import choice
-from typing import Any
+from pathlib import Path
 
 from pandas import read_sql, DataFrame, Series
 from psycopg import connect as pg_connect
@@ -26,8 +24,7 @@ from alexlib.config import ConfigFile
 from alexlib.df import get_distinct_col_vals, series_col
 from alexlib.file import path_search, File, Directory
 
-NUMBERS = "0987654321"
-SQL_CHARS = f"{ascii_letters} _{NUMBERS}"
+SQL_CHARS = f"{ascii_letters} _{digits}"
 QG_SUBS = {
     " ": "_",
     "-": "_",
@@ -175,20 +172,13 @@ class Curl:
 
 @dataclass
 class Connection:
-    curl: str = field(
+    curl: Curl = field(
         repr=False,
     )
     engine: Engine = field(
         repr=False,
         init=False,
     )
-
-    @staticmethod
-    def oracle_mod() -> None:
-        """only used for sqlalchemy <=1.4"""
-        eval("from sys import modules")
-        eval("import oracledb as odb")
-        eval('modules["cx_Oracle"] = odb')
 
     def __post_init__(self) -> None:
         if isinstance(self.curl, Curl):
@@ -197,7 +187,7 @@ class Connection:
 
     @property
     def canping(self):
-        return not (self.host is None or self.port is None)
+        return not (self.curl.host is None or self.curl.port is None)
 
     @property
     def isopen(self) -> bool:
@@ -560,7 +550,7 @@ class SQL:
 
 
 @dataclass
-class Connection:
+class ConnectionMP:
     context: str = field(default="LOCAL")
     driver: str = field(default="postgresql+psycopg://")
     engine: str = field(repr=False, default=None)
@@ -795,7 +785,13 @@ class Connection:
         text = path.read_text()
         return self.run_pg_sql(text)
 
-    def df_to_db(self, df: DataFrame, schema: str, table: str, **kwargs) -> None:
+    def df_to_db(
+        self,
+        df: DataFrame,
+        schema: str,
+        table: str,
+        **kwargs
+    ) -> None:
         if schema not in self.allschemas:
             try:
                 self.create_schema(schema)
@@ -867,7 +863,12 @@ class Connection:
         sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
         return self.run_pd_query(sql)
 
-    def get_record_count(self, schema: str, table: str, print_: bool = True) -> int:
+    def get_record_count(
+        self,
+        schema: str,
+        table: str,
+        print_: bool = True
+    ) -> int:
         sql = f"select count(*) from {schema}.{table};"
         val = self.run_pg_sql(sql).values[0][0]
         if print_:

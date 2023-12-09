@@ -14,7 +14,7 @@ from pandas import DataFrame
 from sqlalchemy import Engine
 
 from alexlib.constants import date_format, datetime_format
-from alexlib.core import sha256sum, chkenv, Version
+from alexlib.core import sha256sum, chkenv
 from alexlib.iters import link
 
 
@@ -900,17 +900,3 @@ def update_file_version(
         for x in file.lines
     ]
     file.write_lines(newlines)
-
-
-update_path_with_tag = partial(
-    update_file_version,
-    str(Version.from_tag()),
-)
-update_setup_with_tag = partial(
-    update_path_with_tag,
-    path_search(
-        "setup.cfg",
-        start_path=Path.cwd(),
-        exclude=[".venv", "Lib"]
-    )
-)

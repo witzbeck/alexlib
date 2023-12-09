@@ -3,12 +3,14 @@ from datetime import datetime, timedelta
 from itertools import chain
 from pathlib import Path
 from string import printable, ascii_letters
-from random import randint, choice
+from random import choices, randint, choice
 
 from alexlib.file import File, Directory
 
 letlist = list(ascii_letters)
 printlist = list(printable)
+vowels = list("aeiou")
+consonants = [x for x in letlist if x not in vowels]
 
 
 @dataclass
@@ -21,33 +23,48 @@ class RandGen:
         return randint(min_int, max_int)
 
     @staticmethod
-    def randintstr(**kwargs):
+    def _randintstr(**kwargs) -> str:
         return str(RandGen.randint(**kwargs))
 
     @staticmethod
-    def randlet():
-        return choice(letlist)
+    def randintstr(n: int = None, **kwargs) -> str:
+        g = lambda: RandGen._randintstr(**kwargs)
+        func = choices if n else choice
+        arg = (g, n) if n else g
+        return func(arg)
 
     @staticmethod
-    def randprint():
-        return choice(printlist)
+    def randlet(
+        n: int = None,
+        vowels_: bool = False,
+    ) -> str:
+        lst = vowels if vowels_ else letlist
+        func = choices if n else choice
+        arg = (lst, n) if n else lst
+        return func(arg)
+
+    @staticmethod
+    def randprint(n: int = None) -> str:
+        func = choices if n else choice
+        arg = (printlist, n) if n else printlist
+        return func(arg)
 
     @staticmethod
     def infgen(
-        _int: bool = False,
-        _intstr: bool = False,
-        _let: bool = False,
+        int_: bool = False,
+        intstr_: bool = False,
+        let_: bool = False,
         printable: bool = False,
     ) -> int | str:
-        if not (_int or _intstr or _let or printable):
+        if not (int_ or intstr_ or let_ or printable):
             raise ValueError("need choice")
         else:
             funcs = []
-        if _int:
+        if int_:
             funcs.append(RandGen.randint)
-        if _intstr:
+        if intstr_:
             funcs.append(RandGen.randintstr)
-        if _let:
+        if let_:
             funcs.append(RandGen.randlet)
         if printable:
             funcs.append(RandGen.randprint)
@@ -77,13 +94,13 @@ class RandGen:
 
     @staticmethod
     def mk_test_name(
-        _min: int = 5,
-        _max: int = 12,
-        _let: bool = True,
-        _intstr: bool = True
+        min_: int = 5,
+        max_: int = 12,
+        let_: bool = True,
+        intstr_: bool = True
     ):
-        name_len = randint(_min, _max)
-        name = RandGen.limgen(name_len, _intstr=_intstr, _let=_let)
+        name_len = randint(min_, max_)
+        name = RandGen.limgen(name_len, intstr_=intstr_, let_=let_)
         return "__test" + name
 
     @staticmethod
