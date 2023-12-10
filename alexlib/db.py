@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, Engine
 from sqlalchemy.sql import text
 from sqlalchemy_utils import database_exists, create_database
 
+from alexlib.auth import Curl
 from alexlib.core import chkenv, ping
 from alexlib.config import ConfigFile
 from alexlib.df import get_distinct_col_vals, series_col
@@ -91,83 +92,6 @@ def get_data_dict_series(
         )
         for name, file in files.items()
     }
-
-
-@dataclass
-class Curl:
-    username: str = field(
-        default=None,
-    )
-    password: str = field(
-        default=None,
-        repr=False,
-    )
-    host: str = field(
-        default=None,
-    )
-    port: int = field(
-        default=None,
-        repr=False,
-    )
-    database: str = field(
-        default=None,
-    )
-    dialect: str = field(default="postgresql", repr=False)
-    driver: str = field(default="psycopg", repr=False)
-    sid: str = field(default=None, repr=False)
-
-    @property
-    def system(self):
-        return f"{self.dialect}+{self.driver}"
-
-    @property
-    def login(self):
-        if self.username and self.password:
-            ret = f"{self.username}:{self.password}"
-        elif self.username:
-            ret = self.username
-        else:
-            ret = ""
-        return ret
-
-    @property
-    def hostport(self):
-        if not self.host:
-            ret = None
-        elif not self.port:
-            ret = self.host
-        else:
-            ret = f"{self.host}:{self.port}"
-        return ret
-
-    @property
-    def dbstr(self):
-        if self.database:
-            return f"/{self.database}"
-        else:
-            return ""
-
-    @property
-    def driverstr(self):
-        if self.dialect == "mssql":
-            return "?driver=SQL+Server"
-        elif self.dialect == "oracle":
-            return ""
-        else:
-            raise ValueError
-
-    def __str__(self):
-        return "".join(
-            [
-                self.system,
-                "://",
-                self.login,
-                "@",
-                self.hostport,
-                self.dbstr,
-                self.driverstr,
-            ]
-        )
 
 
 @dataclass

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from itertools import chain
+from json import JSONDecodeError, load, loads
 from logging import debug
 from os import getenv
 from pathlib import Path
@@ -133,6 +134,14 @@ def asdict(
         x: getattr(obj, x)
         for x in attrs
     }
+
+
+def read_json(path: Path) -> dict[str: Any]:
+    try:
+        ret = load(path.open())
+    except JSONDecodeError:
+        ret = loads(path.open().read())
+    return ret
 
 
 def get_objects_by_attr(
