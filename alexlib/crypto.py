@@ -7,7 +7,7 @@ from typing import Callable
 from cryptography.fernet import Fernet
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SecretValue:
     val: str | bytes | Path
 

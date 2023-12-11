@@ -1,8 +1,8 @@
 
 from dataclasses import dataclass, field
 from functools import cached_property, partial
-from itertools import chain
-from json import JSONDecodeError, dump, dumps, load, loads
+from itertools import product
+from json import dump, dumps, loads
 from pathlib import Path
 from string import ascii_lowercase
 from typing import Callable
@@ -13,7 +13,6 @@ from alexlib.core import read_json
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
 from alexlib.file import File, Directory, path_search
-from symbol import arith_expr
 """
 Generator
 make entry script for auth
@@ -30,6 +29,8 @@ locale.env.database.store
 
 """
 nameismain = __name__ == "__main__"
+creds_path = Path.home() / ".creds"
+
 vowels = "aeiou"
 n = ascii_lowercase[13]
 ndevs = 4
@@ -148,7 +149,7 @@ class Curl:
     host: str = field(default=None)
     port: int = field(default=None, repr=False)
     database: str = field(default=None)
-    dialect: str = field(default="postgresql", repr=False)
+    dialect: str = field(default="postgres", repr=False)
     sid: str = field(default=None, repr=False)
 
     @property
@@ -189,7 +190,6 @@ class Curl:
     def dbstr(self):
         return f"/{self.database}" if self.database else ""
 
-
     @property
     def driverstr(self):
         return "?driver=SQL+Server" if self.dialect == "mssql" else ""
@@ -217,6 +217,8 @@ class Auth:
     host: str = field(default=None, repr=False)
     port: int = field(default=None, repr=False)
     system: str = field(default=None, repr=False)
+    sid: str = field(default=None, repr=False)
+    option: str = field(default=None, repr=False)
 
     @property
     def def_attrs(self) -> list[str]:
@@ -229,12 +231,20 @@ class Auth:
     @cached_property
     def curl(self) -> Curl:
         return Curl(
-            username=self.login.user,
-            password=self.login.pw,
-            host=self.server.host,
-            port=self.server.port,
+            username=self.username,
+            password=self.password,
+            host=self.host,
+            port=self.port,
             database=self.database,
         )
+
+    @property
+    def isoracle(self) -> bool:
+        return self.system == "oracle"
+
+    def set_option(self, option: str) -> None:
+        if self.isoracle:
+            self.sid = option
 
     @classmethod
     def rand(cls):
@@ -325,8 +335,17 @@ class SecretStore(File):
         return {k: SecretValue.from_str(v) for k, v in dict_.items()}
 
     @classmethod
-    def from_dict(cls, dict_: dict[str: str]):
-        return cls(secrets=cls.encode_str_dict(dict_))
+    def from_dict(
+        cls,
+        dict_: dict[str: str],
+        name: Path = None,
+        path: Path = None,
+    ):
+        return cls(
+            secrets=cls.encode_str_dict(dict_),
+            name=name,
+            path=path,
+        )
 
     @classmethod
     def from_path(
@@ -341,10 +360,7 @@ class SecretStore(File):
             bytes_ = crypt.decrypt_bytes(path.read_bytes())
             ret = loads(bytes_.decode())
         else:
-            try:
-                ret = load(path.read_bytes())
-            except JSONDecodeError:
-                ret = loads(path.read_text())
+            read_json(path)
         str_dict = SecretStore.encode_str_dict(ret)
         return cls(secrets=str_dict, name=path.stem, path=path)
 
@@ -373,19 +389,19 @@ class SecretStore(File):
 @dataclass
 class TrustedAuth(Auth):
     def __post_init__(self):
-        if self.login.user:
+        if self.username:
             raise ValueError(f"{self.clsname} cannot have username")
-        if self.login.pw:
+        if self.password:
             raise ValueError(f"{self.clsname} cannot have password")
 
 
 @dataclass
 class AuthHandler:
-    auth: Auth
+    auth: Auth = field(default=None)
     store: SecretStore = field(default=None, repr=False)
     crypt: Cryptographer = field(init=False, repr=False)
     from_user: bool = field(default=False, repr=False)
-    path: Path = field(default=None, repr=False)
+    path: Path = field(default=creds_path, repr=False)
     """ accesses or creates encrypted credentials
     """
 
@@ -403,8 +419,10 @@ class AuthHandler:
 
     @property
     def name(self) -> bool:
-        db = self.auth.database
-        return db if db else self.auth.system
+        ds = self.auth.database if self.auth.database else self.auth.system
+        return ".".join([
+            x for x in [self.auth.locale, self.auth.env, ds] if x
+        ])
 
     @property
     def hasname(self) -> bool:
@@ -616,18 +634,39 @@ class AuthHandler:
         if self.store.secrets and self.hasstorepath:
             self.reencrypt_files()
 
+    @classmethod
+    def from_path(
+        cls,
+        path: Path,
+        key: Path | SecretValue = None,
+    ):
+        auth = Auth.from_dict(read_json(path))
+        return cls(auth=auth, path=path, key=key)
+
 
 @dataclass
 class AuthGenerator:
     name: str = field(default="auth_template")
     path: Path = field(default=None, repr=False)
-    databases: list[str] = field(default_factory=list, repr=False)
-    envs: list[str] = field(default_factory=list, repr=False)
     locales: list[str] = field(default_factory=list, repr=False)
+    envs: list[str] = field(default_factory=list, repr=False)
+    databases: list[str] = field(default_factory=list, repr=False)
     from_user: bool = field(default=False, repr=False)
     overwrite: bool = field(default=False, repr=False)
     """ generates all auth objects, creates store, then deletes self
     """
+
+    @property
+    def def_auth_dict(self) -> dict[str: list[str]]:
+        return {k: v for k, v in {
+            "locale": self.locales,
+            "env": self.envs,
+            "database": self.databases,
+        }.items() if v}
+
+    @property
+    def def_auth_keys(self) -> dict[str: list]:
+        return self.def_auth_dict.keys()
 
     @staticmethod
     def get_auth_template() -> dict[str: str]:
@@ -641,11 +680,19 @@ class AuthGenerator:
         }
 
     @staticmethod
-    def mk_all_templates(*args) -> dict[str:dict]:
+    def mk_product_dict(**kwargs) -> dict[str: list]:
+        keys, vals = kwargs.keys(), kwargs.values()
+        return {
+            ".".join(inst): dict(zip(keys, inst))
+            for inst in product(*vals)
+        }
+
+    def mk_all_templates(self) -> dict[str:dict]:
         tmp = AuthGenerator.get_auth_template()
-        for lst in args:
-            tmp = {k: tmp.copy() for k in lst}
-        return tmp
+        pdict = AuthGenerator.mk_product_dict(**self.def_auth_dict)
+        for d in pdict.values():
+            d.update(tmp)
+        return pdict
 
     @cached_property
     def here(self):
@@ -656,9 +703,7 @@ class AuthGenerator:
         dump(dict_, path.open("w"), indent=4)
 
     def write_template_file(self) -> None:
-        parts = [x for x in [self.databases, self.envs, self.locales] if x]
-        templates = AuthGenerator.mk_all_templates(*parts)
-        AuthGenerator.to_json(templates, self.path)
+        AuthGenerator.to_json(self.mk_all_templates(), self.path)
 
     @property
     def pathexists(self) -> bool:
@@ -674,27 +719,6 @@ class AuthGenerator:
         if self.towrite:
             self.write_template_file()
 
-    @staticmethod
-    def unnest_dict(d: dict[str: dict]) -> dict[str: str]:
-        return list(chain.from_iterable(
-            [(k, vi) for vi in v.keys()]
-            for k, v in d.items()
-        ))
-
-    @staticmethod
-    def decode_template(template: dict[str: str]) -> dict[str: str]:
-        locenvs = AuthGenerator.unnest_dict(template)
-        authdicts = {
-            f"{loc}:{env}:{k}": v
-            for loc, env in locenvs
-            for k, v in template[loc][env].items()
-        }
-        auths = {}
-        for k, v in authdicts.items():
-            v["database"] = k.split(":")[-1]
-            auths[k] = {ki: vi for ki, vi in v.items() if vi}
-        return auths
-
     @property
     def schema(self) -> list[str]:
         return ["locales", "envs", "databases"]
@@ -705,12 +729,31 @@ class AuthGenerator:
         creds_path: Path = Path.home() / ".creds",
     ) -> list[Auth]:
         print(creds_path)
-        template = read_json(template_path)
-        auths = AuthGenerator.decode_template(template)
+        auths = read_json(template_path)
         for k, v in auths.items():
-            store_path = creds_path / k.replace(":", ".") / "store"
+            store_path = creds_path / f"{k}.store"
             AuthGenerator.to_json(v, store_path)
-        return databases
+            store = SecretStore.from_dict(v, path=store_path)
+            handler = AuthHandler(
+                auth=Auth.from_dict(v),
+                path=creds_path,
+                store=store,
+            )
+            handler.crypt.reset_key()
+            handler.write_files()
+        return auths
+
+
+def getauth(*args) -> Auth:
+    if isinstance(args, str):
+        name = args
+    elif isinstance(args, tuple):
+        name = ".".join(args)
+    store_path = creds_path / f"{name}.store"
+    key_path = creds_path / f"{name}.key"
+    crypt = Cryptographer.from_key(key_path)
+    store = SecretStore.from_path(store_path, key=crypt.key)
+    return Auth.from_dict(store.secrets)
 
 
 togen = False
@@ -721,4 +764,5 @@ if nameismain:
             databases=databases,
             locales=locales,
         ).write_template_file()
-    print(AuthGenerator.from_path(Path("_auth_template.json")))
+        print(AuthGenerator.generate())
+    print(getauth("remote", "dev", "learning").curl)
