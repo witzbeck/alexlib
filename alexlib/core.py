@@ -136,7 +136,7 @@ def asdict(
     }
 
 
-def read_json(path: Path) -> dict[str: Any]:
+def read_json(path: Path) -> dict[Hashable: Any]:
     try:
         ret = load(path.open())
     except JSONDecodeError:

@@ -1,0 +1,9 @@
+{
+    "databases": ["learning", "headlines", "finance"],
+    "locales": ["local", "remote"],
+    "systems": ["postgres"],
+    "ndevs": 4,
+    "envs": ["test", "prod"],
+    "date_format": "%m/%d/%Y %I:%M:%S %p"
+  }
+

@@ -9,7 +9,8 @@ from typing import Callable
 from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
 from random import choice, randint
 
-from alexlib.core import read_json
+from alexlib.core import read_json, chkenv
+from alexlib.config import Settings
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
 from alexlib.file import File, Directory, path_search
@@ -28,24 +29,22 @@ locale.env.database.key
 locale.env.database.store
 
 """
-nameismain = __name__ == "__main__"
+if (nameismain := __name__ == "__main__"):
+    settings = Settings()
+
+
 creds_path = Path.home() / ".creds"
-
-vowels = "aeiou"
+ndevs = 6
 n = ascii_lowercase[13]
-ndevs = 4
 
+databases = chkenv("databases", ifnull=["learning"], astype=list)
 systems = ["postgres"]
 devs = [
     f"dev{x}" if ndevs > 1 else "dev"
     for x in ascii_lowercase[-ndevs:]
 ]
 envs = devs + ["test", "prod"]
-databases = [
-    "learning",
-    "headlines",
-    "finance"
-]
+
 locales = [
     "local",
     "remote"
@@ -237,6 +236,18 @@ class Auth:
             port=self.port,
             database=self.database,
         )
+
+    @cached_property
+    def pg_cstr(self):
+        deets = [
+            f"dbname={self.database}",
+            f"host={self.host}",
+            f"port={self.port}",
+            f"user={self.username}",
+        ]
+        if self.password:
+            deets.append(f"password={self.password}")
+        return " ".join(deets)
 
     @property
     def isoracle(self) -> bool:
@@ -748,7 +759,10 @@ def getauth(*args) -> Auth:
     if isinstance(args, str):
         name = args
     elif isinstance(args, tuple):
-        name = ".".join(args)
+        try:
+            name = ".".join(args)
+        except TypeError:
+            name = ".".join(args[0])
     store_path = creds_path / f"{name}.store"
     key_path = creds_path / f"{name}.key"
     crypt = Cryptographer.from_key(key_path)
