@@ -5,7 +5,7 @@ from pathlib import Path
 from string import printable, ascii_letters
 from random import choices, randint, choice
 
-from alexlib.file import File, Directory
+from alexlib.files import File, Directory
 
 letlist = list(ascii_letters)
 printlist = list(printable)
