@@ -12,18 +12,18 @@ from random import choice
 from pathlib import Path
 
 from pandas import read_sql, DataFrame, Series
-from psycopg import connect as pg_connect
+from psycopg import connect as pg_connect, Connection as PGConnection
 from psycopg.errors import UndefinedTable, ProgrammingError
 from psycopg.errors import DuplicateSchema
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.sql import text
 from sqlalchemy_utils import database_exists, create_database
 
-from alexlib.auth import Curl
+from alexlib.auth import Curl, Auth
 from alexlib.core import chkenv, ping
 from alexlib.config import ConfigFile
 from alexlib.df import get_distinct_col_vals, series_col
-from alexlib.file import path_search, File, Directory
+from alexlib.files import path_search, File, Directory
 
 SQL_CHARS = f"{ascii_letters} _{digits}"
 QG_SUBS = {
@@ -36,6 +36,104 @@ QG_SUBS = {
     ".": "",
 }
 QG_KEYS = list(QG_SUBS.keys())
+
+
+def mk_devs(n: int = 1) -> list[str]:
+    return [f"dev{x}" if n > 1 else "dev" for x in ascii_letters[-n:]]
+
+
+def mk_envs(ndevs: list[str]) -> list[str]:
+    return mk_devs(ndevs) + ["test", "prod"]
+
+
+@dataclass
+class SQL:
+    text: str = field()
+    toclip: bool = field(default=True)
+
+    @property
+    def isstr(self):
+        return isinstance(self.text, str)
+
+    def __post_init__(self):
+        if self.toclip:
+            self.to_clipboard(self.text)
+
+    @property
+    def astext(self):
+        return text(self.text)
+
+    @staticmethod
+    def to_clipboard(text: str):
+        p = Popen(["pbcopy"], stdin=PIPE)
+        p.stdin.write(text.encode())
+        p.stdin.close()
+        retcode = p.wait()
+        return True if retcode == 0 else False
+
+    @staticmethod
+    def mk_default_filename(
+        schema: str, table: str, prefix: str = "select", suffix: str = ".sql"
+    ) -> str:
+        return f"{prefix}_{schema}_{table}{suffix}"
+
+    @staticmethod
+    def to_file(text: str, path: Path, overwrite: bool = True) -> bool:
+        if path.exists() and not overwrite:
+            raise FileExistsError("file already exists here. overwrite?")
+        path.write_text(text)
+        return path.exists()
+
+    @classmethod
+    def from_info_schema(
+        cls,
+        schema: str,
+        table: str,
+        info_schema: DataFrame,
+    ):
+        abrv = get_table_abrv(table)
+        lines = ["select\n"]
+        cols = list(info_schema.loc[:, "column_name"])
+        for i, col in enumerate(cols):
+            if i == 0:
+                comma = " "
+            else:
+                comma = ","
+            line = f"{comma}{abrv}.{col}\n"
+            lines.append(line)
+        lines.append(f"from {schema}.{table} {abrv}")
+        return cls("".join(lines))
+
+    def create_onehot_view(
+        df: DataFrame,
+        id_col: str,
+        dist_col: str,
+        schema: str,
+        table: str,
+        command: str = "create view",
+    ) -> str:
+        dist_col = [x for x in df.columns if x[-2:] != "id"][0]
+        id_col = [x for x in df.columns if x != dist_col][0]
+        dist_vals = get_distinct_col_vals(df, dist_col)
+
+        first_line = f"{command} {schema}.v_{table}_onehot as select\n"
+        lines = [first_line]
+        lines.append(f" {id_col}\n")
+        lines.append(f",{dist_col}\n")
+
+        for i in range(len(dist_vals)):
+            com = ","
+            val = dist_vals[i]
+            new_col = f"is_{val}".replace(" ", "_")
+            new_col = new_col.replace("%", "_percent")
+            new_col = new_col.replace("-", "_")
+            new_col = new_col.replace("<", "_less")
+            new_col = new_col.replace("=", "_equal")
+            new_col = new_col.replace(">", "_greater")
+            case_stmt = onehot_case(dist_col, val)
+            lines.append(f"{com}{case_stmt} {new_col}\n")
+        lines.append(f"from {schema}.{table}")
+        return "".join(lines)
 
 
 def execute_query(
@@ -98,15 +196,34 @@ def get_data_dict_series(
 class Connection:
     curl: Curl = field(
         repr=False,
+        default=None,
+    )
+    auth: Auth = field(
+        repr=False,
+        default=None,
     )
     engine: Engine = field(
         repr=False,
         init=False,
     )
 
+    @property
+    def hasauth(self) -> bool:
+        return isinstance(self.auth, Auth)
+
+    @property
+    def hascurl(self) -> bool:
+        return self.curl is not None
+
+    @property
+    def pg_cnxn(self) -> PGConnection:
+        return pg_connect(self.auth.pg_cstr)
+
     def __post_init__(self) -> None:
         if isinstance(self.curl, Curl):
             self.curl = str(self.curl)
+        elif self.hasauth and not self.hascurl:
+            self.curl = str(self.auth.curl)
         self.engine = create_engine(self.curl)
 
     @property
@@ -142,6 +259,11 @@ class Connection:
         statement = text(sql)
         with self.engine.connect() as con:
             return con.execute(statement)
+
+    def run_pd_sql(self, sql: str | SQL) -> DataFrame:
+        if isinstance(sql, str):
+            sql = SQL(sql)
+        return read_sql(sql.astext, self.engine)
 
     def mk_view(self, name: str, sql: str):
         statement = Connection.mk_view_text(name, sql)
@@ -199,6 +321,15 @@ class Connection:
             sid=sid,
         )
         return cls(str(curl))
+
+    @classmethod
+    def from_auth(
+        cls,
+        auth: str | tuple[str] | Auth,
+    ):
+        if not isinstance(auth, Auth):
+            auth = Auth.get(auth)
+        return cls(curl=auth.curl)
 
 
 @dataclass
@@ -384,169 +515,12 @@ def mk_info_sql(
 
 
 @dataclass
-class SQL:
-    text: str = field()
-    toclip: bool = field(default=True)
-
-    @property
-    def isstr(self):
-        return isinstance(self.text, str)
-
-    def __post_init__(self):
-        if self.toclip:
-            self.to_clipboard(self.text)
-
-    @property
-    def astext(self):
-        return text(self.text)
-
-    @staticmethod
-    def to_clipboard(text: str):
-        p = Popen(["pbcopy"], stdin=PIPE)
-        p.stdin.write(text.encode())
-        p.stdin.close()
-        retcode = p.wait()
-        return True if retcode == 0 else False
-
-    @staticmethod
-    def mk_default_filename(
-        schema: str, table: str, prefix: str = "select", suffix: str = ".sql"
-    ) -> str:
-        return f"{prefix}_{schema}_{table}{suffix}"
-
-    @staticmethod
-    def to_file(text: str, path: Path, overwrite: bool = True) -> bool:
-        if path.exists() and not overwrite:
-            raise FileExistsError("file already exists here. overwrite?")
-        path.write_text(text)
-        return path.exists()
-
-    @classmethod
-    def from_info_schema(
-        cls,
-        schema: str,
-        table: str,
-        info_schema: DataFrame,
-    ):
-        abrv = get_table_abrv(table)
-        lines = ["select\n"]
-        cols = list(info_schema.loc[:, "column_name"])
-        for i, col in enumerate(cols):
-            if i == 0:
-                comma = " "
-            else:
-                comma = ","
-            line = f"{comma}{abrv}.{col}\n"
-            lines.append(line)
-        lines.append(f"from {schema}.{table} {abrv}")
-        return cls("".join(lines))
-
-    def create_onehot_view(
-        df: DataFrame,
-        id_col: str,
-        dist_col: str,
-        schema: str,
-        table: str,
-        command: str = "create view",
-    ) -> str:
-        dist_col = [x for x in df.columns if x[-2:] != "id"][0]
-        id_col = [x for x in df.columns if x != dist_col][0]
-        dist_vals = get_distinct_col_vals(df, dist_col)
-
-        first_line = f"{command} {schema}.v_{table}_onehot as select\n"
-        lines = [first_line]
-        lines.append(f" {id_col}\n")
-        lines.append(f",{dist_col}\n")
-
-        for i in range(len(dist_vals)):
-            com = ","
-            val = dist_vals[i]
-            new_col = f"is_{val}".replace(" ", "_")
-            new_col = new_col.replace("%", "_percent")
-            new_col = new_col.replace("-", "_")
-            new_col = new_col.replace("<", "_less")
-            new_col = new_col.replace("=", "_equal")
-            new_col = new_col.replace(">", "_greater")
-            case_stmt = onehot_case(dist_col, val)
-            lines.append(f"{com}{case_stmt} {new_col}\n")
-        lines.append(f"from {schema}.{table}")
-        return "".join(lines)
-
-
-@dataclass
 class ConnectionMP:
     context: str = field(default="LOCAL")
     driver: str = field(default="postgresql+psycopg://")
     engine: str = field(repr=False, default=None)
-    createdb: bool = field(
-        default=False,
-        repr=False,
-    )
-    dotenv_name: str = field(
-        default=".env",
-        repr=False,
-    )
-
-    def get_context(self):
-        if self.context is None:
-            return chkenv("CONTEXT")
-        else:
-            return self.context
-
-    def set_context(self, context: str):
-        self.context = context
-
-    @property
-    def dbname(self):
-        return chkenv("DBNAME", required=False)
-
-    @property
-    def issudo(self):
-        return chkenv("ISSUDO", type=bool, required=False)
-
-    @property
-    def usertype(self):
-        return "SUDO" if self.issudo else "USER"
-
-    @property
-    def host(self):
-        try:
-            ret = chkenv(f"{self.context}DBHOST")
-        except ValueError:
-            ret = chkenv("DBHOST")
-        return ret
-
-    @property
-    def port(self):
-        try:
-            ret = chkenv(f"{self.context}DBPORT")
-        except ValueError:
-            ret = chkenv("DBPORT")
-        return ret
-
-    @property
-    def user(self):
-        return chkenv(f"{self.context}DB{self.usertype}")
-
-    @property
-    def pw(self):
-        return chkenv(f"{self.context}DBPW")
-
-    @property
-    def login(self):
-        return self.user if self.pw is None else f"{self.user}:{self.pw}"
-
-    @property
-    def enginestr(self):
-        h, p = self.host, self.port
-        return f"{self.driver}{self.login}@{h}:{p}/{self.dbname}"
-
-    @staticmethod
-    def get_engine(enginestr):
-        return create_engine(enginestr)
-
-    def set_engine(self):
-        self.engine = Connection.get_engine(self.enginestr)
+    createdb: bool = field(default=False, repr=False)
+    dotenv_name: str = field(default=".env", repr=False)
 
     @staticmethod
     def mk_text(sql: SQL):
