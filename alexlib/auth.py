@@ -13,7 +13,7 @@ from alexlib.core import read_json, chkenv
 from alexlib.config import Settings
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
-from alexlib.file import File, Directory, path_search
+from alexlib.files import File, Directory, path_search
 """
 Generator
 make entry script for auth
@@ -33,7 +33,10 @@ if (nameismain := __name__ == "__main__"):
     settings = Settings()
 
 
-creds_path = Path.home() / ".creds"
+creds = Path.home() / ".creds"
+if not creds.exists():
+    creds.mkdir()
+
 ndevs = 6
 n = ascii_lowercase[13]
 
@@ -407,12 +410,9 @@ class TrustedAuth(Auth):
 
 
 @dataclass
-class AuthHandler:
-    auth: Auth = field(default=None)
+class Auth:
     store: SecretStore = field(default=None, repr=False)
     crypt: Cryptographer = field(init=False, repr=False)
-    from_user: bool = field(default=False, repr=False)
-    path: Path = field(default=creds_path, repr=False)
     """ accesses or creates encrypted credentials
     """
 
@@ -566,10 +566,10 @@ class AuthHandler:
 
     def write_store(self):
         encrypted_bytes = self.crypt.encrypt_bytes(self.get_secret_bytes())
-        AuthHandler.write_file(encrypted_bytes, self.storepath)
+        Auth.write_file(encrypted_bytes, self.storepath)
 
     def write_key(self):
-        AuthHandler.write_file(str(self.crypt.key), self.keypath)
+        Auth.write_file(str(self.crypt.key), self.keypath)
 
     def write_files(self):
         self.write_store()
@@ -653,6 +653,21 @@ class AuthHandler:
     ):
         auth = Auth.from_dict(read_json(path))
         return cls(auth=auth, path=path, key=key)
+
+    @classmethod
+    def get(cls, *args):
+        if isinstance(args, str):
+            name = args
+        elif isinstance(args, tuple):
+            try:
+                name = ".".join(args)
+            except TypeError:
+                name = ".".join(args[0])
+        store_path = creds / f"{name}.store"
+        key_path = creds / f"{name}.key"
+        crypt = Cryptographer.from_key(key_path)
+        store = SecretStore.from_path(store_path, key=crypt.key)
+        return cls.from_dict(store.secrets)
 
 
 @dataclass
@@ -745,7 +760,7 @@ class AuthGenerator:
             store_path = creds_path / f"{k}.store"
             AuthGenerator.to_json(v, store_path)
             store = SecretStore.from_dict(v, path=store_path)
-            handler = AuthHandler(
+            handler = Auth(
                 auth=Auth.from_dict(v),
                 path=creds_path,
                 store=store,
@@ -753,21 +768,6 @@ class AuthGenerator:
             handler.crypt.reset_key()
             handler.write_files()
         return auths
-
-
-def getauth(*args) -> Auth:
-    if isinstance(args, str):
-        name = args
-    elif isinstance(args, tuple):
-        try:
-            name = ".".join(args)
-        except TypeError:
-            name = ".".join(args[0])
-    store_path = creds_path / f"{name}.store"
-    key_path = creds_path / f"{name}.key"
-    crypt = Cryptographer.from_key(key_path)
-    store = SecretStore.from_path(store_path, key=crypt.key)
-    return Auth.from_dict(store.secrets)
 
 
 togen = False
@@ -779,4 +779,4 @@ if nameismain:
             locales=locales,
         ).write_template_file()
         print(AuthGenerator.generate())
-    print(getauth("remote", "dev", "learning").curl)
+    print(Auth.get("remote", "dev", "learning").curl)
