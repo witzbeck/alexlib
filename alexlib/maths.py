@@ -8,7 +8,7 @@ from random import choice
 from numpy import array
 from pandas import DataFrame, Series
 
-from alexlib.perf import timeit
+from alexlib.time import timeit
 
 
 def get_primes(n):
