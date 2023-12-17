@@ -19,10 +19,10 @@ from alexlib.iters import link
 
 
 def figsave(
-        name: str,
-        dirpath: Path,
-        format: str = "png",
-        **kwargs,  # use bb_inches=tight if cutoff
+    name: str,
+    dirpath: Path,
+    format: str = "png",
+    **kwargs,  # use bb_inches=tight if cutoff
 ) -> bool:  # returns True if successful
     path = dirpath / f"{name}.{format}"
     savefig(path, format=format, **kwargs)
@@ -47,16 +47,18 @@ def eval_parents(
 
 def path_search(
         pattern: str,
-        start_path: Path = eval("Path(__file__)"),
+        start_path: Path = Path(eval("__file__")).parent,
         listok: bool = False,
         include: list[str] = [],
         exclude: list[str] = [],
+        max_ascends: int = 8,
 ) -> Path | list[Path]:
     if isinstance(exclude, str):
         exclude = [exclude]
     if isinstance(include, str):
         include = [include]
-    while True:
+    n = 0
+    while n <= max_ascends:
         try:
             ret = [x for x in start_path.rglob(pattern)]
             ret = [
@@ -69,6 +71,7 @@ def path_search(
                 return ret[0]
         except IndexError:
             start_path = start_path.parent
+            n += 1
 
 
 def copy_csv_str(table_name: str, csv_path: Path) -> str:
@@ -96,23 +99,31 @@ class SystemObject:
     )
 
     @property
-    def sysobj_names(self):
+    def isfile(self) -> bool:
+        return self.path.is_file()
+    
+    @property
+    def isdir(self) -> bool:
+        return self.path.is_dir()
+
+    @property
+    def sysobj_names(self) -> list[str]:
         return ["Directory", "File", "SystemObject"]
 
     @property
-    def haspath(self):
+    def haspath(self) -> bool:
         return self.path is not None
 
     @property
-    def hasname(self):
+    def hasname(self) -> bool:
         return self.name is not None
 
     @property
-    def user(self):
-        return getenv("USERNAME")
+    def user(self) -> str:
+        return chkenv("USERNAME", need=False)
 
     @property
-    def hasuser(self):
+    def hasuser(self) -> bool:
         return self.user is not None
 
     @staticmethod
@@ -130,9 +141,9 @@ class SystemObject:
 
     def get_path(
         self,
-        include: list[str] | str = None,
-        exclude: list[str] | str = None,
-        start_path: Path = None,
+        include: list[str] | str = [],
+        exclude: list[str] | str = [],
+        start_path: Path = Path(eval("__file__")).parent,
     ) -> Path:
         if include or self.include:
             include = SystemObject.add_path_cond(self.include, include)
@@ -547,7 +558,10 @@ class File(SystemObject):
         if self.issql and engine is None:
             raise ValueError("need engine to get df from db")
         elif not self.issql:
-            return self.read_func(**kwargs)
+            try:
+                return self.read_func(**kwargs)
+            except TypeError:
+                return self.read_func()
         sql = self.get_sql(replace=replace)
         return self.read_func(sql, engine)
 
@@ -703,6 +717,10 @@ class Directory(SystemObject):
             x for x in self.filelist
             if x.istype(type_) and isinstance(x, File)
         ]
+
+    @property
+    def csv_filelist(self) -> list[File]:
+        return self.get_type_filelist("csv")
 
     @property
     def sql_filelist(self) -> list[File]:
