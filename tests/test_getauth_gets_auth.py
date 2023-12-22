@@ -1,12 +1,12 @@
 from os import name
 from random import choice
 from string import ascii_lowercase
-from alexlib.auth import getauth
-from alexlib.config import Settings
+from alexlib.auth import Auth
+from alexlib.config import ConfigFile
 
 from unittest import TestCase, main
 
-vowels = "aeiou"
+ConfigFile.from_dotenv()
 
 
 class TestAuth(TestCase):
@@ -20,7 +20,6 @@ class TestAuth(TestCase):
         return choice(self.envs)
 
     def setUp(self):
-        self.settings = Settings()
         self.databases = ["learning", "headlines", "finance"]
         self.locales = ["local", "remote"]
         self.ndevs = 4
@@ -41,13 +40,12 @@ class TestAuth(TestCase):
         ])
 
     def test_concat_getauth(self):
-        return getauth(self.concat_name)
+        auth = Auth(self.concat_name)
+        self.assertIsInstance(auth, Auth)
 
     def test_list_getauth(self):
-        return getauth(*self.list_name)
-
-    def tearDown(self):
-        pass
+        auth = Auth(*self.list_name)
+        self.assertIsInstance(auth, Auth)
 
 
 if name == "__main__":
