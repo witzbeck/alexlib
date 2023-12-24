@@ -1,49 +1,53 @@
-from os import name
-from random import choice
-from string import ascii_lowercase
 from unittest import TestCase, main
+from random import choice
+from functools import partial
 
 from alexlib.auth import Auth
+from alexlib.config import Settings
+from alexlib.constants import creds
+
+settings = Settings()
+
+databases = settings.envdict["databases"]
+systems = settings.envdict["systems"]
+envs = settings.envdict["envs"]
+locales = settings.envdict["locales"]
+
+rand_system = partial(choice, systems)
+rand_env = partial(choice, envs)
+rand_db = partial(choice, databases)
+rand_locale = partial(choice, locales)
 
 
 class TestAuth(TestCase):
-    def _rand_database(self) -> str:
-        return choice(self.databases)
-
-    def _rand_locale(self) -> str:
-        return choice(self.locales)
-
-    def _rand_env(self) -> str:
-        return choice(self.envs)
-
     def setUp(self):
-        self.databases = ["learning", "headlines", "finance"]
-        self.locales = ["local", "remote"]
-        self.ndevs = 4
-        self.devs = [
-            f"dev{x}" if self.ndevs > 1 else "dev"
-            for x in ascii_lowercase[-self.ndevs:]
-        ]
-        self.envs = self.devs + ["test", "prod"]
         self.list_name = [
-            self._rand_locale(),
-            self._rand_env(),
-            self._rand_database(),
+            rand_locale(),
+            rand_env(),
+            rand_db(),
         ]
         self.concat_name = ".".join([
-            self._rand_locale(),
-            self._rand_env(),
-            self._rand_database(),
+            rand_locale(),
+            rand_env(),
+            rand_db(),
         ])
 
     def test_concat_getauth(self):
-        auth = Auth(self.concat_name)
-        self.assertIsInstance(auth, Auth)
+        if (creds / f"{self.concat_name}.store").exists():
+            auth = Auth(self.concat_name)
+            self.assertIsInstance(auth, Auth)
+        else:
+            with self.assertRaises(ValueError):
+                Auth(self.concat_name)
 
     def test_list_getauth(self):
-        auth = Auth(*self.list_name)
-        self.assertIsInstance(auth, Auth)
+        if (creds / f"{self.list_name}.store").exists():
+            auth = Auth(self.list_name)
+            self.assertIsInstance(auth, Auth)
+        else:
+            with self.assertRaises(ValueError):
+                Auth(self.list_name)
 
 
-if name == "__main__":
+if __name__ == "__main__":
     main()

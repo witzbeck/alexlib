@@ -8,40 +8,11 @@ from typing import Callable
 from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
 from random import choice, randint
 
-from alexlib.core import read_json, chkenv
-from alexlib.config import Settings
+from alexlib.core import read_json
 from alexlib.constants import creds
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
 from alexlib.files import File
-
-"""
-Generator
-make entry script for auth
-generates a json to fill in
-product of details for scaffolding
-
-Executor
-generates all auth objects,
-creates store,
-then deletes self
-
-locale.env.database.key
-locale.env.database.store
-
-"""
-if (nameismain := __name__ == "__main__"):
-    settings = Settings()
-
-databases = chkenv("databases", ifnull=["learning"], astype=list)
-systems = ["postgres"]
-envs = ["dev", "test", "prod"]
-locales = ["local", "remote"]
-
-rand_system = partial(choice, systems)
-rand_env = partial(choice, envs)
-rand_db = partial(choice, databases)
-rand_locale = partial(choice, locales)
 
 
 @dataclass
@@ -108,8 +79,8 @@ class Server:
     @staticmethod
     def rand_addr() -> str:
         return ".".join([
-            choice(systems),
-            choice(envs),
+            "postgres",
+            choice(["dev", "test", "prod"]),
             RandGen.randlet(n=6),
             choice(["local", "remote"])
         ])
@@ -156,6 +127,10 @@ class Curl:
             "mysql": "mysql+mysqldb://",
             "sqlite": "sqlite:///",
         }
+
+    @property
+    def canping(self):
+        return self.host and self.port
 
     @property
     def system(self):
@@ -488,6 +463,8 @@ class Auth:
                 self.name = ".".join(self.name)
             except TypeError:
                 self.name = ".".join(self.name[0])
+        if not self.hasstore and not self.storepath.exists():
+            raise ValueError("must have store or storepath")
         self.set_crypt()
         self.set_store()
         self.set_get_attrs()
@@ -612,15 +589,3 @@ class AuthGenerator:
             handler.crypt.reset_key()
             handler.write_files()
         return auths
-
-
-togen = False
-if nameismain:
-    if togen:
-        AuthGenerator(
-            envs=envs,
-            databases=databases,
-            locales=locales,
-        ).write_template_file()
-        print(AuthGenerator.generate())
-    print(Auth("remote", "dev", "learning").curl)
