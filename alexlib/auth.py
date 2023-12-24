@@ -4,16 +4,17 @@ from functools import cached_property, partial
 from itertools import product
 from json import dump, dumps, loads
 from pathlib import Path
-from string import ascii_lowercase
 from typing import Callable
 from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
 from random import choice, randint
 
 from alexlib.core import read_json, chkenv
 from alexlib.config import Settings
+from alexlib.constants import creds
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
-from alexlib.files import File, Directory, path_search
+from alexlib.files import File
+
 """
 Generator
 make entry script for auth
@@ -32,30 +33,15 @@ locale.env.database.store
 if (nameismain := __name__ == "__main__"):
     settings = Settings()
 
-
-creds = Path.home() / ".creds"
-if not creds.exists():
-    creds.mkdir()
-
-ndevs = 6
-n = ascii_lowercase[13]
-
 databases = chkenv("databases", ifnull=["learning"], astype=list)
 systems = ["postgres"]
-devs = [
-    f"dev{x}" if ndevs > 1 else "dev"
-    for x in ascii_lowercase[-ndevs:]
-]
-envs = devs + ["test", "prod"]
-
-locales = [
-    "local",
-    "remote"
-]
+envs = ["dev", "test", "prod"]
+locales = ["local", "remote"]
 
 rand_system = partial(choice, systems)
 rand_env = partial(choice, envs)
 rand_db = partial(choice, databases)
+rand_locale = partial(choice, locales)
 
 
 @dataclass
@@ -155,6 +141,13 @@ class Curl:
     sid: str = field(default=None, repr=False)
 
     @property
+    def clsname(self) -> str:
+        return self.__class__.__name__
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    @property
     def dialect_map(self):
         return {
             "postgres": "postgresql+psycopg://",
@@ -208,40 +201,8 @@ class Curl:
             ]
         )
 
-
-@dataclass
-class Auth:
-    locale: str = field(default=None, repr=False)
-    env: str = field(default=None, repr=False)
-    database: str = field(default=None, repr=False)
-    username: str = field(default=None, repr=False)
-    password: str = field(default=None, repr=False)
-    host: str = field(default=None, repr=False)
-    port: int = field(default=None, repr=False)
-    system: str = field(default=None, repr=False)
-    sid: str = field(default=None, repr=False)
-    option: str = field(default=None, repr=False)
-
-    @property
-    def def_attrs(self) -> list[str]:
-        return ["name", "env"]
-
-    @property
-    def defname(self) -> str:
-        return f"{self.env}:{self.database}"
-
     @cached_property
-    def curl(self) -> Curl:
-        return Curl(
-            username=self.username,
-            password=self.password,
-            host=self.host,
-            port=self.port,
-            database=self.database,
-        )
-
-    @cached_property
-    def pg_cstr(self):
+    def postgres(self) -> str:
         deets = [
             f"dbname={self.database}",
             f"host={self.host}",
@@ -251,56 +212,6 @@ class Auth:
         if self.password:
             deets.append(f"password={self.password}")
         return " ".join(deets)
-
-    @property
-    def isoracle(self) -> bool:
-        return self.system == "oracle"
-
-    def set_option(self, option: str) -> None:
-        if self.isoracle:
-            self.sid = option
-
-    @classmethod
-    def rand(cls):
-        return cls(
-            system=rand_system(),
-            env=rand_env(),
-            username=Username.rand(),
-            password=Password.rand(),
-            host=Server.rand_host(),
-            port=Server.rand_port(),
-            database=rand_db(),
-        )
-
-    @property
-    def clsname(self) -> str:
-        return self.__class__.__name__
-
-    @property
-    def hostparts(self) -> list[str]:
-        host = self.host
-        return host.split(".") if host else []
-
-    @property
-    def hashost(self) -> bool:
-        return bool(self.host)
-
-    def __repr__(self):
-        loc = f"{self.locale}:" if self.locale else ""
-        d = self.database if self.database else self.system
-        return f"{self.clsname}({loc}{self.env}:{d})"
-
-    @cached_property
-    def basicauth(self) -> HTTPBasicAuthHandler:
-        return HTTPBasicAuthHandler(self.username, self.password)
-
-    @cached_property
-    def digestauth(self) -> HTTPDigestAuthHandler:
-        return HTTPDigestAuthHandler(self.username, self.password)
-
-    @classmethod
-    def from_dict(cls, dict_: dict):
-        return cls(**dict_)
 
 
 @dataclass
@@ -401,15 +312,6 @@ class SecretStore(File):
 
 
 @dataclass
-class TrustedAuth(Auth):
-    def __post_init__(self):
-        if self.username:
-            raise ValueError(f"{self.clsname} cannot have username")
-        if self.password:
-            raise ValueError(f"{self.clsname} cannot have password")
-
-
-@dataclass
 class Auth:
     name: str = field()
     store: SecretStore = field(default=None, repr=False)
@@ -438,60 +340,19 @@ class Auth:
 
     @cached_property
     def keyname(self) -> str:
-        end = ".key"
-        if self.name.endswith(end):
-            ret = self.name
-        else:
-            ret = f"{self.name}{end}"
-        return ret
+        return f"{self.name}.key"
 
     @cached_property
     def keypath(self) -> Path:
-        return self.dirpath / self.keyname
+        return creds / self.keyname
 
     @cached_property
     def storename(self) -> str:
-        end = ".store"
-        if self.name.endswith(end):
-            ret = self.name
-        else:
-            ret = f"{self.name}{end}"
-        return ret
-
-    @property
-    def hasstorepath(self):
-        return False if not self.hasstore else self.store.haspath
+        return f"{self.name}.store"
 
     @cached_property
-    def here(self) -> Path:  # creates base path object
-        return Path(eval("__file__"))
-
-    @cached_property
-    def dirpath(self) -> Path:
-        if self.path:
-            ret = self.path
-        elif "alexlib" in self.here.parts:
-            ret = path_search(".creds")
-        elif self.hasstorepath:
-            ret = self.store.parent
-        else:
-            ret = self.here.parent
-        if isinstance(ret, Path) or isinstance(ret, Directory):
-            return ret
-        else:
-            raise TypeError(f"{ret} should be Path or Directory")
-
-    @cached_property
-    def storepath(self):
-        if self.store is None:
-            ret = self.dirpath / self.storename
-        elif self.store.haspath:
-            ret = self.store.path
-        elif self.store is not None:
-            ret = self.dirpath / self.storename
-        else:
-            raise ValueError("store exists but has not path")
-        return ret
+    def storepath(self) -> Path:
+        return creds / self.storename
 
     @property
     def key(self) -> SecretValue:
@@ -506,9 +367,7 @@ class Auth:
     def get_store(self) -> SecretValue:
         isstore = isinstance(self.store, SecretStore)
         ispath = isinstance(self.store, Path)
-        if self.from_user:
-            ret = SecretStore.from_user(name=self.name, path=self.storepath)
-        elif isstore:
+        if isstore:
             ret = self.store
         elif ispath:
             ret = SecretStore.from_path(self.store, key=self.key)
@@ -598,16 +457,18 @@ class Auth:
         return self.run_getattr("get_database")
 
     @cached_property
-    def curl(self) -> str:
-        return str(
-            Curl(
-                username=self.username,
-                password=self.password,
-                host=self.host,
-                port=self.port,
-                database=self.database,
-            )
+    def curl(self) -> Curl:
+        return Curl(
+            username=self.username,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
         )
+
+    @cached_property
+    def pg_curl(self) -> str:
+        return self.curl.postgres
 
     @cached_property
     def basicauth(self):
@@ -616,19 +477,31 @@ class Auth:
 
     @cached_property
     def digestauth(self):
-        u, p = self.user, self.pw
+        u, p = self.username, self.password
         return HTTPDigestAuthHandler(u, p)
 
     def __post_init__(self):
+        if isinstance(self.name, list):
+            self.name = ".".join(self.name)
+        elif isinstance(self.name, tuple):
+            try:
+                self.name = ".".join(self.name)
+            except TypeError:
+                self.name = ".".join(self.name[0])
         self.set_crypt()
         self.set_store()
         self.set_get_attrs()
         if not (self.storepath.exists() and self.keypath.exists()):
             self.write_files()
-        elif self.from_user:
-            self.write_files()
-        if self.store.secrets and self.hasstorepath:
+        if self.store.secrets:
             self.reencrypt_files()
+
+    @classmethod
+    def from_dict(cls, name: str, dict_: dict[str: str]):
+        crypt = Cryptographer.new()
+        store_path = creds / f"{name}.store"
+        store = SecretStore.from_dict(dict_, path=store_path, key=crypt.key)
+        return cls(name=name, store=store, crypt=crypt)
 
     @classmethod
     def from_path(
@@ -636,23 +509,9 @@ class Auth:
         path: Path,
         key: Path | SecretValue = None,
     ):
-        auth = Auth.from_dict(read_json(path))
+        name = ".".join(path.name.split(".")[:-1])
+        auth = Auth.from_dict(name, read_json(path))
         return cls(auth=auth, path=path, key=key)
-
-    @classmethod
-    def get(cls, *args):
-        if isinstance(args, str):
-            name = args
-        elif isinstance(args, tuple):
-            try:
-                name = ".".join(args)
-            except TypeError:
-                name = ".".join(args[0])
-        store_path = creds / f"{name}.store"
-        key_path = creds / f"{name}.key"
-        crypt = Cryptographer.from_key(key_path)
-        store = SecretStore.from_path(store_path, key=crypt.key)
-        return cls.from_dict(store.secrets)
 
 
 @dataclass
@@ -764,4 +623,4 @@ if nameismain:
             locales=locales,
         ).write_template_file()
         print(AuthGenerator.generate())
-    print(Auth.get("remote", "dev", "learning").curl)
+    print(Auth("remote", "dev", "learning").curl)

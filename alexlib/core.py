@@ -35,6 +35,30 @@ def istrue(w: str | int):
     return ret
 
 
+def isdunder(key: str) -> bool:
+    return (key.endswith("__") and key.startswith("__"))
+
+
+def ishidden(key: str) -> bool:
+    return (key.startswith("_") and not isdunder(key))
+
+
+def asdict(
+    obj: object,
+    include_hidden: bool = False,
+    include_dunder: bool = False,
+) -> dict[str: Any]:
+    attrs = list(vars(obj).keys())
+    if not include_dunder:
+        attrs = [x for x in attrs if not isdunder(x)]
+    if not include_hidden:
+        attrs = [x for x in attrs if not ishidden(x)]
+    return {
+        x: getattr(obj, x)
+        for x in attrs
+    }
+
+
 def aslist(val: str, sep: str = ","):
     if val.startswith("[") and val.endswith("]"):
         try:
@@ -116,7 +140,7 @@ def chkenv(
     envname: str,
     need: bool = True,
     ifnull: bool = None,
-    astype: Any = None,
+    astype: type = None,
 ) -> Any:
     """gets/checks/converts environment variable"""
     val = getenv(envname)
@@ -129,11 +153,11 @@ def chkenv(
 
     if ((isblank or isnone_) and ifnotnone):
         return ifnull
-    elif (isnone and need):
+    elif (isnone_ and need):
         raise ValueError(envname)
     elif (isblank and need):
         raise ValueError(envname)
-    elif (isblank or isnone):
+    elif (isblank or isnone_):
         return None
     elif astypenotnone:
         ret = envcast(val, astype, need=need)
@@ -150,30 +174,6 @@ def concat_lists(lists: list[list[Any]]) -> list[Any]:
     return list(chain.from_iterable(
         lists
     ))
-
-
-def isdunder(key: str) -> bool:
-    return (key.endswith("__") and key.startswith("__"))
-
-
-def ishidden(key: str) -> bool:
-    return (key.startswith("_") and not isdunder(key))
-
-
-def asdict(
-        obj: object,
-        include_hidden: bool = False,
-        include_dunder: bool = False,
-) -> dict[str: Any]:
-    attrs = list(vars(obj).keys())
-    if not include_dunder:
-        attrs = [x for x in attrs if not isdunder(x)]
-    if not include_hidden:
-        attrs = [x for x in attrs if not ishidden(x)]
-    return {
-        x: getattr(obj, x)
-        for x in attrs
-    }
 
 
 def read_json(path: Path) -> dict[Hashable: Any]:
