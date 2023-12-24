@@ -1,13 +1,16 @@
+from os import environ
+from random import choice
 from unittest import TestCase, main
 
 from alexlib.core import istrue, isnone, aslist, chktext, chktype
-from alexlib.core import envcast, chkenv, concat_lists, isdunder, ishidden
-from alexlib.core import asdict, get_objects_by_attr, Object
-from alexlib.core import mk_dictvals_distinct, invert_dict, sha256sum
-from alexlib.core import get_last_tag, get_curent_version, Version, ping
+from alexlib.core import envcast, chkenv, isdunder, ishidden, asdict
 
 
 class TestCore(TestCase):
+    @property
+    def rand_env(self) -> str:
+        return choice(list(environ.keys()))
+
     def test_istrue(self):
         self.assertTrue(istrue(True))
         self.assertTrue(istrue("True"))
@@ -84,8 +87,43 @@ class TestCore(TestCase):
         self.assertEqual(envcast("[1,2,3]", list), [1, 2, 3])
         self.assertListEqual(envcast("['a','b','c']", list), ["a", "b", "c"])
         self.assertDictEqual(envcast('{"a":1,"b":2}', dict), {"a": 1, "b": 2})
-        self.assertDictEqual(envcast('{"a":1,"b":2,"c":3}', dict), {"a": 1, "b": 2, "c": 3})
-        self.assertDictEqual(envcast('{"a":1,"b":2,"c":3,"d":4}', dict), {"a": 1, "b": 2, "c": 3, "d": 4})
+        self.assertDictEqual(
+            envcast('{"a":1,"b":2,"c":3}', dict),
+            {"a": 1, "b": 2, "c": 3}
+        )
+        self.assertDictEqual(
+            envcast('{"a":1,"b":2,"c":3,"d":4}', dict),
+            {"a": 1, "b": 2, "c": 3, "d": 4}
+        )
+
+    def test_isdunder(self):
+        self.assertTrue(isdunder("__dunder__"))
+        self.assertFalse(isdunder("dunder__"))
+        self.assertFalse(isdunder("__dunder"))
+
+    def test_ishidden(self):
+        self.assertTrue(ishidden("_hidden"))
+        self.assertFalse(ishidden("hidden_"))
+        self.assertTrue(ishidden("_hidden_"))
+
+    def test_asdict(self):
+        class TestClass:
+            def __init__(self):
+                self.a = 1
+                self.b = 2
+                self._c = 3
+                self.__d = 4
+
+        obj = TestClass()
+        dct = asdict(obj)
+        self.assertIsInstance(dct, dict)
+        self.assertEqual(dct, {"a": 1, "b": 2})
+
+    def test_chkenv(self):
+        with self.assertRaises(ValueError):
+            chkenv("TEST_ENV_VAR")
+        env = chkenv(self.rand_env)
+        self.assertIsInstance(env, str)
 
 
 if __name__ == "__main__":

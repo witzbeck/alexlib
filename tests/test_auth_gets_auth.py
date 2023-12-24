@@ -1,12 +1,9 @@
 from os import name
 from random import choice
 from string import ascii_lowercase
-from alexlib.auth import Auth
-from alexlib.config import ConfigFile
-
 from unittest import TestCase, main
 
-ConfigFile.from_dotenv()
+from alexlib.auth import Auth
 
 
 class TestAuth(TestCase):
