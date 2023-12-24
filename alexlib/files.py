@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from functools import cached_property, partial
 from json import load, loads, dump, dumps
 from logging import info
-from os import getenv
 from pathlib import Path
 from random import choice
 from typing import Callable, Any
@@ -101,7 +100,7 @@ class SystemObject:
     @property
     def isfile(self) -> bool:
         return self.path.is_file()
-    
+
     @property
     def isdir(self) -> bool:
         return self.path.is_dir()
@@ -421,17 +420,6 @@ class File(SystemObject):
     @property
     def lines(self) -> list[str]:
         return self.text.split("\n")
-
-    @staticmethod
-    def filter_lines(
-        lines: list[str],
-        startchar: int,
-        endchar: int,
-    ):
-        pass
-
-    def get_filter_lines(self):
-        pass
 
     @property
     def line_counter(self) -> Counter:

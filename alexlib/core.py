@@ -14,6 +14,40 @@ from subprocess import check_output
 """
 
 
+def isnone(w: str):
+    if isinstance(w, str):
+        ret = w.lower() == 'none' or len(w) == 0
+    else:
+        ret = w is None
+    return ret
+
+
+def istrue(w: str | int):
+    if isnone(w):
+        ret = False
+    elif isinstance(w, bool):
+        ret = w is True
+    elif isinstance(w, int):
+        ret = bool(w)
+    elif isinstance(w, str):
+        ret = w.lower() == 'true' or w.lower() == 't'
+        ret = bool(int(w)) if w.isnumeric() else ret
+    return ret
+
+
+def aslist(val: str, sep: str = ","):
+    if val.startswith("[") and val.endswith("]"):
+        try:
+            ret = loads(val)
+        except JSONDecodeError:
+            ret = val.strip("[]").split(sep)
+            ret = [x.strip("'") for x in ret]
+            ret = [x.strip('"') for x in ret]
+    else:
+        ret = val.split(sep)
+    return ret
+
+
 def chktext(
     text: str,
     prefix: str = None,
@@ -33,9 +67,9 @@ def chktext(
 
 
 def chktype(
-        obj: object,
-        type_: type,
-        mustexist: bool = True,
+    obj: object,
+    type_: type,
+    mustexist: bool = True,
 ) -> object:
     """confirms correct type or raises error"""
     if not isinstance(obj, type_):
@@ -56,17 +90,23 @@ def chktype(
 
 def envcast(
     val: str,
-    astype: Any,
-    spliton: str = ",",
+    astype: type,
     need: bool = True,
+    sep: str = ",",
 ) -> Any:
     """converts output to specified type"""
     if isinstance(astype, str):
         astype = eval(astype)
     if issubclass(astype, list):
-        ret = val.split(spliton)
+        ret = aslist(val, sep=sep)
+    elif issubclass(astype, dict):
+        ret = loads(val)
+    elif issubclass(astype, bool):
+        ret = istrue(val)
     elif issubclass(astype, datetime):
         ret = datetime.fromisoformat(val)
+    elif isnone(val):
+        ret = None
     else:
         ret = astype(val)
     return chktype(ret, astype, mustexist=need)
@@ -81,13 +121,13 @@ def chkenv(
     """gets/checks/converts environment variable"""
     val = getenv(envname)
     isblank = val == ""
-    isnone = val is None
-    istrue = val == "True"
+    isnone_ = isnone(val)
+    istrue_ = istrue(val)
     isfalse = val == "False"
     ifnotnone = ifnull is not None
     astypenotnone = astype is not None
 
-    if ((isblank or isnone) and ifnotnone):
+    if ((isblank or isnone_) and ifnotnone):
         return ifnull
     elif (isnone and need):
         raise ValueError(envname)
@@ -97,7 +137,7 @@ def chkenv(
         return None
     elif astypenotnone:
         ret = envcast(val, astype, need=need)
-    elif istrue:
+    elif istrue_:
         ret = True
     elif isfalse:
         ret = False

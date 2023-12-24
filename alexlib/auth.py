@@ -411,33 +411,18 @@ class TrustedAuth(Auth):
 
 @dataclass
 class Auth:
+    name: str = field()
     store: SecretStore = field(default=None, repr=False)
     crypt: Cryptographer = field(init=False, repr=False)
     """ accesses or creates encrypted credentials
     """
 
+    @property
+    def clsname(self):
+        return self.__class__.__name__
+
     def __repr__(self):
-        clsname = self.__class__.__name__
-        db = self.database if self.database else self.system
-        lines = "\n\t".join(
-            [
-                f"\tenv:db =  {self.env}:{db}",
-                f"nsecrets =  {len(self.store)}",
-                f"storepath =  {self.storepath}",
-            ]
-        )
-        return f"{clsname}(\n{lines}\n)"
-
-    @property
-    def name(self) -> bool:
-        ds = self.auth.database if self.auth.database else self.auth.system
-        return ".".join([
-            x for x in [self.auth.locale, self.auth.env, ds] if x
-        ])
-
-    @property
-    def hasname(self) -> bool:
-        return bool(self.name)
+        return f"{self.clsname}({self.name})"
 
     @property
     def haskey(self) -> bool:
