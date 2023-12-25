@@ -285,7 +285,7 @@ class SecretStore(File):
         return cls(secrets=ret, name=name, path=path)
 
     @property
-    def str_secrets_dict(self):
+    def str_secrets_dict(self) -> dict[str:str]:
         return {k: str(v) for k, v in self.secrets.items()}
 
 
@@ -316,19 +316,19 @@ class Auth:
     def hascrypt(self) -> bool:
         return hasattr(self, "crypt")
 
-    @cached_property
+    @property
     def keyname(self) -> str:
         return f"{self.name}.key"
 
-    @cached_property
+    @property
     def keypath(self) -> Path:
         return creds / self.keyname
 
-    @cached_property
+    @property
     def storename(self) -> str:
         return f"{self.name}.store"
 
-    @cached_property
+    @property
     def storepath(self) -> Path:
         return creds / self.storename
 
@@ -414,27 +414,27 @@ class Auth:
         else:
             return ret
 
-    @cached_property
+    @property
     def username(self) -> str:
         return self.run_getattr("get_username")
 
-    @cached_property
+    @property
     def password(self) -> str:
         return self.run_getattr("get_password")
 
-    @cached_property
+    @property
     def host(self) -> str:
         return self.run_getattr("get_host")
 
-    @cached_property
+    @property
     def port(self) -> int:
         return self.run_getattr("get_port")
 
-    @cached_property
+    @property
     def database(self) -> str:
         return self.run_getattr("get_database")
 
-    @cached_property
+    @property
     def curl(self) -> Curl:
         return Curl(
             username=self.username,
@@ -475,6 +475,18 @@ class Auth:
             self.write_files()
         if self.store.secrets:
             self.reencrypt_files()
+
+    def update_value(self, key: str, value: str) -> None:
+        self.store.secrets[key] = SecretValue.from_str(value)
+        self.write_store()
+
+    def update_values(self, dict_: dict[str:str]) -> None:
+        for k, v in dict_.items():
+            self.update_value(k, v)
+
+    def rename(self, name: str) -> None:
+        self.name = name
+        self.write_files()
 
     @classmethod
     def from_dict(cls, name: str, dict_: dict[str:str]):

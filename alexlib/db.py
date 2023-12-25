@@ -258,6 +258,8 @@ class Connection:
     ) -> None:
         if file.issql:
             eng = self.engine
+        if not isinstance(schema, str):
+            schema = str(schema)
         df = file.get_df(eng=eng)
         df.to_sql(table, self.engine, schema=schema, if_exists=if_exists)
 
