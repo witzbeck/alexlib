@@ -229,13 +229,20 @@ class Connection:
 
     @staticmethod
     def get_clause(sql: SQL | str | TextClause):
-        if isinstance(sql, SQL):
+        if isinstance(sql, Path):
+            sql = Connection.get_clause(sql.read_text())
+        elif isinstance(sql, File):
+            sql = Connection.get_clause(sql.text)
+        elif isinstance(sql, SQL):
             sql = sql.text
         elif isinstance(sql, str):
             sql = text(sql)
         return sql
 
-    def exe_sql(self, sql: SQL | str | TextClause) -> CursorResult:
+    def exe_sql(
+        self,
+        sql: SQL | str | TextClause | Path | File
+    ) -> CursorResult:
         clause = Connection.get_clause(sql)
         with self.engine.connect() as con:
             return con.execute(clause)
