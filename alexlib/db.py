@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from functools import cached_property
 from queue import Queue
+from logging import warning
 from sqlite3 import Connection as LiteConnection, Cursor
 from sqlite3 import DatabaseError, connect as lite_connect
 from string import ascii_letters, digits
@@ -193,14 +194,10 @@ def get_data_dict_series(
 
 @dataclass
 class Connection:
-    curl: Curl = field(
-        repr=False,
-        default=None,
-    )
-    engine: Engine = field(
-        repr=False,
-        init=False,
-    )
+    curl: Curl = field(repr=False, default=None)
+    schema_col: str = field(default="table_schema", repr=False)
+    table_col: str = field(default="table_name", repr=False)
+    engine: Engine = field(repr=False, init=False)
 
     @property
     def hasauth(self) -> bool:
@@ -228,7 +225,10 @@ class Connection:
         return f"CREATE VIEW {name} AS {sql};"
 
     @staticmethod
-    def get_clause(sql: SQL | str | TextClause):
+    def get_clause(
+        sql: SQL | str | TextClause,
+        asstr: bool = True,
+    ) -> TextClause | str:
         if isinstance(sql, Path):
             sql = Connection.get_clause(sql.read_text())
         elif isinstance(sql, File):
@@ -237,15 +237,25 @@ class Connection:
             sql = sql.text
         elif isinstance(sql, str):
             sql = text(sql)
+        if asstr:
+            return str(sql)
         return sql
 
-    def exe_sql(
+    def execute(
         self,
-        sql: SQL | str | TextClause | Path | File
+        sql: SQL | str | TextClause | Path | File,
+        fetch: bool = False,
     ) -> CursorResult:
         clause = Connection.get_clause(sql)
-        with self.engine.connect() as con:
-            return con.execute(clause)
+        with self.pg_cnxn as cnxn:
+            cnxn.autocommit = True
+            with cnxn.cursor() as cursor:
+                try:
+                    cursor.execute(clause.encode("utf-8"))
+                except UndefinedTable as e:
+                    raise UndefinedTable(f"{e} - {clause}")
+                if fetch:
+                    return cursor.fetchall()
 
     def get_df(self, sql: SQL | str | TextClause) -> DataFrame:
         clause = Connection.get_clause(sql)
@@ -253,7 +263,7 @@ class Connection:
 
     def mk_view(self, name: str, sql: str):
         statement = Connection.mk_view_text(name, sql)
-        return self.exe_sql(statement)
+        return self.execute(statement)
 
     def file_to_db(
         self,
@@ -371,11 +381,27 @@ class Connection:
 
     @property
     def allschemas(self) -> list[str]:
-        return get_distinct_col_vals(self.info_schema, "table_schema")
+        return get_distinct_col_vals(self.info_schema, self.schema_col)
+
+    def schema_exists(self, schema: str) -> bool:
+        return schema in self.allschemas
+
+    @property
+    def schema_tables(self) -> dict[str:list[str]]:
+        return {
+            schema: self.get_all_schema_tables(schema)
+            for schema in self.allschemas
+        }
+
+    def table_exists(self, schema: str, table: str) -> bool:
+        try:
+            return table in self.schema_tables[schema]
+        except KeyError:
+            return False
 
     @property
     def alltables(self) -> list[str]:
-        return get_distinct_col_vals(self.info_schema, "table_name")
+        return get_distinct_col_vals(self.info_schema, self.table_col)
 
     @staticmethod
     def mk_cmd_sql(
@@ -398,7 +424,10 @@ class Connection:
         self.run_pg_sql(sql)
 
     def create_schema(self, schema: str) -> None:
-        self.obj_cmd("create", "schema", schema)
+        try:
+            self.obj_cmd("create", "schema", schema)
+        except DuplicateSchema:
+            warning(f"schema {schema} already exists")
 
     def drop_table(
         self,

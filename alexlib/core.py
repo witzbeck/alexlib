@@ -112,7 +112,7 @@ def chktype(
 def envcast(
     val: str,
     astype: type,
-    need: bool = True,
+    need: bool = False,
     sep: str = ",",
 ) -> Any:
     """converts output to specified type"""
@@ -130,7 +130,13 @@ def envcast(
         ret = None
     else:
         ret = astype(val)
-    return chktype(ret, astype, mustexist=need)
+    if ret is None and need:
+        raise ValueError(f"input must be {astype}")
+    else:
+        try:
+            return chktype(ret, astype, mustexist=need)
+        except TypeError:
+            return ret
 
 
 def chkenv(
