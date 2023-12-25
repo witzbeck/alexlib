@@ -133,10 +133,10 @@ class datetime(datetime):
 
 @decorator
 def timeit(
-        func: Callable,
-        niter: int = None,
-        *args,
-        **kwargs,
+    func: Callable,
+    niter: int = None,
+    *args,
+    **kwargs,
 ) -> None:
     pc1 = perf_counter()
     if niter is None:

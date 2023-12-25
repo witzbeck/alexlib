@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import partial
+from itertools import chain
 from typing import Any
 
 from pandas import DataFrame, Series, to_datetime
@@ -42,11 +43,7 @@ def get_rows_as_list(df: DataFrame) -> list[list]:
     return [get_row_as_list(i, df) for i in rng]
 
 
-def filter_df(
-    df: DataFrame,
-    col: str,
-    val: Any
-) -> DataFrame:
+def filter_df(df: DataFrame, col: str, val: Any) -> DataFrame:
     if not isinstance(df, DataFrame):
         raise TypeError(f"{df} not {DataFrame}")
     return df[df.loc[:, col] == val]
@@ -69,9 +66,9 @@ def get_val_order(
 
 
 def get_unique_col_vals(
-        col: str,
-        df: DataFrame | list[DataFrame]
-        ) -> list:
+    col: str,
+    df: DataFrame | list[DataFrame]
+) -> list:
     """ gets unique vals from col in df
         inputs:
             col = column of interest to find unique values
@@ -143,9 +140,9 @@ def drop_invariate_cols(df: DataFrame):
 
 
 def split_df(
-        df: DataFrame,
-        ratio: float,
-        head: bool = True
+    df: DataFrame,
+    ratio: float,
+    head: bool = True
 ) -> DataFrame:
     to = int(len(df) * ratio)
     if head:
@@ -154,22 +151,19 @@ def split_df(
         return df.tail(to)
 
 
-def filter_df(df: DataFrame, col: str, val: str):
-    return df[df.loc[:, col] == val]
-
-
-def series_col(df: DataFrame, col: str):
+def series_col(df: DataFrame, col: str) -> Series:
     return Series(df.loc[:, col])
 
 
-def get_distinct_col_vals(df: DataFrame, col: str):
+def get_distinct_col_vals(df: DataFrame, col: str) -> list:
     return list(df.loc[:, col].unique())
 
 
-def rm_df_col_pattern(pattern: str | tuple | list,
-                      df: DataFrame,
-                      end: bool = True
-                      ) -> DataFrame:
+def rm_df_col_pattern(
+    pattern: str | tuple | list,
+    df: DataFrame,
+    end: bool = True
+) -> DataFrame:
     isstr = isinstance(pattern, str)
     cols = df.columns
     if isstr and end:

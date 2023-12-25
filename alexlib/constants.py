@@ -10,7 +10,4 @@ epoch_seconds = epoch.timestamp()
 home = Path.home()
 creds = home / ".creds"
 venvs = home / ".venvs"
-[
-    path.mkdir(exist_ok=True)
-    for path in [creds, venvs]
-]
+[path.mkdir(exist_ok=True) for path in [creds, venvs]]

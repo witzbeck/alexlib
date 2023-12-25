@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from queue import Queue
 from sqlite3 import Connection as LiteConnection, Cursor
-from sqlite3 import DatabaseError, connect as s3_connect
+from sqlite3 import DatabaseError, connect as lite_connect
 from string import ascii_letters, digits
 from threading import Thread
 from typing import Any
@@ -471,7 +471,7 @@ class Connection:
         self,
         schema: str,
         table: str,
-    ):
+    ) -> SQL:
         info = self.get_info_schema(schema=schema, table=table)
         return SQL.from_info_schema(schema, table, info)
 
@@ -545,11 +545,7 @@ class Connection:
         )
 
     @classmethod
-    def from_db(
-        cls,
-        dbname: str,
-        **kwargs,
-    ):
+    def from_db(cls, dbname: str, **kwargs):
         environ["DBNAME"] = dbname
         return cls(**kwargs)
 
@@ -565,7 +561,7 @@ class LocalETL:
 
     @cached_property
     def localdb(self) -> LiteConnection:
-        return s3_connect(self.localdb_name)
+        return lite_connect(self.localdb_name)
 
     @property
     def cursor(self) -> Cursor:
@@ -580,6 +576,10 @@ class LocalETL:
             x for x in self.resources_dir.filelist
             if x.name.endswith(".sql")
         ]
+
+    @property
+    def file_prefixes(self) -> list[str]:
+        return list(set([x.path.stem.split("_")[0] for x in self.sql_files]))
 
     @cached_property
     def landing_files(self) -> dict[str:File]:
@@ -596,6 +596,21 @@ class LocalETL:
             for x in self.sql_files
             if x.name.startswith(self.main_prefix)
         }
+
+    @cached_property
+    def file_dict(self) -> dict[str: dict[str:File]]:
+        return {
+            prefix: {
+                "_".join(x.path.stem.split("_")[1:]): x
+                for x in self.sql_files
+                if x.name.startswith(prefix)
+            }
+            for prefix in self.file_prefixes
+        }
+
+    @cached_property
+    def table_dict(self) -> dict[str:File]:
+        return {k: [x for x in v] for k, v in self.file_dict.items()}
 
     @cached_property
     def landing_tables(self) -> list[str]:
@@ -741,21 +756,10 @@ class Column:
     name: str = field()
     table: str = field()
     schema: str = field()
-    series: Series = field(
-        repr=False,
-    )
-    distvals: list[str] = field(
-        init=False,
-        repr=False,
-    )
-    freqs: dict[list[float]] = field(
-        init=False,
-        repr=False,
-    )
-    props: dict[list[float]] = field(
-        init=False,
-        repr=False,
-    )
+    series: Series = field(repr=False)
+    distvals: list[str] = field(init=False, repr=False)
+    freqs: dict[list[float]] = field(init=False, repr=False)
+    props: dict[list[float]] = field(init=False, repr=False)
 
     def __len__(self) -> int:
         return len(self.series)
@@ -925,8 +929,3 @@ def update_host_schema(
     schema_tables = source.get_all_schema_tables(schema)
     for table in schema_tables:
         update_host_table(schema, table, source=source, dest=dest)
-
-
-if __name__ == "__main__":
-    c = Connection()
-    print(c.info_schema)

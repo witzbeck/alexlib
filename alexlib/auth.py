@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from functools import cached_property, partial
 from itertools import product
@@ -69,21 +68,25 @@ class Server:
 
     @staticmethod
     def rand_ip() -> str:
-        return ".".join([
-            str(randint(180, 199)),
-            str(randint(160, 179)),
-            RandGen.randintstr(n=1),
-            RandGen.randintstr(n=3),
-        ])
+        return ".".join(
+            [
+                str(randint(180, 199)),
+                str(randint(160, 179)),
+                RandGen.randintstr(n=1),
+                RandGen.randintstr(n=3),
+            ]
+        )
 
     @staticmethod
     def rand_addr() -> str:
-        return ".".join([
-            "postgres",
-            choice(["dev", "test", "prod"]),
-            RandGen.randlet(n=6),
-            choice(["local", "remote"])
-        ])
+        return ".".join(
+            [
+                "postgres",
+                choice(["dev", "test", "prod"]),
+                RandGen.randlet(n=6),
+                choice(["local", "remote"]),
+            ]
+        )
 
     @staticmethod
     def rand_host() -> str:
@@ -191,7 +194,7 @@ class Curl:
 
 @dataclass
 class SecretStore(File):
-    secrets: dict[str: SecretValue] = field(default_factory=dict)
+    secrets: dict[str:SecretValue] = field(default_factory=dict)
 
     @property
     def keys(self) -> list[str]:
@@ -237,7 +240,7 @@ class SecretStore(File):
     @classmethod
     def from_dict(
         cls,
-        dict_: dict[str: str],
+        dict_: dict[str:str],
         name: Path = None,
         path: Path = None,
     ):
@@ -474,7 +477,7 @@ class Auth:
             self.reencrypt_files()
 
     @classmethod
-    def from_dict(cls, name: str, dict_: dict[str: str]):
+    def from_dict(cls, name: str, dict_: dict[str:str]):
         crypt = Cryptographer.new()
         store_path = creds / f"{name}.store"
         store = SecretStore.from_dict(dict_, path=store_path, key=crypt.key)
@@ -505,18 +508,22 @@ class AuthGenerator:
 
     @property
     def def_auth_dict(self) -> dict[str: list[str]]:
-        return {k: v for k, v in {
-            "locale": self.locales,
-            "env": self.envs,
-            "database": self.databases,
-        }.items() if v}
+        return {
+            k: v
+            for k, v in {
+                "locale": self.locales,
+                "env": self.envs,
+                "database": self.databases,
+            }.items()
+            if v
+        }
 
     @property
-    def def_auth_keys(self) -> dict[str: list]:
+    def def_auth_keys(self) -> dict[str:list]:
         return self.def_auth_dict.keys()
 
     @staticmethod
-    def get_auth_template() -> dict[str: str]:
+    def get_auth_template() -> dict[str:str]:
         return {
             "username": "",
             "password": "",
@@ -527,7 +534,7 @@ class AuthGenerator:
         }
 
     @staticmethod
-    def mk_product_dict(**kwargs) -> dict[str: list]:
+    def mk_product_dict(**kwargs) -> dict[str:list]:
         keys, vals = kwargs.keys(), kwargs.values()
         return {
             ".".join(inst): dict(zip(keys, inst))
@@ -546,7 +553,7 @@ class AuthGenerator:
         return Path(eval("__file__")).parent
 
     @staticmethod
-    def to_json(dict_: dict[str: str], path: Path) -> None:
+    def to_json(dict_: dict[str:str], path: Path) -> None:
         dump(dict_, path.open("w"), indent=4)
 
     def write_template_file(self) -> None:

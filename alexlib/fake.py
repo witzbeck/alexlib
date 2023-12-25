@@ -16,10 +16,7 @@ consonants = [x for x in letlist if x not in vowels]
 @dataclass
 class RandGen:
     @staticmethod
-    def randint(
-        min_int: int = 0,
-        max_int: int = 10
-    ) -> int:
+    def randint(min_int: int = 0, max_int: int = 10) -> int:
         return randint(min_int, max_int)
 
     @staticmethod
@@ -80,11 +77,7 @@ class RandGen:
                 yield choice(funcs)()
 
     @staticmethod
-    def limgen(
-        lim: int,
-        concat: bool = True,
-        **kwargs
-    ):
+    def limgen(lim: int, concat: bool = True, **kwargs):
         infg = RandGen.infgen(**kwargs)
         gen = [next(infg) for _ in range(lim)]
         if concat:
@@ -94,10 +87,7 @@ class RandGen:
 
     @staticmethod
     def mk_test_name(
-        min_: int = 5,
-        max_: int = 12,
-        let_: bool = True,
-        intstr_: bool = True
+        min_: int = 5, max_: int = 12, let_: bool = True, intstr_: bool = True
     ):
         name_len = randint(min_, max_)
         name = RandGen.limgen(name_len, intstr_=intstr_, let_=let_)
@@ -124,10 +114,7 @@ class RandGen:
         return f"{name}.{ext}"
 
     @staticmethod
-    def mk_timedelta(
-        min_days: int = 10,
-        max_days: int = 10_000
-    ):
+    def mk_timedelta(min_days: int = 10, max_days: int = 10_000):
         days = randint(min_days, max_days)
         return timedelta(days=days)
 
@@ -164,13 +151,12 @@ class FileFaker:
         return dirpath / name
 
     @staticmethod
-    def write_file(dirpath: Path,
-                   inc_text: bool = True,
-                   overwrite: bool = True
-                   ) -> File:
+    def write_file(
+        dirpath: Path, inc_text: bool = True, overwrite: bool = True
+    ) -> File:
         path = FileFaker.mk_filepath(dirpath)
         exists = path.exists()
-        if (exists and not overwrite):
+        if exists and not overwrite:
             raise FileExistsError
         else:
             path.touch()
@@ -180,18 +166,18 @@ class FileFaker:
         return File(path=path)
 
     @staticmethod
-    def write_files(dirpath: Path,
-                    nfiles: int,
-                    **kwargs,
-                    ):
+    def write_files(
+        dirpath: Path,
+        nfiles: int,
+        **kwargs,
+    ):
         dp = dirpath
         rng = range(nfiles)
         func = FileFaker.write_file
         return [func(dp, **kwargs) for _ in rng]
 
     @staticmethod
-    def mk_dirpath(target_dir: Path
-                   ) -> Path:
+    def mk_dirpath(target_dir: Path) -> Path:
         name = RandGen.mk_dirname()
         return target_dir / name
 

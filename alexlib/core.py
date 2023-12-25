@@ -16,7 +16,7 @@ from subprocess import check_output
 
 def isnone(w: str):
     if isinstance(w, str):
-        ret = w.lower() == 'none' or len(w) == 0
+        ret = w.lower() == "none" or len(w) == 0
     else:
         ret = w is None
     return ret
@@ -30,36 +30,33 @@ def istrue(w: str | int):
     elif isinstance(w, int):
         ret = bool(w)
     elif isinstance(w, str):
-        ret = w.lower() == 'true' or w.lower() == 't'
+        ret = w.lower() == "true" or w.lower() == "t"
         ret = bool(int(w)) if w.isnumeric() else ret
     return ret
 
 
 def isdunder(key: str) -> bool:
-    return (key.endswith("__") and key.startswith("__"))
+    return key.endswith("__") and key.startswith("__")
 
 
 def ishidden(key: str) -> bool:
-    return (key.startswith("_") and not isdunder(key))
+    return key.startswith("_") and not isdunder(key)
 
 
 def asdict(
     obj: object,
     include_hidden: bool = False,
     include_dunder: bool = False,
-) -> dict[str: Any]:
+) -> dict[str:Any]:
     attrs = list(vars(obj).keys())
     if not include_dunder:
         attrs = [x for x in attrs if not isdunder(x)]
     if not include_hidden:
         attrs = [x for x in attrs if not ishidden(x)]
-    return {
-        x: getattr(obj, x)
-        for x in attrs
-    }
+    return {x: getattr(obj, x) for x in attrs}
 
 
-def aslist(val: str, sep: str = ","):
+def aslist(val: str, sep: str = ",") -> list[Any]:
     if val.startswith("[") and val.endswith("]"):
         try:
             ret = loads(val)
@@ -101,12 +98,12 @@ def chktype(
     else:
         ret = obj
 
-    if (ispath := isinstance(obj, Path)):
+    if ispath := isinstance(obj, Path):
         exists = obj.exists()
     else:
         exists = True
 
-    if (ispath and mustexist and not exists):
+    if ispath and mustexist and not exists:
         raise FileExistsError(f"{obj} must exist but doesn't")
     else:
         return ret
@@ -151,13 +148,13 @@ def chkenv(
     ifnotnone = ifnull is not None
     astypenotnone = astype is not None
 
-    if ((isblank or isnone_) and ifnotnone):
+    if (isblank or isnone_) and ifnotnone:
         return ifnull
-    elif (isnone_ and need):
+    elif isnone_ and need:
         raise ValueError(envname)
-    elif (isblank and need):
+    elif isblank and need:
         raise ValueError(envname)
-    elif (isblank or isnone_):
+    elif isblank or isnone_:
         return None
     elif astypenotnone:
         ret = envcast(val, astype, need=need)
@@ -171,12 +168,10 @@ def chkenv(
 
 
 def concat_lists(lists: list[list[Any]]) -> list[Any]:
-    return list(chain.from_iterable(
-        lists
-    ))
+    return list(chain.from_iterable(lists))
 
 
-def read_json(path: Path) -> dict[Hashable: Any]:
+def read_json(path: Path) -> dict[Hashable:Any]:
     try:
         ret = load(path.open())
     except JSONDecodeError:
@@ -223,14 +218,12 @@ class Object(object):
                 self.set_hasattr(k)
 
 
-def mk_dictvals_distinct(
-    dict_: dict[Hashable: Hashable]
-) -> dict[Any:Any]:
+def mk_dictvals_distinct(dict_: dict[Hashable:Any]) -> dict[Hashable:Any]:
     keys = list(dict_.keys())
     return {key: list(set(dict_[key])) for key in keys}
 
 
-def invert_dict(_dict: dict):
+def invert_dict(_dict: dict) -> dict[Hashable:Hashable]:
     """flips the keys and values of a dictionary"""
     rng = range(len(_dict))
     vals = list(_dict.values())
@@ -241,15 +234,15 @@ def sha256sum(
     path: Path,
     bytearr: bytearray = bytearray(128 * 1024),
 ) -> str:
-    """ inputs:
-            filename = path + name of file to hash
-        returns:
-            hash of file
+    """inputs:
+        filename = path + name of file to hash
+    returns:
+        hash of file
     """
     if not isinstance(path, Path):
         raise TypeError("func only computes sum on path")
     h, mv = sha256(), memoryview(bytearr)
-    with open(path, 'rb', buffering=0) as f:
+    with open(path, "rb", buffering=0) as f:
         for n in iter(lambda: f.readinto(mv), 0):
             h.update(mv[:n])
     return h.hexdigest()
@@ -267,7 +260,7 @@ def get_curent_version(tag: str) -> str:
     if tag.startswith("v"):
         tag = tag[1:]
     if "-" in tag:
-        tag = tag[:tag.index("-")]
+        tag = tag[: tag.index("-")]
     return tag
 
 
@@ -283,11 +276,13 @@ class Version:
         return cls(*parts)
 
     def __iter__(self):
-        return iter([
-            self.major,
-            self.minor,
-            self.patch,
-        ])
+        return iter(
+            [
+                self.major,
+                self.minor,
+                self.patch,
+            ]
+        )
 
     def __str__(self) -> str:
         return ".".join(list(self))
@@ -296,11 +291,7 @@ class Version:
         return str(self)
 
 
-def ping(
-    host: str,
-    port: int,
-    astext: bool = False
-) -> bool | str:
+def ping(host: str, port: int, astext: bool = False) -> bool | str:
     with socket(AF_INET, SOCK_STREAM) as sock:
         isopen = sock.connect_ex((host, port)) == 0
         text = "" if isopen else "not "

@@ -12,15 +12,15 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
-from alexlib.core import datetime as dt
+from alexlib.core import datetime, chkenv
 from alexlib.db import Connection
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.config import chkenv, ConfigFile
+from alexlib.config import DotEnv
 from alexlib.iters import keys, link
 from alexlib.maths import discrete_exp_dist
 
 
-config = ConfigFile.from_dotenv()
+config = DotEnv()
 cnxn = Connection()
 
 model_types = chkenv("MODEL_TYPES", type=list)
@@ -44,10 +44,12 @@ class Features:
     def drop_cols(self):
         r = chkenv("DROP_COLS", type=list)
         res_cols = [x for x in r if x != self.to_predict_col]
-        return link([
-            self.to_exclude,
-            res_cols,
-        ])
+        return link(
+            [
+                self.to_exclude,
+                res_cols,
+            ]
+        )
 
     @property
     def tbl(self):
@@ -92,7 +94,7 @@ class Features:
         return col in self.to_exclude
 
     def innotex(self, col: str):
-        return (self.isin(col) and not self.isex(col))
+        return self.isin(col) and not self.isex(col)
 
     @property
     def features(self):
@@ -113,27 +115,27 @@ class Features:
             "bigint",
         ]
 
-    def isbool(self, col: str):
+    def isbool(self, col: str) -> bool:
         return self.get_dtype(col) in ["boolean", "bit"]
 
     @property
-    def catcols(self):
+    def catcols(self) -> list[str]:
         return [x for x in self.features if self.iscat(x)]
 
     @property
-    def numcols(self):
+    def numcols(self) -> list[str]:
         return [x for x in self.features if self.isnum(x)]
 
     @property
-    def boolcols(self):
+    def boolcols(self) -> list[str]:
         return [x for x in self.features if self.isbool(x)]
 
     @property
-    def feat_df(self):
+    def feat_df(self) -> DataFrame:
         return self.df.loc[:, self.features]
 
     @property
-    def nfilters(self):
+    def nfilters(self) -> int:
         return len(self.df_filter)
 
     @property
@@ -149,7 +151,7 @@ class Features:
 
     @property
     def now(self):
-        return dt.now()
+        return datetime.now()
 
     @property
     def logdict(self):
@@ -494,12 +496,12 @@ class Parameters:
             },
             "gauss": {
                 "clf__random_state": [self.random_state],
-            }
+            },
         }
         _dict = _dict[self.model_type]
         _keys = keys(_dict)
         innotrand = lambda x: (x in _keys and not self.randomsearch)
-        if (innotrand("clf__learning_rate") and self.model_type != "mlp"):
+        if innotrand("clf__learning_rate") and self.model_type != "mlp":
             _dict.update({"clf__learning_rate": discrete_exp_dist(1, 4)})
         if innotrand("clf__C"):
             _dict.update({"clf__C": discrete_exp_dist(-2, 2)})
@@ -518,6 +520,6 @@ class Parameters:
         return _dict
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     feat = Features()
     print(get_distinct_col_vals(feat.info_schema, "data_type"))

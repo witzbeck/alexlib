@@ -5,10 +5,11 @@ from numpy import array
 
 from alexlib.maths import combine_domains, interpolate, get_rect_area
 from alexlib.maths import get_list_difs
-from alexlib.perf import timeit
+from alexlib.time import timeit
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from alexlib.db import Connection
+
     cnxn = Connection()
 
 roundto = 8
@@ -56,13 +57,13 @@ class Rate:
 
     @property
     def affirm_val(self):
-        if (self.istrue and self.ispositive):
+        if self.istrue and self.ispositive:
             return 1
-        if (self.istrue and self.isnegative):
+        if self.istrue and self.isnegative:
             return 0
-        elif (self.isfalse and self.isnegative):
+        elif self.isfalse and self.isnegative:
             return 1
-        elif (self.isfalse and self.ispositive):
+        elif self.isfalse and self.ispositive:
             return 0
 
     @property
@@ -99,11 +100,14 @@ class Rate:
         labels: list[int],
         rng: range,
     ):
-        p, l, = predictions, labels
-        return [
-            (p[i] == l[i] == affirm_val)
-            for i in rng
-        ]
+        (
+            p,
+            l,
+        ) = (
+            predictions,
+            labels,
+        )
+        return [(p[i] == l[i] == affirm_val) for i in rng]
 
     def get_rate(self, threshold: float):
         predictions = self.get_predictions(
@@ -120,10 +124,7 @@ class Rate:
 
     @property
     def rates(self):
-        return array([
-            self.get_rate(threshold)
-            for threshold in thresholds
-        ])
+        return array([self.get_rate(threshold) for threshold in thresholds])
 
     @classmethod
     def tp(
@@ -203,11 +204,7 @@ class ROC:  # Receiver Operating Characteristic
 
     @staticmethod
     def get_deltas(lst: list[float]):
-        return [
-            lst[i] - lst[i - 1]
-            if i > 0 else lst[i]
-            for i in rng
-        ]
+        return [lst[i] - lst[i - 1] if i > 0 else lst[i] for i in rng]
 
     @property
     def fp_delta(self):
@@ -219,10 +216,7 @@ class ROC:  # Receiver Operating Characteristic
 
     @property
     def auc(self):
-        return sum([
-            self.fp_delta[i] * self.tp[i]
-            for i in rng
-        ])
+        return sum([self.fp_delta[i] * self.tp[i] for i in rng])
 
     @staticmethod
     def mk_legend_text(
@@ -245,6 +239,7 @@ class ROC:  # Receiver Operating Characteristic
     ):
         from matplotlib.pyplot import plot, title as t, show
         from matplotlib.pyplot import xlabel as x, ylabel as y, legend
+
         plot(self.fp, self.tp)
         x(xlabel), y(ylabel), t(title)
         legend([self.legend_text])
@@ -298,10 +293,7 @@ class ABROCA:
         val: float,
         lookuplst: list[float],
     ):
-        return lookuplst.index(ABROCA.get_one_smaller(
-            val,
-            lookuplst
-        ))
+        return lookuplst.index(ABROCA.get_one_smaller(val, lookuplst))
 
     @staticmethod
     def get_one_bigger(
@@ -315,10 +307,7 @@ class ABROCA:
         val: float,
         lookuplst: list[float],
     ):
-        return lookuplst.index(ABROCA.get_one_bigger(
-            val,
-            lookuplst
-        ))
+        return lookuplst.index(ABROCA.get_one_bigger(val, lookuplst))
 
     @staticmethod
     def get_interpolated_val(
@@ -357,8 +346,8 @@ class ABROCA:
 
     @staticmethod
     def get_new_tpr(
-            roc: ROC,
-            domain: list[float],
+        roc: ROC,
+        domain: list[float],
     ) -> list[float]:
         return [
             ABROCA.get_interpolated_val(
@@ -396,10 +385,7 @@ class ABROCA:
         tpr2: list[float],
         rng: range,
     ):
-        return [
-            tpr1[i] - tpr2[i]
-            for i in rng
-        ]
+        return [tpr1[i] - tpr2[i] for i in rng]
 
     @timeit
     def set_combined_tpr_deltas(self):
@@ -441,7 +427,7 @@ class ABROCA:
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     abroca = ABROCA.rand()
     # print(abroca.roc1.auc, abroca.roc1.fp)
     # print(abroca.roc2.auc, abroca.roc2.fp)
@@ -451,10 +437,7 @@ if __name__ == '__main__':
     abroca.set_new_tpr2()
     print(len(abroca.new_tpr2), "new_tpr2")
     abroca.set_domain_deltas()
-    print(
-        abroca.domain_deltas.__class__.__name__,
-        len(abroca.domain_deltas)
-    )
+    print(abroca.domain_deltas.__class__.__name__, len(abroca.domain_deltas))
     abroca.set_combined_tpr_deltas()
     print(
         abroca.combined_tpr_deltas.__class__.__name__,

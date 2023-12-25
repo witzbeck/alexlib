@@ -1,17 +1,15 @@
-from datetime import datetime as dt
 from dataclasses import dataclass, field
 import logging as log
 
 from pandas import DataFrame
-import openai
 
-import alexlib as al
-from alexlib.config import ConfigFile, chkenv
+from alexlib.core import chkenv
+from alexlib.config import DotEnv
 from alexlib.db import Table, Connection
 
 if __name__ == '__main__':
     schema = "gpt"
-    config = ConfigFile(name=".env")
+    config = DotEnv()
     c = Connection.from_context("LOCAL")
     log.info(schema)
 
@@ -46,17 +44,18 @@ class Messages:
     @property
     def nmsgs(self) -> int:
         return len(self.lst)
-    
+
     @property
     def rng(self) -> range:
         return range(self.nmsgs)
 
-    def update_attr(self, attr: str, vals: list):
-        for i, msg in enumerate(self.lst):
+    def update_attr(self, attr: str, vals: list) -> None:
+        [
             setattr(msg, attr, vals[i])
-        return self
+            for i, msg in enumerate(self.lst)
+        ]
 
-    def get_update_ids_vals(self, last_id: int):
+    def get_update_ids_vals(self, last_id: int) -> list[str]:
         return [i + last_id + 1 for i in range(len(self.lst))]
 
     def update_ids(self, last_id: int):
@@ -126,7 +125,6 @@ class Messages:
         tbl = Table.from_db(context, schema, table)
         df = tbl.get_df()
         return cls.from_df(df)
-        
 
 
 @dataclass

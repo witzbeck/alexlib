@@ -37,20 +37,20 @@ def eval_parents(
     parts = path.parts
 
     nincluded = sum([x in include for x in parts])
-    incpass = (nincluded == ninclude or include is None)
+    incpass = nincluded == ninclude or include is None
 
     nexcluded = sum([x in exclude for x in parts])
-    excpass = (nexcluded == 0 or exclude is None)
-    return (incpass and excpass)
+    excpass = nexcluded == 0 or exclude is None
+    return incpass and excpass
 
 
 def path_search(
-        pattern: str,
-        start_path: Path = Path(eval("__file__")).parent,
-        listok: bool = False,
-        include: list[str] = [],
-        exclude: list[str] = [],
-        max_ascends: int = 8,
+    pattern: str,
+    start_path: Path = Path(eval("__file__")).parent,
+    listok: bool = False,
+    include: list[str] = [],
+    exclude: list[str] = [],
+    max_ascends: int = 8,
 ) -> Path | list[Path]:
     if isinstance(exclude, str):
         exclude = [exclude]
@@ -60,10 +60,7 @@ def path_search(
     while n <= max_ascends:
         try:
             ret = [x for x in start_path.rglob(pattern)]
-            ret = [
-                x for x in ret
-                if eval_parents(x, include, exclude)
-            ]
+            ret = [x for x in ret if eval_parents(x, include, exclude)]
             if listok:
                 return ret
             else:
@@ -92,10 +89,7 @@ class SystemObject:
         default_factory=list,
         repr=False,
     )
-    max_ascends: int = field(
-        repr=False,
-        default=8
-    )
+    max_ascends: int = field(repr=False, default=8)
 
     @property
     def isfile(self) -> bool:
@@ -160,12 +154,11 @@ class SystemObject:
                 include=include,
                 exclude=exclude,
                 start_path=start_path,
-                max_ascends=self.max_ascends
+                max_ascends=self.max_ascends,
             )
         else:
-            raise ValueError(
-                f"need name cur={self.name} or path cur={self.path}"
-            )
+            n, p = self.name, self.path
+            raise ValueError(f"need name cur={n} or path cur={p}")
         return ret
 
     def set_path(self):
@@ -383,31 +376,31 @@ class File(SystemObject):
         return low.endswith(other)
 
     @property
-    def isxlsx(self):
+    def isxlsx(self) -> bool:
         return self.istype(".xlsx")
 
     @property
-    def issql(self):
+    def issql(self) -> bool:
         return self.istype(".sql")
 
     @property
-    def iscsv(self):
+    def iscsv(self) -> bool:
         return self.istype(".csv")
 
     @property
-    def isjson(self):
+    def isjson(self) -> bool:
         return self.istype(".json")
 
     @property
-    def istxt(self):
+    def istxt(self) -> bool:
         return self.istype(".txt")
 
     @property
-    def ispy(self):
+    def ispy(self) -> bool:
         return self.istype(".py")
 
     @property
-    def isipynb(self):
+    def isipynb(self) -> bool:
         return self.istype(".ipynb")
 
     @property
@@ -440,8 +433,7 @@ class File(SystemObject):
     @property
     def line_repeats(self) -> dict[str: list[int]]:
         return {
-            k: v
-            for k, v in self.line_indexes.items()
+            k: v for k, v in self.line_indexes.items()
             if (len(v) > 1 and len(k) > 0)
         }
 
@@ -491,10 +483,7 @@ class File(SystemObject):
     def end_text(self) -> str:
         return chkenv("report_end_text", need=False)
 
-    def get_sql(
-        self,
-        replace: list[tuple[str, str]] = None
-    ) -> str:
+    def get_sql(self, replace: list[tuple[str, str]] = None) -> str:
         sql = self.text
         if isinstance(replace, tuple):
             sql = sql.replace(*replace)
@@ -691,11 +680,10 @@ class Directory(SystemObject):
 
     @property
     def tree(self):
-        return {
-            self.name: {
-                obj.name: Directory.tree_item(obj) for obj in self.objlist
-            }
-        }
+        return {self.name: {
+            obj.name: Directory.tree_item(obj)
+            for obj in self.objlist
+        }}
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.name})"
@@ -751,15 +739,11 @@ class Directory(SystemObject):
 
     @property
     def allchildfiles(self) -> list[File]:
-        return self.filelist + link([
-            x.allchildfiles for x in self.dirlist
-        ])
+        return self.filelist + link([x.allchildfiles for x in self.dirlist])
 
     @property
     def allchilddirs(self) -> list[SystemObject]:
-        return self.dirlist + link([
-            x.allchilddirs for x in self.dirlist
-        ])
+        return self.dirlist + link([x.allchilddirs for x in self.dirlist])
 
     @property
     def childdirswithfiles(self):
@@ -854,9 +838,9 @@ class Directory(SystemObject):
         oisfile = isinstance(other, File)
         oisdir = isinstance(other, Directory)
         oispath = isinstance(other, Path)
-        fdp = (oisfile or oisdir or oispath)
+        fdp = oisfile or oisdir or oispath
         oisstr = isinstance(other, str)
-        oisnum = (isinstance(other, int) or isinstance(other, float))
+        oisnum = isinstance(other, int) or isinstance(other, float)
 
         if fdp:
             path, name = self.path, other.name
@@ -901,8 +885,5 @@ def update_file_version(
 ) -> None:
     file = File.from_path(path)
     newline = f"version = {version}"
-    newlines = [
-        newline if x.startswith("version") else x
-        for x in file.lines
-    ]
+    newlines = [newline if x.startswith("version") else x for x in file.lines]
     file.write_lines(newlines)

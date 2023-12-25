@@ -5,7 +5,6 @@ https://examples.pyviz.org/attractors/attractors.html
 """
 from dataclasses import dataclass, field
 from math import sin, cos, sqrt, fabs
-from types import GeneratorType
 from typing import Callable, Generator
 
 from datashader import Canvas
@@ -15,11 +14,11 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 from matplotlib.colors import _ColorMapping
 from numba import jit
-from numpy import zeros, arange, sign, array
+from numpy import zeros, sign, array
 from pandas import DataFrame
 
-
 from alexlib.iters import get_comb_gen
+
 
 @jit(nopython=True)
 def clifford(
@@ -148,7 +147,7 @@ class Attractor:
     )
 
     def __post_init__(self):
-        self.cycler = 
+        self.cycler = ""
         self.canvas = Canvas(
             plot_width=self.plotsize[0],
             plot_height=self.plotsize[1]

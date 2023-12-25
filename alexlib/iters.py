@@ -29,13 +29,10 @@ def get_comb_gen(_list: list, _int: int):
         yield pair
 
 
-def list_gen(_list: list,
-             rand: bool = False,
-             inf: bool = False
-             ):
+def list_gen(_list: list, rand: bool = False, inf: bool = False):
     """returns a generator for a list of items
-        - if rand is True, the items are returned in random order
-        - if inf is True, the items can be returned infinitely
+    - if rand is True, the items are returned in random order
+    - if inf is True, the items can be returned infinitely
     """
     _list = list(_list)
     while True:
@@ -71,10 +68,10 @@ def rm_pattern(list_of_strs: list, pattern: str, end: bool = True):
 
 
 def get_idx_val(
-        idx_counter: int,
-        in_val: Any,
-        in_list: list[Any],
-        out_list: list[Any],
+    idx_counter: int,
+    in_val: Any,
+    in_list: list[Any],
+    out_list: list[Any],
 ) -> Any:
     """returns the value of the out_list
     at the index of the in_val in the in_list"""
