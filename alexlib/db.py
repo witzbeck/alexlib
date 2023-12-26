@@ -252,6 +252,8 @@ class Connection:
             with cnxn.cursor() as cursor:
                 try:
                     cursor.execute(clause.encode("utf-8"))
+                except UnicodeDecodeError:
+                    cursor.execute(clause.encode())
                 except UndefinedTable as e:
                     raise UndefinedTable(f"{e} - {clause}")
                 if fetch:
