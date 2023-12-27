@@ -395,6 +395,16 @@ class Connection:
             for schema in self.allschemas
         }
 
+    @property
+    def table_rows(self) -> dict[str:dict[str:int]]:
+        return {
+            schema: {
+                table: self.get_record_count(schema, table, print_=False)
+                for table in tables
+            }
+            for schema, tables in self.schema_tables.items()
+        }
+
     def table_exists(self, schema: str, table: str) -> bool:
         try:
             return table in self.schema_tables[schema]
