@@ -272,15 +272,22 @@ class Connection:
         file: File,
         schema: str,
         table: str,
-        eng: Engine = None,
+        engine: Engine = None,
         if_exists: str = "replace",
+        index: bool = False,
     ) -> None:
         if file.issql:
-            eng = self.engine
+            engine = self.engine
         if not isinstance(schema, str):
             schema = str(schema)
-        df = file.get_df(eng=eng)
-        df.to_sql(table, self.engine, schema=schema, if_exists=if_exists)
+        df = file.get_df(engine=engine)
+        df.to_sql(
+            table,
+            self.engine,
+            schema=schema,
+            if_exists=if_exists,
+            index=index,
+        )
 
     def sql_to_file(
         self,
