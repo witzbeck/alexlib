@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from functools import cached_property
 from queue import Queue
-from logging import warning
 from sqlite3 import Connection as LiteConnection, Cursor
 from sqlite3 import DatabaseError, connect as lite_connect
 from string import ascii_letters, digits
@@ -244,9 +243,13 @@ class Connection:
     def execute(
         self,
         sql: SQL | str | TextClause | Path | File,
-        fetch: bool = False,
+        fetch: bool | int = False,
     ) -> CursorResult:
         clause = Connection.get_clause(sql)
+        if ";" in clause:
+            for part in clause.split(";"):
+                if part:
+                    self.execute(part, fetch=fetch)
         with self.pg_cnxn as cnxn:
             cnxn.autocommit = True
             with cnxn.cursor() as cursor:
@@ -256,8 +259,14 @@ class Connection:
                     cursor.execute(clause.encode())
                 except UndefinedTable as e:
                     raise UndefinedTable(f"{e} - {clause}")
+                if fetch == 1 and isinstance(fetch, int):
+                    ret = cursor.fetchone()[0]
+                elif fetch and isinstance(fetch, int):
+                    ret = cursor.fetchmany(fetch)
+                elif fetch:
+                    ret = cursor.fetchall()
                 if fetch:
-                    return cursor.fetchall()
+                    return ret
 
     def get_df(self, sql: SQL | str | TextClause) -> DataFrame:
         clause = Connection.get_clause(sql)
@@ -346,7 +355,7 @@ class Connection:
 
     def create_db(self) -> None:
         if self.dbexists:
-            raise ValueError("database already exists")
+            print(f"database[{self.curl.database}] already exists")
         elif self.curl.database is None:
             raise ValueError("dbname is None")
         else:
@@ -402,6 +411,34 @@ class Connection:
             for schema in self.allschemas
         }
 
+    def show_row_counts(
+        self,
+        schema: str | list[str] | None = None,
+        table: str | list[str] | None = None,
+        system_schemas: bool = False,
+    ) -> None:
+        d = {k: v for k, v in self.schema_tables.items()}
+        if not system_schemas:
+            d = {k: v for k, v in d.items() if k not in ["information_schema", "pg_catalog"]}
+        if isinstance(schema, str):
+            schema = [schema]
+        if schema:
+            d = {k: v for k, v in d.items() if k in schema}
+
+        for schema, tables in d.items():
+            print(schema)
+            if isinstance(table, str):
+                tables = [table]
+            if table:
+                tables = [tbl for tbl in tables if tbl in table]
+            for tbl in tables:
+                try:
+                    sql = f'SELECT count(*) FROM {schema}."{tbl}"'
+                    rows = self.execute(sql, fetch=1)
+                    print(f"\t{schema}.{tbl} = {rows} rows")
+                except UndefinedTable:
+                    print(f"\t{schema}.{tbl} = UndefinedTable")
+    
     @property
     def table_rows(self) -> dict[str:dict[str:int]]:
         return {
@@ -446,7 +483,7 @@ class Connection:
         try:
             self.obj_cmd("create", "schema", schema)
         except DuplicateSchema:
-            warning(f"schema {schema} already exists")
+            print(f"schema[{schema}] already exists")
 
     def drop_table(
         self,
