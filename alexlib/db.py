@@ -504,6 +504,18 @@ class Connection:
         addl_cmd = "cascade" if cascade else ""
         self.obj_cmd("drop", "table", table, schema=schema, addl_cmd=addl_cmd)
 
+    def drop_table_pattern(
+        self,
+        pattern: str,
+        schema: str,
+        cascade: bool = True,
+    ) -> None:
+        [
+            self.drop_table(schema, tab, cascade=cascade)
+            for tab in self.get_all_schema_tables(schema)
+            if pattern in tab
+        ]
+
     def drop_view(self, schema: str, view: str) -> None:
         self.obj_cmd("drop", "view", view, schema=schema)
 

@@ -35,9 +35,10 @@ def discrete_exp_dist(
     exp_inc: int = 1,
     numerator: int = 1
 ) -> list[float]:
-    exp_max += 1
-    rng = range(exp_min, exp_max, exp_inc)
-    return [numerator / (exp_int**i) for i in rng]
+    return [
+        numerator / (exp_int**i)
+        for i in range(exp_min, exp_max + 1, exp_inc)
+    ]
 
 
 def isintorfloat(x: int | float) -> bool:
