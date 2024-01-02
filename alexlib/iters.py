@@ -8,16 +8,6 @@ def link(lists: list[list]):
     return list(chain.from_iterable(lists))
 
 
-def keys(_dict: dict):
-    """returns the keys of a dictionary as a list"""
-    return list(_dict.keys())
-
-
-def vals(_dict: dict):
-    """returns the values of a dictionary as a list"""
-    return list(_dict.values())
-
-
 def idx_list(shape: list[int]):
     """returns a list of all indices for the shape of an ndarray"""
     return list(product(range(x) for x in shape))

@@ -20,12 +20,8 @@ def get_primes(n):
     return [2] + [i for i in range(3, n, 2) if sieve[i]]
 
 
-def randbool(asint: bool = False):
-    if asint:
-        choices = [0, 1]
-    else:
-        choices = [True, False]
-    return choice(choices)
+def randbool(asint: bool = False) -> bool | int:
+    return choice([0, 1] if asint else [True, False])
 
 
 def euclidean_distance(itr: Iterable):
