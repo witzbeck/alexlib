@@ -419,7 +419,10 @@ class Connection:
     ) -> None:
         d = {k: v for k, v in self.schema_tables.items()}
         if not system_schemas:
-            d = {k: v for k, v in d.items() if k not in ["information_schema", "pg_catalog"]}
+            d = {
+                k: v for k, v in d.items()
+                if k not in ["information_schema", "pg_catalog"]
+            }
         if isinstance(schema, str):
             schema = [schema]
         if schema:
@@ -438,7 +441,7 @@ class Connection:
                     print(f"\t{schema}.{tbl} = {rows} rows")
                 except UndefinedTable:
                     print(f"\t{schema}.{tbl} = UndefinedTable")
-    
+
     @property
     def table_rows(self) -> dict[str:dict[str:int]]:
         return {
@@ -484,6 +487,13 @@ class Connection:
             self.obj_cmd("create", "schema", schema)
         except DuplicateSchema:
             print(f"schema[{schema}] already exists")
+
+    def drop_schema(self, schema: str) -> None:
+        self.obj_cmd("drop", "schema", schema, addl_cmd="cascade")
+
+    def drop_all_schema_tables(self, schema: str) -> None:
+        self.drop_schema(schema)
+        self.create_schema(schema)
 
     def drop_table(
         self,
