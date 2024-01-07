@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from itertools import chain
-from json import JSONDecodeError, load, loads
+from json import JSONDecodeError, load, loads, dumps
 from logging import debug
 from os import getenv
 from pathlib import Path
@@ -183,6 +183,11 @@ def read_json(path: Path) -> dict[Hashable:Any]:
     except JSONDecodeError:
         ret = loads(path.open().read())
     return ret
+
+
+def show_dict(d: dict, indent: int = 4) -> None:
+    d = {k: v for k, v in d.items() if not k.startswith("_")}
+    print(dumps(d, indent=indent))
 
 
 def get_objects_by_attr(
