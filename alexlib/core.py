@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from itertools import chain
 from json import JSONDecodeError, load, loads, dumps
@@ -12,6 +12,10 @@ from subprocess import check_output
 
 """ core functions & objects must only use the standard lib
 """
+
+
+def get_local_tz() -> timezone:
+    return datetime.now().astimezone().tzinfo
 
 
 def isnone(w: str):
