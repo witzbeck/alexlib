@@ -4,8 +4,9 @@ from itertools import product
 from json import dump, dumps, loads
 from pathlib import Path
 from typing import Callable
-from urllib.request import HTTPBasicAuthHandler, HTTPDigestAuthHandler
 from random import choice, randint
+
+from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
 from alexlib.core import read_json
 from alexlib.constants import creds
@@ -451,12 +452,12 @@ class Auth:
     @cached_property
     def basicauth(self):
         u, p = self.username, self.password
-        return HTTPBasicAuthHandler(u, p)
+        return HTTPBasicAuth(u, p)
 
     @cached_property
     def digestauth(self):
         u, p = self.username, self.password
-        return HTTPDigestAuthHandler(u, p)
+        return HTTPDigestAuth(u, p)
 
     def __post_init__(self):
         if isinstance(self.name, list):
