@@ -190,8 +190,12 @@ def read_json(path: Path) -> dict[Hashable:Any]:
 
 
 def show_dict(d: dict, indent: int = 4) -> None:
-    d = {k: v for k, v in d.items() if not k.startswith("_")}
-    print(dumps(d, indent=indent))
+    if isinstance(d, list):
+        for dict_ in d:
+            show_dict(dict_)
+    else:
+        d = {k: v for k, v in d.items() if not k.startswith("_")}
+        print(dumps(d, indent=indent))
 
 
 def get_objects_by_attr(

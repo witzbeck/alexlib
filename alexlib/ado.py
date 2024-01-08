@@ -6,18 +6,22 @@ from alexlib.__init__ import dotenv
 from requests import Response, get
 from requests.auth import HTTPBasicAuth
 
-from alexlib.core import chkenv, get_local_tz
+from alexlib.core import chkenv, get_local_tz, show_dict
 
 dotenv
 
 
 @dataclass
-class AdoAuth:
+class AzureDevOpsClient:
     host: str
     org: str
     project: str
     token: str = field(repr=False)
     api_version: str = field(default="7.0", repr=False)
+
+    @property
+    def org_initials(self) -> str:
+        return self.org[:3].capitalize()
 
     @property
     def basic(self) -> HTTPBasicAuth:
@@ -41,41 +45,84 @@ class AdoAuth:
         return cls(*envs, **kwenvs)
 
     @property
-    def api_part(self) -> str:
-        return f"?api-version={self.api_version}"
+    def api_part(self) -> dict:
+        return {"api-version": self.api_version}
 
     @property
-    def api_path(self) -> str:
+    def org_path(self) -> str:
         return "/".join([
             self.host,
             self.org,
-            self.project,
-            "_apis",
         ])
 
-    def mk_url(
-        self,
-        resource_path: str,
-        kwparts: list[str] = [],
-    ) -> str:
+    @property
+    def project_path(self) -> str:
         return "/".join([
-            self.api_path,
+            self.org_path,
+            self.project,
+        ])
+
+    @property
+    def org_api_path(self) -> str:
+        return self.org_path + "/_apis"
+
+    @property
+    def project_api_path(self) -> str:
+        return self.project_path + "/_apis"
+
+    @staticmethod
+    def fmt_uri_kwargs(
+        kwargs: dict[str, str]
+    ) -> str:
+        return "?" + "&".join([
+            f"{k}={v}"
+            for k, v in kwargs.items()
+        ])
+
+    @staticmethod
+    def mk_uri(
+        api_path: str,
+        resource_path: str,
+        kwargs: dict[str:str] = None,
+    ) -> str:
+        ret = "/".join([
+            api_path,
             resource_path,
-        ]) + "".join(kwparts)
+        ])
+        if kwargs:
+            ret += AzureDevOpsClient.fmt_uri_kwargs(kwargs)
+        return ret
+
+    def mk_team_iterations_uri(self, team: str) -> str:
+        team_api_path = self.project_path + f"/{team}/_apis"
+        return AzureDevOpsClient.mk_uri(
+            team_api_path,
+            "work/teamsettings/iterations",
+            kwargs=self.api_part
+        )
+
+    def get_team_iterations(self, team: str) -> dict:
+        return self.get_response(
+            self.mk_team_iterations_uri(team)
+        ).json()["value"]
 
     @property
     def last_sprint_query_id(self) -> str:
         return chkenv("ADO_LAST_SPRINT_QUERY_ID")
 
     @property
-    def last_sprint_url(self) -> str:
-        return self.mk_url(
-            f"wit/wiql/{self.last_sprint_query_id}",
-            kwparts=[self.api_part],
+    def my_hours_query_id(self) -> str:
+        return chkenv("ADO_MY_HOURS_QUERY_ID")
+
+    def mk_query_uri(self, query_id: str) -> str:
+        return AzureDevOpsClient.mk_uri(
+            self.project_api_path,
+            f"wit/wiql/{query_id}",
+            kwargs=self.api_part,
         )
 
-    def get_response(self, url: str) -> Response:
-        resp = get(url, auth=self.basic)
+    def get_response(self, uri: str) -> Response:
+        resp = get(uri, auth=self.basic)
         if resp.status_code == 200:
             return resp
         else:
@@ -85,32 +132,106 @@ class AdoAuth:
             ])
             raise ConnectionError(msg)
 
-    @property
-    def last_sprint_workitems(self) -> list[str]:
-        resp = self.get_response(self.last_sprint_url)
+    def get_workitems(self, query_id: str) -> list[str]:
+        resp = self.get_response(self.mk_query_uri(query_id))
         return [x["id"] for x in resp.json()["workItems"]]
 
-    @property
-    def workitems(self) -> dict:
-        url = self.mk_url(self.workitem_path, kwparts=[self.api_part])
-        return self.get_response(url)
+    @cached_property
+    def last_sprint_workitems(self) -> dict:
+        return self.get_workitems(self.last_sprint_query_id)
+
+    @cached_property
+    def my_hours_workitems(self) -> dict:
+        return self.get_workitems(self.my_hours_query_id)
 
     @property
-    def org_initials(self) -> str:
-        return self.org[:3].capitalize()
+    def all_projects_uri(self) -> dict:
+        return AzureDevOpsClient.mk_uri(
+            self.org_api_path,
+            "projects",
+            kwargs=self.api_part,
+        )
 
+    @cached_property
+    def all_projects(self) -> dict:
+        return self.get_response(self.all_projects_uri).json()["value"]
+
+    @cached_property
+    def all_project_names(self) -> list[str]:
+        return [x["name"] for x in self.all_projects]
+
+    @cached_property
+    def all_project_ids(self) -> list[str]:
+        return [x["id"] for x in self.all_projects]
+
+    @property
+    def all_teams_uri(self) -> dict:
+        return AzureDevOpsClient.mk_uri(
+            self.org_api_path,
+            "teams",
+            kwargs=self.api_part,
+        )
+
+    @cached_property
+    def all_teams(self) -> dict:
+        return self.get_response(self.all_teams_uri).json()["value"]
+
+    @cached_property
+    def all_team_names(self) -> list[str]:
+        return [x["name"] for x in self.all_teams]
+
+    @cached_property
+    def all_team_ids(self) -> list[str]:
+        return [x["id"] for x in self.all_teams]
+
+    @cached_property
+    def team_projects(self) -> dict:
+        return {
+            x: [
+                y["projectName"] for y in self.all_teams
+                if y["name"] == x
+            ][0]
+            for x in self.all_team_names
+        }
+
+    @cached_property
+    def project_teams(self) -> dict:
+        return {
+            x: [
+                y["name"] for y in self.all_teams
+                if y["projectName"] == x
+            ]
+            for x in self.all_project_names
+        }
+
+    @cached_property
+    def team_iterations(self) -> dict:
+        teams = self.project_teams[self.project]
+        iters = {
+            x: self.get_team_iterations(x)
+            for x in teams
+        }
+        return {k: v for k, v in iters.items() if v}
+
+    @property
+    def my_team(self) -> str:
+        return chkenv("ADO_TEAM")
+
+    @cached_property
+    def my_team_iterations(self) -> dict:
+        return self.get_team_iterations(self.my_team)
 
 @dataclass
 class ProductBacklogItem:
     id: int
-    auth: AdoAuth = field(
-        default_factory=AdoAuth.from_envs,
+    client: AzureDevOpsClient = field(
+        default_factory=AzureDevOpsClient.from_envs,
         repr=False,
     )
 
     @property
     def resource_path(self) -> str:
-        return self.auth.workitem_path
+        return self.client.workitem_path
 
     @cached_property
     def tz(self) -> timezone:
@@ -126,7 +247,7 @@ class ProductBacklogItem:
             self.auth.api_path,
             "wit/workitems",
             str(self.id),
-        ]) + self.auth.api_part
+        ]) + self.client.api_part
 
     @classmethod
     def from_env(cls, env: str = "ADO_PBI_ID", **kwargs):
@@ -156,24 +277,32 @@ class ProductBacklogItem:
         return self.fields["System.AreaPath"]
 
     @property
+    def area_parts(self) -> list[str]:
+        return self.area_path.split("\\")
+
+    @property
     def area(self) -> str:
-        return self.area_path.split("\\")[-1]
+        return self.area_parts[-1]
 
     @property
     def iteration_path(self) -> str:
         return self.fields["System.IterationPath"]
 
     @property
+    def iteration_parts(self) -> str:
+        return self.iteration_path.split("\\")
+
+    @property
     def iteration(self) -> str:
-        return self.iteration_path.split("\\")[-1]
+        return self.iteration_parts[-1]
 
     @property
     def status(self) -> str:
-        return self.fields[f"{self.auth.org_initials}.Status"]
+        return self.fields[f"{self.client.org_initials}.Status"]
 
     @property
     def targeted_release(self) -> str:
-        return self.fields[f"{self.auth.org_initials}.TargetedRelease"]
+        return self.fields[f"{self.client.org_initials}.TargetedRelease"]
 
     @property
     def qa_effort(self) -> float:
@@ -281,9 +410,16 @@ class ProductBacklogItem:
 
 
 if __name__ == "__main__":
+    client = AzureDevOpsClient.from_envs()
+    """
     pbi = ProductBacklogItem.from_env()
-    auth = AdoAuth.from_envs()
     pbis = [
         ProductBacklogItem(x, auth=pbi.auth)
         for x in pbi.auth.last_sprint_workitems
     ]
+    show_dict(client.project_teams)
+    print(client.all_projects_uri)
+    print(client.all_teams_uri)
+    show_dict(client.project_teams)
+    """
+    show_dict(client.my_team_iterations)
