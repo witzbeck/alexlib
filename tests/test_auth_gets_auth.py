@@ -26,11 +26,13 @@ class TestAuth(TestCase):
             rand_env(),
             rand_db(),
         ]
-        self.concat_name = ".".join([
-            rand_locale(),
-            rand_env(),
-            rand_db(),
-        ])
+        self.concat_name = ".".join(
+            [
+                rand_locale(),
+                rand_env(),
+                rand_db(),
+            ]
+        )
 
     def test_concat_getauth(self):
         if (creds / f"{self.concat_name}.store").exists():

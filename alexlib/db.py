@@ -405,10 +405,9 @@ class Connection:
         return schema in self.allschemas
 
     @property
-    def schema_tables(self) -> dict[str:list[str]]:
+    def schema_tables(self) -> dict[str : list[str]]:
         return {
-            schema: self.get_all_schema_tables(schema)
-            for schema in self.allschemas
+            schema: self.get_all_schema_tables(schema) for schema in self.allschemas
         }
 
     def show_row_counts(
@@ -420,7 +419,8 @@ class Connection:
         d = {k: v for k, v in self.schema_tables.items()}
         if not system_schemas:
             d = {
-                k: v for k, v in d.items()
+                k: v
+                for k, v in d.items()
                 if k not in ["information_schema", "pg_catalog"]
             }
         if isinstance(schema, str):
@@ -443,7 +443,7 @@ class Connection:
                     print(f"\t{schema}.{tbl} = UndefinedTable")
 
     @property
-    def table_rows(self) -> dict[str:dict[str:int]]:
+    def table_rows(self) -> dict[str : dict[str:int]]:
         return {
             schema: {
                 table: self.get_record_count(schema, table, print_=False)
@@ -464,11 +464,7 @@ class Connection:
 
     @staticmethod
     def mk_cmd_sql(
-        cmd: str,
-        obj_type: str,
-        obj_name: str,
-        schema: str = None,
-        addl_cmd: str = ""
+        cmd: str, obj_type: str, obj_name: str, schema: str = None, addl_cmd: str = ""
     ) -> None:
         if obj_type not in ["table", "view"]:
             name = obj_name
@@ -495,12 +491,7 @@ class Connection:
         self.drop_schema(schema)
         self.create_schema(schema)
 
-    def drop_table(
-        self,
-        schema: str,
-        table: str,
-        cascade: bool = True
-    ) -> None:
+    def drop_table(self, schema: str, table: str, cascade: bool = True) -> None:
         addl_cmd = "cascade" if cascade else ""
         self.obj_cmd("drop", "table", table, schema=schema, addl_cmd=addl_cmd)
 
@@ -552,13 +543,7 @@ class Connection:
         text = path.read_text()
         return self.run_pg_sql(text)
 
-    def df_to_db(
-        self,
-        df: DataFrame,
-        schema: str,
-        table: str,
-        **kwargs
-    ) -> None:
+    def df_to_db(self, df: DataFrame, schema: str, table: str, **kwargs) -> None:
         if schema not in self.allschemas:
             try:
                 self.create_schema(schema)
@@ -630,12 +615,7 @@ class Connection:
         sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
         return self.run_pd_query(sql)
 
-    def get_record_count(
-        self,
-        schema: str,
-        table: str,
-        print_: bool = True
-    ) -> int:
+    def get_record_count(self, schema: str, table: str, print_: bool = True) -> int:
         sql = f"select count(*) from {schema}.{table};"
         val = self.run_pg_sql(sql).values[0][0]
         if print_:
@@ -688,10 +668,7 @@ class LocalETL:
 
     @cached_property
     def sql_files(self) -> list[File]:
-        return [
-            x for x in self.resources_dir.filelist
-            if x.name.endswith(".sql")
-        ]
+        return [x for x in self.resources_dir.filelist if x.name.endswith(".sql")]
 
     @property
     def file_prefixes(self) -> list[str]:
@@ -714,7 +691,7 @@ class LocalETL:
         }
 
     @cached_property
-    def file_dict(self) -> dict[str: dict[str:File]]:
+    def file_dict(self) -> dict[str : dict[str:File]]:
         return {
             prefix: {
                 "_".join(x.path.stem.split("_")[1:]): x
@@ -815,10 +792,7 @@ class LocalETL:
         return self.main_data
 
     @staticmethod
-    def to_csv(
-        data_dict: dict[str:DataFrame],
-        dirpath: Path | Directory
-    ) -> None:
+    def to_csv(data_dict: dict[str:DataFrame], dirpath: Path | Directory) -> None:
         if isinstance(dirpath, Directory):
             path = dirpath.path
         elif isinstance(dirpath, Path):

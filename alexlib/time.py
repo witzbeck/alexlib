@@ -15,38 +15,57 @@ roundto = 6
 UNITS = ["s", "ms", "μs", "ns"]
 
 
-class timedelta(timedelta):
+def get_rand_datetime() -> datetime:
+    return datetime(
+        randint(2, 3000),
+        randint(1, 12),
+        randint(1, 28),
+        randint(0, 23),
+        randint(0, 59),
+        randint(0, 59),
+        randint(0, 1000000),
+    )
+
+
+def get_rand_timedelta() -> timedelta:
+    return timedelta(
+        weeks=randint(0, 100),
+        days=randint(0, 30),
+        hours=randint(0, 23),
+        minutes=randint(0, 59),
+        seconds=randint(0, 59),
+        microseconds=randint(0, 1000000),
+    )
+
+
+class CustomTimedelta(timedelta):
     """new timedelta class with extra methods"""
 
     @classmethod
     def rand(cls) -> timedelta():
-        return timedelta(
-            weeks=randint(0, 100),
-            days=randint(0, 30),
-            hours=randint(0, 23),
-            minutes=randint(0, 59),
-            seconds=randint(0, 59),
-            microseconds=randint(0, 1000000),
-        )
+        return cls(seconds=get_rand_timedelta().total_seconds())
 
     @property
     def epoch_self_dif(self) -> float:
         return self.total_seconds() - epoch_seconds
 
-    @classmethod
-    def _find_smallest_unit(cls):
-        """write a function that returns the smallest
-        unit of time in a datetime or timedelta
-        """
-        print(dir(timedelta(days=1)))
+    @staticmethod
+    def _find_smallest_unit(td: timedelta):
+        """returns the smallest unit of time in a timedelta"""
+        # Check each unit, starting from the largest to the smallest
+        if td.days != 0:
+            return "days"
+        elif td.seconds != 0:
+            return "seconds"
+        elif td.microseconds != 0:
+            return "microseconds"
+        else:
+            return "zero"  # Handle the case where timedelta is zero
 
     def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
         return divmod(self.epoch_self_dif, td.total_seconds())
 
-    def __round__(
-        self,
-        td: timedelta,
-    ) -> timedelta:
+    def __round__(self, td: timedelta) -> timedelta:
         """
         allows for rounding timedelta to a timedelta
             returns rounded dateti
@@ -58,20 +77,12 @@ class timedelta(timedelta):
         return self.fromtimestamp(epoch_seconds + dif - mod)
 
 
-class datetime(datetime):
+class CustomDatetime(datetime):
     """new datetime class with extra methods"""
 
     @classmethod
     def rand(cls) -> datetime:
-        return datetime(
-            randint(2, 3000),
-            randint(1, 12),
-            randint(1, 28),
-            randint(0, 23),
-            randint(0, 59),
-            randint(0, 59),
-            randint(0, 1000000),
-        )
+        return cls.fromtimestamp(get_rand_datetime().timestamp())
 
     @cached_property
     def holidays(self) -> list[Holiday]:

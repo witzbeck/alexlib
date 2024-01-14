@@ -120,10 +120,7 @@ class SystemObject:
         return self.user is not None
 
     @staticmethod
-    def add_path_cond(
-        cur_list: list[str],
-        toadd: str | list[str]
-    ) -> list[str]:
+    def add_path_cond(cur_list: list[str], toadd: str | list[str]) -> list[str]:
         if isinstance(toadd, str):
             toadd = [toadd]
         elif not toadd:
@@ -423,7 +420,7 @@ class File(SystemObject):
         return len(self.lines)
 
     @property
-    def line_indexes(self) -> dict[str: list[int]]:
+    def line_indexes(self) -> dict[str : list[int]]:
         lines, rng = self.lines, range(self.nlines)
         return {
             line: [i + 1 for i in rng if line == lines[i]]
@@ -431,10 +428,9 @@ class File(SystemObject):
         }
 
     @property
-    def line_repeats(self) -> dict[str: list[int]]:
+    def line_repeats(self) -> dict[str : list[int]]:
         return {
-            k: v for k, v in self.line_indexes.items()
-            if (len(v) > 1 and len(k) > 0)
+            k: v for k, v in self.line_indexes.items() if (len(v) > 1 and len(k) > 0)
         }
 
     @property
@@ -680,19 +676,13 @@ class Directory(SystemObject):
 
     @property
     def tree(self):
-        return {self.name: {
-            obj.name: Directory.tree_item(obj)
-            for obj in self.objlist
-        }}
+        return {self.name: {obj.name: Directory.tree_item(obj) for obj in self.objlist}}
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.name})"
 
     def get_type_filelist(self, type_: str) -> list[File]:
-        return [
-            x for x in self.filelist
-            if x.istype(type_) and isinstance(x, File)
-        ]
+        return [x for x in self.filelist if x.istype(type_) and isinstance(x, File)]
 
     @property
     def csv_filelist(self) -> list[File]:

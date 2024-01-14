@@ -114,8 +114,7 @@ class SecretValue:
 
 def mk_secretdict(dict: dict) -> dict[str:SecretValue]:
     return {
-        k: SecretValue.from_str(v) if isinstance(v, str) else v
-        for k, v in dict.items()
+        k: SecretValue.from_str(v) if isinstance(v, str) else v for k, v in dict.items()
     }
 
 

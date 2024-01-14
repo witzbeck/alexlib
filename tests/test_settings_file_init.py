@@ -5,7 +5,6 @@ from alexlib.config import Settings
 
 
 class TestConfigFile(TestCase):
-
     def setUp(self):
         self.settings = Settings()
         self.rand_key = self.settings.rand_key
@@ -20,10 +19,7 @@ class TestConfigFile(TestCase):
         self.assertGreater(len(self.settings.envdict), 0)
 
     def test_gets_rand_env(self):
-        self.assertEqual(
-            str(self.settings.envdict[self.rand_key]),
-            self.rand_val
-        )
+        self.assertEqual(str(self.settings.envdict[self.rand_key]), self.rand_val)
 
 
 if __name__ == "__main__":

@@ -520,7 +520,7 @@ class AuthGenerator:
     """
 
     @property
-    def def_auth_dict(self) -> dict[str: list[str]]:
+    def def_auth_dict(self) -> dict[str : list[str]]:
         return {
             k: v
             for k, v in {
@@ -549,10 +549,7 @@ class AuthGenerator:
     @staticmethod
     def mk_product_dict(**kwargs) -> dict[str:list]:
         keys, vals = kwargs.keys(), kwargs.values()
-        return {
-            ".".join(inst): dict(zip(keys, inst))
-            for inst in product(*vals)
-        }
+        return {".".join(inst): dict(zip(keys, inst)) for inst in product(*vals)}
 
     def mk_all_templates(self) -> dict[str:dict]:
         tmp = AuthGenerator.get_auth_template()

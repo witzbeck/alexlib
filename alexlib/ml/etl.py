@@ -369,12 +369,7 @@ class Parameters:
         _dict = {
             "logreg": [
                 {
-                    "clf__solver": [
-                        "lbfgs",
-                        "sag",
-                        "newton-cg",
-                        "newton-cholesky"
-                    ],
+                    "clf__solver": ["lbfgs", "sag", "newton-cg", "newton-cholesky"],
                     "clf__penalty": [None, "l2"],
                     "clf__C": expon(scale=0.1),
                     "clf__warm_start": [False],

@@ -7,7 +7,7 @@ from alexlib.core import chkenv
 from alexlib.config import DotEnv
 from alexlib.db import Table, Connection
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     schema = "gpt"
     config = DotEnv()
     c = Connection.from_context("LOCAL")
@@ -50,10 +50,7 @@ class Messages:
         return range(self.nmsgs)
 
     def update_attr(self, attr: str, vals: list) -> None:
-        [
-            setattr(msg, attr, vals[i])
-            for i, msg in enumerate(self.lst)
-        ]
+        [setattr(msg, attr, vals[i]) for i, msg in enumerate(self.lst)]
 
     def get_update_ids_vals(self, last_id: int) -> list[str]:
         return [i + last_id + 1 for i in range(len(self.lst))]
@@ -69,17 +66,11 @@ class Messages:
 
     @property
     def df(self) -> DataFrame:
-        return DataFrame.from_records(
-            [x.record for x in self.lst]
-        )
+        return DataFrame.from_records([x.record for x in self.lst])
 
     @property
     def tbl(self) -> Table:
-        return Table.from_db(
-            self.context,
-            self.schema,
-            self.table
-        )
+        return Table.from_db(self.context, self.schema, self.table)
 
     @classmethod
     def from_list(
@@ -87,7 +78,7 @@ class Messages:
         lst: list[dict],
         is_input: bool = False,
         is_return: bool = False,
-        spiciness: float = -1.,
+        spiciness: float = -1.0,
     ):
         def msg_from_dict(d: dict, i: int):
             d["message_id"] = 0
@@ -97,6 +88,7 @@ class Messages:
             d["is_return"] = is_return
             msg = Message.from_dict(d)
             return msg
+
         rng = range(len(lst))
         msgs = [msg_from_dict(lst[i], i) for i in rng]
         return cls(lst=msgs)
@@ -167,6 +159,6 @@ class Experiment:
     completions: list[Message] = field(default_factory=list)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     df = c.get_table("gpt", "messages")
     print(df)

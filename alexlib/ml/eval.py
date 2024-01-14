@@ -100,10 +100,7 @@ class Rate:
         labels: list[int],
         rng: range,
     ):
-        (
-            p,
-            l,
-        ) = (
+        (p, l,) = (
             predictions,
             labels,
         )
@@ -440,8 +437,7 @@ if __name__ == "__main__":
     print(abroca.domain_deltas.__class__.__name__, len(abroca.domain_deltas))
     abroca.set_combined_tpr_deltas()
     print(
-        abroca.combined_tpr_deltas.__class__.__name__,
-        len(abroca.combined_tpr_deltas)
+        abroca.combined_tpr_deltas.__class__.__name__, len(abroca.combined_tpr_deltas)
     )
     abroca.set_abroca()
     # print(abroca.abroca)

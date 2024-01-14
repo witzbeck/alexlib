@@ -9,11 +9,7 @@ from sqlalchemy import Engine
 from alexlib.iters import rm_pattern
 
 
-def add_col(
-    df: DataFrame,
-    col: str,
-    val: Any
-) -> DataFrame:
+def add_col(df: DataFrame, col: str, val: Any) -> DataFrame:
     df.loc[:, col] = val
     return df
 
@@ -25,11 +21,7 @@ add_timestamp_col = partial(
 )
 
 
-def col_pair_to_dict(
-    col1: str,
-    col2: str,
-    df: DataFrame
-) -> dict:
+def col_pair_to_dict(col1: str, col2: str, df: DataFrame) -> dict:
     pairs = df.loc[:, [col1, col2]].to_dict("records")
     return {p[col1]: p[col2] for p in pairs}
 
@@ -56,28 +48,21 @@ def get_val_order(
     filter_col: str,
     filter_val: str | int | float,
 ):
-    filtered_df = filter_df(
-        df,
-        filter_col,
-        filter_val
-    )
+    filtered_df = filter_df(df, filter_col, filter_val)
     series_list = filtered_df.loc[:, order_col].to_list()
     return series_list.index(order_val)
 
 
-def get_unique_col_vals(
-    col: str,
-    df: DataFrame | list[DataFrame]
-) -> list:
-    """ gets unique vals from col in df
-        inputs:
-            col = column of interest to find unique values
-            df = dataframe containing column
-        returns:
-            val_list = list of unique values
+def get_unique_col_vals(col: str, df: DataFrame | list[DataFrame]) -> list:
+    """gets unique vals from col in df
+    inputs:
+        col = column of interest to find unique values
+        df = dataframe containing column
+    returns:
+        val_list = list of unique values
     """
     if isinstance(df, DataFrame):
-        vals = df.loc[:, col].unique()         # str from slice
+        vals = df.loc[:, col].unique()  # str from slice
     elif isinstance(df, dict):
         vals = get_unique_col_vals(col, list(df.values()))
     elif isinstance(df, list):
@@ -89,27 +74,20 @@ def get_unique_col_vals(
     return list(vals)
 
 
-def make_unique_dict(
-    key_col: str,
-    df: DataFrame
-) -> dict[str: Any]:
-    """ creates a dict of slices from df using the unique vals from 1 col
-        inputs:
-            col = column of interest to use as keys
-            df = dataframe
-        returns:
-            out_dict = dict of slices
+def make_unique_dict(key_col: str, df: DataFrame) -> dict[str:Any]:
+    """creates a dict of slices from df using the unique vals from 1 col
+    inputs:
+        col = column of interest to use as keys
+        df = dataframe
+    returns:
+        out_dict = dict of slices
     """
     return {
-        key: filter_df(df, key_col, key)
-        for key in get_unique_col_vals(key_col, df)
+        key: filter_df(df, key_col, key) for key in get_unique_col_vals(key_col, df)
     }
 
 
-def col_vals_to_dict(df: DataFrame,
-                     key_col: str,
-                     val_col: str
-                     ):
+def col_vals_to_dict(df: DataFrame, key_col: str, val_col: str):
     d = df.loc[:, [key_col, val_col]]
     recs = d.to_dict(orient="records")
     return {x[key_col]: x[val_col] for x in recs}
@@ -125,11 +103,7 @@ def ts_col_to_dt(
     return df
 
 
-def set_type_list(
-    df: DataFrame,
-    type: Any,
-    cols: list[str]
-) -> DataFrame:
+def set_type_list(df: DataFrame, type: Any, cols: list[str]) -> DataFrame:
     for col in cols:
         df.loc[:, col] = df.loc[:, col].astype(type)
     return df
@@ -139,11 +113,7 @@ def drop_invariate_cols(df: DataFrame):
     return df.loc[:, (df.iloc[0]).any()]
 
 
-def split_df(
-    df: DataFrame,
-    ratio: float,
-    head: bool = True
-) -> DataFrame:
+def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
     to = int(len(df) * ratio)
     if head:
         return df.head(to)
@@ -160,9 +130,7 @@ def get_distinct_col_vals(df: DataFrame, col: str) -> list:
 
 
 def rm_df_col_pattern(
-    pattern: str | tuple | list,
-    df: DataFrame,
-    end: bool = True
+    pattern: str | tuple | list, df: DataFrame, end: bool = True
 ) -> DataFrame:
     isstr = isinstance(pattern, str)
     cols = df.columns

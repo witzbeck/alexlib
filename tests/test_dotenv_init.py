@@ -5,7 +5,6 @@ from alexlib.config import DotEnv
 
 
 class TestConfigFile(TestCase):
-
     def setUp(self):
         self.dotenv = DotEnv()
         self.rand_key = self.dotenv.rand_key

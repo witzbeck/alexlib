@@ -97,11 +97,7 @@ class AzureDevOpsObject:
     @classmethod
     def from_dict(cls, d: dict):
         d = {k: v for k, v in d.items() if not isinstance(v, dict)}
-        [
-            d.update(v)
-            for v in d.values()
-            if isinstance(v, dict)
-        ]
+        [d.update(v) for v in d.values() if isinstance(v, dict)]
         return cls(**d)
 
 
@@ -130,11 +126,13 @@ class AzureDevOpsClient:
 
     @cached_property
     def area_path(self) -> str:
-        return self.sep.join([
-            self.project,
-            "Team",
-            self.team,
-        ])
+        return self.sep.join(
+            [
+                self.project,
+                "Team",
+                self.team,
+            ]
+        )
 
     @cached_property
     def iteration_path(self) -> str:
@@ -187,18 +185,22 @@ class AzureDevOpsClient:
 
     @property
     def org_path(self) -> str:
-        return "/".join([
-            self.host,
-            self.org,
-        ])
+        return "/".join(
+            [
+                self.host,
+                self.org,
+            ]
+        )
 
     @property
     def project_path(self) -> str:
         proj = self.project.replace(" ", "%20")
-        return "/".join([
-            self.org_path,
-            proj,
-        ])
+        return "/".join(
+            [
+                self.org_path,
+                proj,
+            ]
+        )
 
     @property
     def org_api_path(self) -> str:
@@ -209,13 +211,8 @@ class AzureDevOpsClient:
         return self.project_path + "/_apis"
 
     @staticmethod
-    def fmt_uri_kwargs(
-        kwargs: dict[str, str]
-    ) -> str:
-        return "?" + "&".join([
-            f"{k}={v}"
-            for k, v in kwargs.items()
-        ])
+    def fmt_uri_kwargs(kwargs: dict[str, str]) -> str:
+        return "?" + "&".join([f"{k}={v}" for k, v in kwargs.items()])
 
     @staticmethod
     def mk_uri(
@@ -223,10 +220,12 @@ class AzureDevOpsClient:
         resource_path: str,
         kwargs: dict[str:str] = None,
     ) -> str:
-        ret = "/".join([
-            api_path,
-            resource_path,
-        ])
+        ret = "/".join(
+            [
+                api_path,
+                resource_path,
+            ]
+        )
         if kwargs:
             ret += AzureDevOpsClient.fmt_uri_kwargs(kwargs)
         return ret
@@ -234,15 +233,11 @@ class AzureDevOpsClient:
     def mk_team_iterations_uri(self, team: str) -> str:
         team_api_path = self.project_path + f"/{team}/_apis"
         return AzureDevOpsClient.mk_uri(
-            team_api_path,
-            "work/teamsettings/iterations",
-            kwargs=self.api_part
+            team_api_path, "work/teamsettings/iterations", kwargs=self.api_part
         )
 
     def get_team_iterations(self, team: str) -> dict:
-        return self.get_response(
-            self.mk_team_iterations_uri(team)
-        ).json()["value"]
+        return self.get_response(self.mk_team_iterations_uri(team)).json()["value"]
 
     @property
     def last_sprint_query_id(self) -> str:
@@ -268,10 +263,7 @@ class AzureDevOpsClient:
         if resp.status_code == 200:
             return resp
         else:
-            msg = ", ".join([
-                f"code={resp.status_code}",
-                f"url={resp.url}"
-            ])
+            msg = ", ".join([f"code={resp.status_code}", f"url={resp.url}"])
             raise ConnectionError(msg)
 
     def get_workitems(self, query_id: str) -> list[str]:
@@ -329,34 +321,22 @@ class AzureDevOpsClient:
     @cached_property
     def team_projects(self) -> dict:
         return {
-            x: [
-                y["projectName"] for y in self.all_teams
-                if y["name"] == x
-            ][0]
+            x: [y["projectName"] for y in self.all_teams if y["name"] == x][0]
             for x in self.all_team_names
         }
 
     @cached_property
     def project_teams(self) -> dict:
         return {
-            x: [
-                y["name"] for y in self.all_teams
-                if y["projectName"] == x
-            ]
+            x: [y["name"] for y in self.all_teams if y["projectName"] == x]
             for x in self.all_project_names
         }
 
     @cached_property
     def team_iterations(self) -> dict:
         teams = self.project_teams[self.project]
-        iters = {
-            x: self.get_team_iterations(x)
-            for x in teams
-        }
-        return {
-            k: [Iteration.from_dict(y) for y in v]
-            for k, v in iters.items() if v
-        }
+        iters = {x: self.get_team_iterations(x) for x in teams}
+        return {k: [Iteration.from_dict(y) for y in v] for k, v in iters.items() if v}
 
     @property
     def my_team(self) -> str:
@@ -377,23 +357,14 @@ class AzureDevOpsClient:
 
     @cached_property
     def workitem_relationship_map(self) -> dict:
-        return {
-            x["name"]: x["referenceName"]
-            for x in self.workitem_relationship_types
-        }
+        return {x["name"]: x["referenceName"] for x in self.workitem_relationship_types}
 
     @cached_property
     def relationship_workitem_map(self) -> dict:
-        return {
-            v: k
-            for k, v in self.workitem_relationship_map.items()
-        }
+        return {v: k for k, v in self.workitem_relationship_map.items()}
 
     def add_relationship(
-        self,
-        workitem_id: int,
-        rel_id: int,
-        rel_type: str = "Child"
+        self, workitem_id: int, rel_id: int, rel_type: str = "Child"
     ) -> Response:
         rel_code = self.workitem_relationship_map[rel_type]
         isforward = rel_code.endswith("Forward")
@@ -413,30 +384,29 @@ class AzureDevOpsClient:
             f"wit/workitems/{workitem_id}",
             kwargs=self.api_part,
         )
-        payload = [{
-            "op": "add",
-            "path": "/relations/-",
-            "value": {
-                "rel": rel_code,
-                "url": f"{self.org_api_path}/wit/workitems/{rel_id}",
-                "attributes": {
-                    "comment": "".join([
-                        "adding relationship ",
-                        rel_type,
-                        f"({rel_id})",
-                        " -> ",
-                        rev_type,
-                        f"({workitem_id})",
-                    ])
-                }
+        payload = [
+            {
+                "op": "add",
+                "path": "/relations/-",
+                "value": {
+                    "rel": rel_code,
+                    "url": f"{self.org_api_path}/wit/workitems/{rel_id}",
+                    "attributes": {
+                        "comment": "".join(
+                            [
+                                "adding relationship ",
+                                rel_type,
+                                f"({rel_id})",
+                                " -> ",
+                                rev_type,
+                                f"({workitem_id})",
+                            ]
+                        )
+                    },
+                },
             }
-        }]
-        return patch(
-            uri,
-            auth=self.basic,
-            headers=self.patch_headers,
-            json=payload
-        )
+        ]
+        return patch(uri, auth=self.basic, headers=self.patch_headers, json=payload)
 
     def create_task(
         self,
@@ -458,31 +428,34 @@ class AzureDevOpsClient:
             },
         ]
         if self.iteration_path:
-            payload.append({
-                "op": "add",
-                "path": "/fields/System.IterationPath",
-                "value": self.iteration_path,
-            })
+            payload.append(
+                {
+                    "op": "add",
+                    "path": "/fields/System.IterationPath",
+                    "value": self.iteration_path,
+                }
+            )
         if self.area_path:
-            payload.append({
-                "op": "add",
-                "path": "/fields/System.AreaPath",
-                "value": self.area_path,
-            })
+            payload.append(
+                {
+                    "op": "add",
+                    "path": "/fields/System.AreaPath",
+                    "value": self.area_path,
+                }
+            )
         if description and hasworkitem:
             description = f"{description} | PBI = {workitem_id}"
         if description:
-            payload.append({
-                "op": "add",
-                "path": "/fields/System.Description",
-                "value": description,
-            })
+            payload.append(
+                {
+                    "op": "add",
+                    "path": "/fields/System.Description",
+                    "value": description,
+                }
+            )
         show_dict(payload)
         resp = post(
-            uri,
-            auth=self.basic,
-            headers=self.post_headers,
-            data=dumps(payload)
+            uri, auth=self.basic, headers=self.post_headers, data=dumps(payload)
         )
         stat200 = resp.status_code == 200
         if stat200 and workitem_id is not None:
@@ -518,11 +491,16 @@ class ProductBacklogItem:
 
     @property
     def url(self) -> str:
-        return "/".join([
-            self.auth.api_path,
-            "wit/workitems",
-            str(self.id),
-        ]) + self.client.api_part
+        return (
+            "/".join(
+                [
+                    self.auth.api_path,
+                    "wit/workitems",
+                    str(self.id),
+                ]
+            )
+            + self.client.api_part
+        )
 
     @classmethod
     def from_env(cls, env: str = "ADO_PBI_ID", **kwargs):
@@ -588,14 +566,14 @@ class ProductBacklogItem:
         try:
             return float(self.fields["Custom.QAEffort"])
         except TypeError:
-            return 0.
+            return 0.0
 
     @property
     def dev_effort(self) -> float:
         try:
             return float(self.fields["Custom.DevEffort"])
         except TypeError:
-            return 0.
+            return 0.0
 
     @property
     def work_item_type(self) -> str:
@@ -623,8 +601,7 @@ class ProductBacklogItem:
 
     @property
     def created_date(self) -> datetime:
-        return datetime.fromisoformat(
-            self.fields["System.CreatedDate"]).replace(
+        return datetime.fromisoformat(self.fields["System.CreatedDate"]).replace(
             tzinfo=self.tz
         )
 
@@ -650,8 +627,7 @@ class ProductBacklogItem:
 
     @property
     def changed_date(self) -> datetime:
-        return datetime.fromisoformat(
-            self.fields["System.ChangedDate"]).replace(
+        return datetime.fromisoformat(self.fields["System.ChangedDate"]).replace(
             tzinfo=self.tz
         )
 

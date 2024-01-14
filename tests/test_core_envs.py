@@ -88,12 +88,10 @@ class TestCore(TestCase):
         self.assertListEqual(envcast("['a','b','c']", list), ["a", "b", "c"])
         self.assertDictEqual(envcast('{"a":1,"b":2}', dict), {"a": 1, "b": 2})
         self.assertDictEqual(
-            envcast('{"a":1,"b":2,"c":3}', dict),
-            {"a": 1, "b": 2, "c": 3}
+            envcast('{"a":1,"b":2,"c":3}', dict), {"a": 1, "b": 2, "c": 3}
         )
         self.assertDictEqual(
-            envcast('{"a":1,"b":2,"c":3,"d":4}', dict),
-            {"a": 1, "b": 2, "c": 3, "d": 4}
+            envcast('{"a":1,"b":2,"c":3,"d":4}', dict), {"a": 1, "b": 2, "c": 3, "d": 4}
         )
 
     def test_isdunder(self):

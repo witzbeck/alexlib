@@ -16,7 +16,7 @@ def get_primes(n):
     sieve = [True] * n
     for i in range(3, int(n**0.5) + 1, 2):
         if sieve[i]:
-            sieve[i * i:: 2 * i] = [False] * ((n - i * i - 1) // (2 * i) + 1)
+            sieve[i * i :: 2 * i] = [False] * ((n - i * i - 1) // (2 * i) + 1)
     return [2] + [i for i in range(3, n, 2) if sieve[i]]
 
 
@@ -29,16 +29,9 @@ def euclidean_distance(itr: Iterable):
 
 
 def discrete_exp_dist(
-    exp_min: int,
-    exp_max: int,
-    exp_int: int = 10,
-    exp_inc: int = 1,
-    numerator: int = 1
+    exp_min: int, exp_max: int, exp_int: int = 10, exp_inc: int = 1, numerator: int = 1
 ) -> list[float]:
-    return [
-        numerator / (exp_int**i)
-        for i in range(exp_min, exp_max + 1, exp_inc)
-    ]
+    return [numerator / (exp_int**i) for i in range(exp_min, exp_max + 1, exp_inc)]
 
 
 def isintorfloat(x: int | float) -> bool:
@@ -258,10 +251,7 @@ class VariableBaseNumber:
             self.exp_dict[exp] = val
             exp -= 1
             unit = self.get_unit(exp)
-        toupdate = {
-            i: 0 for i in range(self.highest_exp)
-            if i not in self.exponents
-        }
+        toupdate = {i: 0 for i in range(self.highest_exp) if i not in self.exponents}
         self.exp_dict.update(toupdate)
 
     @property
@@ -297,10 +287,7 @@ class VariableBaseNumber:
         return self.get_unit(self.lowest_exp)
 
     def __str__(self):
-        left = "".join([
-            self.get_char(val)
-            for exp, val in self.exp_items if exp >= 0
-        ])
+        left = "".join([self.get_char(val) for exp, val in self.exp_items if exp >= 0])
         if self.hasdecimal:
             right = "." + "".join(
                 [self.get_char(val) for exp, val in self.exp_items if exp < 0]
