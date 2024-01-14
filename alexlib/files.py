@@ -729,6 +729,14 @@ class File(SystemObject):
         destination.write_bytes(self.path.read_bytes())
         return File.from_path(destination)
 
+    @classmethod
+    def df_to_file(cls, df: DataFrame, path: Path) -> "File":
+        """writes dataframe to file"""
+        funcname = f"to_{path.suffix}"
+        func = getattr(df, funcname)
+        func(path)
+        return cls(path=path)
+
 
 # pylint: disable=too-many-public-methods
 @dataclass
