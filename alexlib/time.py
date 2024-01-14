@@ -1,4 +1,27 @@
-"""Module for custom datetime and timedelta classes."""
+"""
+This module provides custom implementations of the datetime and timedelta classes
+from Python's standard library, along with utility functions and a decorator for
+performance measurement.
+
+Classes:
+    CustomTimedelta: An enhanced version of the standard library's timedelta class,
+                     providing additional methods such as random timedelta generation,
+                     epoch time difference calculation, and rounding capabilities.
+    CustomDatetime: An extended datetime class incorporating features for checking
+                    holidays, business days, and generating random datetime instances.
+
+Functions:
+    get_rand_datetime(): Generates a random datetime object based on the CustomDatetime class.
+    get_rand_timedelta(): Creates a random timedelta object using the CustomTimedelta class.
+    timeit(func, *args, niter=None, **kwargs): A decorator to time the execution of a function,
+                                               with the option to repeat the function call
+                                               multiple times for averaging.
+
+The module leverages external libraries such as pandas for handling specific date-time features
+like business day calculations and US Federal Holiday determination. It is designed for
+applications requiring custom date-time manipulations beyond the capabilities of the standard
+datetime module.
+"""
 from datetime import datetime
 from datetime import timedelta
 from functools import cached_property
