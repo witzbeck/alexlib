@@ -1,13 +1,13 @@
+"""Constants for alexlib."""
 from datetime import datetime
 from pathlib import Path
 
-date_format = "%Y-%m-%d"
-time_format = "%H:%M:%S"
-datetime_format = date_format + " " + time_format
+DATE_FORMAT = "%Y-%m-%d"
+TIME_FORMAT = "%H:%M:%S"
+DATETIME_FORMAT = DATE_FORMAT + " " + TIME_FORMAT
 epoch = datetime(1000, 1, 1)
 epoch_seconds = epoch.timestamp()
 
 home = Path.home()
-creds = home / ".creds"
-venvs = home / ".venvs"
-[path.mkdir(exist_ok=True) for path in [creds, venvs]]
+(creds := home / ".creds").mkdir(exist_ok=True)
+(venvs := home / ".venvs").mkdir(exist_ok=True)

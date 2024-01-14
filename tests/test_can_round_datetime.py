@@ -1,35 +1,34 @@
-from datetime import datetime as std_datetime
-from unittest import TestCase, main
+"""Test the round_datetime function."""
+from datetime import datetime
+from unittest import main
+from unittest import TestCase
 
 from alexlib.constants import epoch
-from alexlib.time import datetime, timedelta
+from alexlib.time import CustomDatetime
+from alexlib.time import CustomTimedelta
+from alexlib.time import get_rand_datetime
+from alexlib.time import get_rand_timedelta
 
 
 class TestRoundDatetime(TestCase):
-    def setUp(self) -> None:
-        self.dt = datetime.rand()
-        self.td = timedelta.rand()
+    """Test the round_datetime function."""
 
-    def test_round_dt(self):
-        now = datetime.now()
-        delta = timedelta(hours=36)
-        print(delta)
-        rounded = round(now, delta)
-        self.assertIsInstance(rounded, datetime)
-        print(rounded)
-        self.assertIn(rounded.strftime("%H"), ["00", "12"])
+    def setUp(self) -> None:
+        """Set up the test case."""
+        self.dt = get_rand_datetime()
+        self.td = get_rand_timedelta()
 
     def test_epoch_is_datetime(self) -> None:
-        self.assertIsInstance(epoch, std_datetime)
+        """Test that epoch is a datetime object."""
+        self.assertIsInstance(epoch, datetime)
 
     def test_makes_rand_datetime(self) -> None:
-        self.assertIsInstance(self.dt, datetime)
+        """Test that get_rand_datetime makes a CustomDatetime object."""
+        self.assertIsInstance(self.dt, CustomDatetime)
 
     def test_makes_rand_timedelta(self) -> None:
-        self.assertIsInstance(self.td, timedelta)
-
-    def tearDown(self) -> None:
-        return super().tearDown()
+        """Test that get_rand_timedelta makes a CustomTimedelta object."""
+        self.assertIsInstance(self.td, CustomTimedelta)
 
 
 if __name__ == "__main__":

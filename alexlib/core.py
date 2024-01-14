@@ -1,24 +1,49 @@
+"""
+This module provides a collection of utility functions for various tasks such as data type checking,
+environment variable handling, JSON operations, and working with file systems. It includes functions
+for converting values to specific data types, validating and manipulating dictionaries and lists,
+hashing files, managing environment variables, and more. The module is designed to enhance productivity
+in data handling and processing tasks, offering a robust set of tools for common and advanced operations.
+
+Key functionalities include:
+- Type checking and conversion for various data types.
+- Utilities for working with environment variables, including type casting and validation.
+- JSON file reading and dictionary manipulation functions.
+- Network utilities for checking socket connections.
+- File hashing for integrity checks.
+- Version control utilities for retrieving Git tags and versions.
+- A custom `Version` data class for managing semantic versioning.
+
+The module relies on standard Python libraries such as `dataclasses`, `datetime`, `hashlib`, `itertools`,
+`json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
+"""
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from hashlib import sha256
 from itertools import chain
-from json import JSONDecodeError, load, loads, dumps
+from json import dumps
+from json import JSONDecodeError
+from json import load
+from json import loads
 from logging import debug
 from os import getenv
 from pathlib import Path
-from socket import AF_INET, SOCK_STREAM, socket
-from typing import Any, Hashable
+from socket import AF_INET
+from socket import SOCK_STREAM
+from socket import socket
 from subprocess import check_output
-
-""" core functions & objects must only use the standard lib
-"""
+from typing import Any
+from typing import Hashable
 
 
 def get_local_tz() -> timezone:
+    """returns local timezone"""
     return datetime.now().astimezone().tzinfo
 
 
-def isnone(w: str):
+def isnone(w: str) -> bool:
+    """checks if input is None or empty string"""
     if isinstance(w, str):
         ret = w.lower() == "none" or len(w) == 0
     else:
@@ -26,7 +51,8 @@ def isnone(w: str):
     return ret
 
 
-def istrue(w: str | int):
+def istrue(w: str | int) -> bool:
+    """checks if input is True or 1"""
     if isnone(w):
         ret = False
     elif isinstance(w, bool):
@@ -40,10 +66,12 @@ def istrue(w: str | int):
 
 
 def isdunder(key: str) -> bool:
+    """checks if input is a dunder variable"""
     return key.endswith("__") and key.startswith("__")
 
 
 def ishidden(key: str) -> bool:
+    """checks if input is a hidden variable"""
     return key.startswith("_") and not isdunder(key)
 
 
@@ -52,6 +80,7 @@ def asdict(
     include_hidden: bool = False,
     include_dunder: bool = False,
 ) -> dict[str:Any]:
+    """converts object to dictionary"""
     attrs = list(vars(obj).keys())
     if not include_dunder:
         attrs = [x for x in attrs if not isdunder(x)]
@@ -61,6 +90,7 @@ def asdict(
 
 
 def aslist(val: str, sep: str = ",") -> list[Any]:
+    """converts string to list"""
     if val.startswith("[") and val.endswith("]"):
         try:
             ret = loads(val)
@@ -79,6 +109,7 @@ def chktext(
     value: str = None,
     suffix: str = None,
 ) -> bool:
+    """checks if text starts with prefix, contains value, or ends with suffix"""
     text = text.lower()
     if prefix:
         ret = text.startswith(prefix.lower())
@@ -99,18 +130,13 @@ def chktype(
     """confirms correct type or raises error"""
     if not isinstance(obj, type_):
         raise TypeError(f"input is {type(obj)}, not {type_}")
-    else:
-        ret = obj
 
-    if ispath := isinstance(obj, Path):
-        exists = obj.exists()
-    else:
-        exists = True
+    ispath = isinstance(obj, Path)
+    exists = obj.exists() if ispath else True
 
     if ispath and mustexist and not exists:
         raise FileExistsError(f"{obj} must exist but doesn't")
-    else:
-        return ret
+    return obj
 
 
 def envcast(
@@ -122,6 +148,8 @@ def envcast(
     """converts output to specified type"""
     if isinstance(astype, str):
         astype = eval(astype)
+    if not isinstance(astype, type):
+        raise TypeError(f"astype must be type but is {type(astype)}")
     if issubclass(astype, list):
         ret = aslist(val, sep=sep)
     elif issubclass(astype, dict):
@@ -134,13 +162,12 @@ def envcast(
         ret = None
     else:
         ret = astype(val)
-    if ret is None and need:
+    if isnone(val) and need:
         raise ValueError(f"input must be {astype}")
-    else:
-        try:
-            return chktype(ret, astype, mustexist=need)
-        except TypeError:
-            return ret
+    try:
+        return chktype(ret, astype, mustexist=need)
+    except TypeError:
+        return ret
 
 
 def chkenv(
@@ -158,14 +185,16 @@ def chkenv(
     ifnotnone = ifnull is not None
     astypenotnone = astype is not None
 
-    if (isblank or isnone_) and ifnotnone:
-        return ifnull
+    if val and astype is None:
+        ret = val
+    elif (isblank or isnone_) and ifnotnone:
+        ret = ifnull
     elif isnone_ and need:
         raise ValueError(envname)
     elif isblank and need:
         raise ValueError(envname)
     elif isblank or isnone_:
-        return None
+        ret = None
     elif astypenotnone:
         ret = envcast(val, astype, need=need)
     elif istrue_:
@@ -178,10 +207,12 @@ def chkenv(
 
 
 def concat_lists(lists: list[list[Any]]) -> list[Any]:
+    """concatenates list of lists"""
     return list(chain.from_iterable(lists))
 
 
 def read_json(path: Path) -> dict[Hashable:Any]:
+    """reads json file"""
     try:
         ret = load(path.open())
     except JSONDecodeError:
@@ -190,6 +221,7 @@ def read_json(path: Path) -> dict[Hashable:Any]:
 
 
 def show_dict(d: dict, indent: int = 4) -> None:
+    """prints dictionary"""
     if isinstance(d, list):
         print("[")
         for dict_ in d:
@@ -209,20 +241,27 @@ def get_objects_by_attr(
     return [x for x in lst if getattr(x, attr) == val]
 
 
-class Object(object):
+class Object:
+    """base class for objects"""
+
     @property
-    def reg_attrs(self):
+    def reg_attrs(self) -> dict[str:Any]:
+        """returns all attributes except hidden ones"""
         return {k: v for k, v in self.__dict__.items() if k[0] != "_"}
 
     @property
-    def reg_attrs_keys(self):
+    def reg_attrs_keys(self) -> list[str]:
+        """returns all attributes except hidden ones"""
         return list(self.reg_attrs.keys())
 
-    def set_hasattr(self, attr: str):
+    def set_hasattr(self, attr: str) -> None:
+        """sets hasattr property for attribute"""
+
         def hasattr_func(
             self,
             attr: str,
         ) -> bool:
+            """checks if object has attribute"""
             if not hasattr(self, attr):
                 ret = False
             else:
@@ -233,13 +272,15 @@ class Object(object):
         if not hasattr(self, newattr):
             setattr(self, newattr, property(hasattr_func))
 
-    def set_hasattrs(self):
+    def set_hasattrs(self) -> None:
+        """sets hasattr property for all attributes"""
         for k in self.reg_attrs_keys:
             if not k.startswith("has"):
                 self.set_hasattr(k)
 
 
 def mk_dictvals_distinct(dict_: dict[Hashable:Any]) -> dict[Hashable:Any]:
+    """makes all values in dictionary distinct"""
     keys = list(dict_.keys())
     return {key: list(set(dict_[key])) for key in keys}
 
@@ -270,14 +311,17 @@ def sha256sum(
 
 
 def chkhash(path: Path, stored_hash: str) -> bool:
+    """checks if hash of file matches stored hash"""
     return sha256sum(path) == stored_hash
 
 
 def get_last_tag() -> str:
+    """returns last git tag"""
     return check_output(["git", "describe", "--tags"]).decode("ascii")
 
 
 def get_curent_version(tag: str) -> str:
+    """returns current version"""
     if tag.startswith("v"):
         tag = tag[1:]
     if "-" in tag:
@@ -287,16 +331,20 @@ def get_curent_version(tag: str) -> str:
 
 @dataclass
 class Version:
+    """data class for semantic versioning"""
+
     major: int
     minor: int
     patch: int
 
     @classmethod
     def from_tag(cls):
+        """returns version from git tag"""
         parts = get_curent_version(get_last_tag()).split(".")
         return cls(*parts)
 
     def __iter__(self):
+        """returns version as iterable"""
         return iter(
             [
                 self.major,
@@ -306,13 +354,16 @@ class Version:
         )
 
     def __str__(self) -> str:
+        """returns version as string"""
         return ".".join(list(self))
 
     def __repr__(self) -> str:
+        """returns version as string"""
         return str(self)
 
 
 def ping(host: str, port: int, astext: bool = False) -> bool | str:
+    """checks if socket is open"""
     with socket(AF_INET, SOCK_STREAM) as sock:
         isopen = sock.connect_ex((host, port)) == 0
         text = "" if isopen else "not "

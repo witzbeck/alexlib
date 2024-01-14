@@ -39,7 +39,6 @@ runs
 pip-wheel-metadata/
 /USDC
 temp*
-.pre-commit*
 /mlruns
 !*.tsv
 .DS_Store
