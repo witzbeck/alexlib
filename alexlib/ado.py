@@ -1,14 +1,114 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cached_property
-from alexlib.__init__ import dotenv
+from json import dumps
 
-from requests import Response, get
+from requests import Response, get, post, patch
 from requests.auth import HTTPBasicAuth
 
+from alexlib.__init__ import dotenv
 from alexlib.core import chkenv, get_local_tz, show_dict
 
 dotenv
+
+
+@dataclass
+class AzureDevOpsObject:
+    id: str = field(repr=False)
+    name: str = field()
+    path: str = field()
+    url: str = field(repr=False)
+    startdate: datetime = field(default=None, repr=False)
+    finishdate: datetime = field(default=None, repr=False)
+    timeframe: str = field(default=None, repr=False)
+    sep: str = field(default="\\", repr=False)
+
+    def __post_init__(self) -> None:
+        if self.startdate is not None:
+            self.startdate = datetime.fromisoformat(self.startdate)
+        if self.finishdate is not None:
+            self.finishdate = datetime.fromisoformat(self.finishdate)
+
+    @cached_property
+    def path_parts(self) -> list[str]:
+        return self.path.split(self.sep)
+
+    @cached_property
+    def timeframes(self) -> list[str]:
+        return ["past", "current", "future"]
+
+    @cached_property
+    def ops(self) -> list[str]:
+        return ["<", "==", ">"]
+
+    @property
+    def progress_states(self) -> list[str]:
+        return ["planning", "inprogress", "completed"]
+
+    @property
+    def hastime(self) -> bool:
+        return self.startdate is not None and self.finishdate is not None
+
+    @property
+    def usetime(self) -> datetime:
+        if not self.hastime:
+            raise ValueError("Object has no start or finish date")
+        elif self.finishdate is not None:
+            ret = self.finishdate
+        elif self.startdate is not None:
+            ret = self.startdate
+        return ret
+
+    def istimeframe(self, timeframe: str, op: str) -> bool:
+        if timeframe not in self.timeframes and not op:
+            raise ValueError(f"Invalid timeframe: {timeframe}")
+        elif op not in self.ops and not timeframe:
+            raise ValueError(f"Invalid operator: {op}")
+        elif timeframe:
+            ret = self.timeframe == timeframe
+        else:
+            ret = exec("self.timeframe 'eval(op)' timeframe")
+        return ret
+
+    @cached_property
+    def ispast(self) -> bool:
+        if self.timeframe:
+            ret = self.timeframe == "past"
+        else:
+            ret = self.usetime < datetime.now()
+        return ret
+
+    @cached_property
+    def isfuture(self) -> bool:
+        if self.timeframe:
+            ret = self.timeframe == "future"
+        else:
+            ret = self.usetime > datetime.now()
+        return ret
+
+    @cached_property
+    def iscurrent(self) -> bool:
+        if self.timeframe:
+            ret = self.timeframe == "current"
+        else:
+            ret = self.usetime == datetime.now().date()
+        return ret
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        d = {k: v for k, v in d.items() if not isinstance(v, dict)}
+        [
+            d.update(v)
+            for v in d.values()
+            if isinstance(v, dict)
+        ]
+        return cls(**d)
+
+
+@dataclass
+class Iteration(AzureDevOpsObject):
+    def __post_init__(self) -> None:
+        return super().__post_init__()
 
 
 @dataclass
@@ -18,14 +118,51 @@ class AzureDevOpsClient:
     project: str
     token: str = field(repr=False)
     api_version: str = field(default="7.0", repr=False)
+    sep: str = field(default="\\", repr=False)
 
     @property
     def org_initials(self) -> str:
         return self.org[:3].capitalize()
 
+    @cached_property
+    def team(self) -> str:
+        return chkenv("ADO_TEAM")
+
+    @cached_property
+    def area_path(self) -> str:
+        return self.sep.join([
+            self.project,
+            "Team",
+            self.team,
+        ])
+
+    @cached_property
+    def iteration_path(self) -> str:
+        return chkenv("ADO_ITERATION_PATH")
+
     @property
     def basic(self) -> HTTPBasicAuth:
         return HTTPBasicAuth("", self.token)
+
+    @cached_property
+    def header_map(self) -> dict:
+        return {
+            "get": {"Content-Type": "application/json"},
+            "post": {"Content-Type": "application/json-patch+json"},
+            "patch": {"Content-Type": "application/json-patch+json"},
+        }
+
+    @property
+    def post_headers(self) -> dict:
+        return self.header_map["post"]
+
+    @property
+    def patch_headers(self) -> dict:
+        return self.header_map["patch"]
+
+    @property
+    def get_headers(self) -> dict:
+        return self.header_map["get"]
 
     @classmethod
     def from_envs(
@@ -57,9 +194,10 @@ class AzureDevOpsClient:
 
     @property
     def project_path(self) -> str:
+        proj = self.project.replace(" ", "%20")
         return "/".join([
             self.org_path,
-            self.project,
+            proj,
         ])
 
     @property
@@ -109,6 +247,10 @@ class AzureDevOpsClient:
     @property
     def last_sprint_query_id(self) -> str:
         return chkenv("ADO_LAST_SPRINT_QUERY_ID")
+
+    @property
+    def new_tasks_query_id(self) -> str:
+        return chkenv("ADO_NEW_TASKS_CREATED_TODAY_QUERY_ID")
 
     @property
     def my_hours_query_id(self) -> str:
@@ -211,7 +353,10 @@ class AzureDevOpsClient:
             x: self.get_team_iterations(x)
             for x in teams
         }
-        return {k: v for k, v in iters.items() if v}
+        return {
+            k: [Iteration.from_dict(y) for y in v]
+            for k, v in iters.items() if v
+        }
 
     @property
     def my_team(self) -> str:
@@ -220,6 +365,136 @@ class AzureDevOpsClient:
     @cached_property
     def my_team_iterations(self) -> dict:
         return self.get_team_iterations(self.my_team)
+
+    @cached_property
+    def workitem_relationship_types(self) -> dict:
+        uri = AzureDevOpsClient.mk_uri(
+            self.org_api_path,
+            "wit/workitemrelationtypes",
+            kwargs=self.api_part,
+        )
+        return self.get_response(uri).json()["value"]
+
+    @cached_property
+    def workitem_relationship_map(self) -> dict:
+        return {
+            x["name"]: x["referenceName"]
+            for x in self.workitem_relationship_types
+        }
+
+    @cached_property
+    def relationship_workitem_map(self) -> dict:
+        return {
+            v: k
+            for k, v in self.workitem_relationship_map.items()
+        }
+
+    def add_relationship(
+        self,
+        workitem_id: int,
+        rel_id: int,
+        rel_type: str = "Child"
+    ) -> Response:
+        rel_code = self.workitem_relationship_map[rel_type]
+        isforward = rel_code.endswith("Forward")
+        isreverse = rel_code.endswith("Reverse")
+        isrelated = rel_code.endswith("Related")
+        hasrev = isforward or isreverse or isrelated
+        if isforward:
+            rev_code = rel_code.replace("Forward", "Reverse")
+        elif isreverse:
+            rev_code = rel_code.replace("Reverse", "Forward")
+        elif isrelated:
+            rev_code = rel_code
+        if hasrev:
+            rev_type = self.relationship_workitem_map[rev_code]
+        uri = AzureDevOpsClient.mk_uri(
+            self.project_api_path,
+            f"wit/workitems/{workitem_id}",
+            kwargs=self.api_part,
+        )
+        payload = [{
+            "op": "add",
+            "path": "/relations/-",
+            "value": {
+                "rel": rel_code,
+                "url": f"{self.org_api_path}/wit/workitems/{rel_id}",
+                "attributes": {
+                    "comment": "".join([
+                        "adding relationship ",
+                        rel_type,
+                        f"({rel_id})",
+                        " -> ",
+                        rev_type,
+                        f"({workitem_id})",
+                    ])
+                }
+            }
+        }]
+        return patch(
+            uri,
+            auth=self.basic,
+            headers=self.patch_headers,
+            json=payload
+        )
+
+    def create_task(
+        self,
+        title: str,
+        workitem_id: int = None,
+        description: str = None,
+    ) -> dict:
+        hasworkitem = workitem_id is not None
+        uri = AzureDevOpsClient.mk_uri(
+            self.project_api_path,
+            "wit/workitems/$task",
+            kwargs=self.api_part,
+        )
+        payload = [
+            {
+                "op": "add",
+                "path": "/fields/System.Title",
+                "value": title,
+            },
+        ]
+        if self.iteration_path:
+            payload.append({
+                "op": "add",
+                "path": "/fields/System.IterationPath",
+                "value": self.iteration_path,
+            })
+        if self.area_path:
+            payload.append({
+                "op": "add",
+                "path": "/fields/System.AreaPath",
+                "value": self.area_path,
+            })
+        if description and hasworkitem:
+            description = f"{description} | PBI = {workitem_id}"
+        if description:
+            payload.append({
+                "op": "add",
+                "path": "/fields/System.Description",
+                "value": description,
+            })
+        show_dict(payload)
+        resp = post(
+            uri,
+            auth=self.basic,
+            headers=self.post_headers,
+            data=dumps(payload)
+        )
+        stat200 = resp.status_code == 200
+        if stat200 and workitem_id is not None:
+            resp = self.add_relationship(
+                workitem_id=workitem_id,
+                rel_id=resp.json()["id"],
+            )
+        if stat200:
+            return resp
+        else:
+            raise ConnectionError(f"{resp.status_code} - {resp.text}")
+
 
 @dataclass
 class ProductBacklogItem:
@@ -278,13 +553,17 @@ class ProductBacklogItem:
 
     @property
     def area_parts(self) -> list[str]:
-        return self.area_path.split("\\")
+        return self.area_path.split(self.sep)
 
     @property
     def area(self) -> str:
         return self.area_parts[-1]
 
     @property
+    def _iteration_path(self) -> str:
+        return "System.IterationPath"
+
+    @cached_property
     def iteration_path(self) -> str:
         return self.fields["System.IterationPath"]
 
@@ -411,15 +690,3 @@ class ProductBacklogItem:
 
 if __name__ == "__main__":
     client = AzureDevOpsClient.from_envs()
-    """
-    pbi = ProductBacklogItem.from_env()
-    pbis = [
-        ProductBacklogItem(x, auth=pbi.auth)
-        for x in pbi.auth.last_sprint_workitems
-    ]
-    show_dict(client.project_teams)
-    print(client.all_projects_uri)
-    print(client.all_teams_uri)
-    show_dict(client.project_teams)
-    """
-    show_dict(client.my_team_iterations)

@@ -191,8 +191,10 @@ def read_json(path: Path) -> dict[Hashable:Any]:
 
 def show_dict(d: dict, indent: int = 4) -> None:
     if isinstance(d, list):
+        print("[")
         for dict_ in d:
             show_dict(dict_)
+        print("]")
     else:
         d = {k: v for k, v in d.items() if not k.startswith("_")}
         print(dumps(d, indent=indent))
