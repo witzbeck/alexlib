@@ -22,20 +22,16 @@ This module is intended to be used in Python applications for centralized manage
 and environment variables, simplifying tasks such as setting up logging, reading configuration files, and
 environment variable manipulation.
 """
-from dataclasses import dataclass
-from dataclasses import field
-from logging import basicConfig
-from logging import INFO
+from dataclasses import dataclass, field
+from logging import INFO, basicConfig
 from os import environ
 from pathlib import Path
 from random import choice
 from typing import Any
 
 from alexlib.constants import DATETIME_FORMAT
-from alexlib.core import envcast
-from alexlib.core import isnone
-from alexlib.files import Directory
-from alexlib.files import File
+from alexlib.core import envcast, isnone
+from alexlib.files import Directory, File
 
 
 @dataclass
@@ -237,36 +233,20 @@ class ConfigFile(File):
 
     def mkdir(self, name: str, exist_ok: bool = True) -> Path:
         """Creates a directory"""
-        d = self.path / name
-        d.mkdir(name, exist_ok=exist_ok)
-        return d
+        (dr := self.path / name).mkdir(name, exist_ok=exist_ok)
+        return dr
 
     @property
     def logdir(self) -> Directory:
         """Returns the log directory"""
-        d = Directory(path=self.parent) / self.logdirname
-        d.path.mkdir(exist_ok=True)
-        return d
-
-    @property
-    def curfile(self) -> str:
-        """Returns the current file"""
-        return eval("__file__")
-
-    @property
-    def curpath(self) -> Path:
-        """Returns the current path"""
-        return Path(self.curfile)
-
-    @property
-    def curname(self) -> str:
-        """Returns the current name"""
-        return self.curpath.name
+        ld = Directory(path=self.parent) / self.logdirname
+        ld.path.mkdir(exist_ok=True)
+        return ld
 
     def set_basic_config(self) -> None:
         """Sets the basic configuration"""
         logdir = self.logdir
-        name = self.curname
+        name = self.path.stem
         logfile = logdir.path / f"{name}.log"
         basicConfig(
             filename=logfile,
@@ -285,7 +265,9 @@ class DotEnv(ConfigFile):
     @property
     def lines(self) -> list[str]:
         """Returns the lines of the file"""
-        return [x for x in super().lines if not x.startswith("#") and "=" in x]
+        all_lines = super().lines
+        nocomments = [x[: x.index("#")] if "#" in x else x for x in all_lines]
+        return [x for x in nocomments if x]
 
 
 @dataclass

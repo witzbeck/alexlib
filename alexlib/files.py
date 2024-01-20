@@ -21,31 +21,23 @@ in Python scripting and data processing tasks.
 Dependencies: collections, dataclasses, datetime, functools, json, logging, os, pathlib, random, typing, matplotlib, pandas, sqlalchemy
 """
 from collections import Counter
-from dataclasses import dataclass
-from dataclasses import field
-from datetime import datetime
-from datetime import timedelta
-from functools import cached_property
-from functools import partial
-from json import dumps
-from json import JSONDecodeError
-from json import load
-from json import loads
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from functools import cached_property, partial
+from json import JSONDecodeError, dumps, load, loads
 from logging import info
 from os import stat_result
 from pathlib import Path
 from random import choice
 from typing import Any
-from typing import Callable
 
 from matplotlib.pyplot import savefig
 from pandas import DataFrame
 from sqlalchemy import Engine
 
-from alexlib.constants import DATE_FORMAT
-from alexlib.constants import DATETIME_FORMAT
-from alexlib.core import chkenv
-from alexlib.core import sha256sum
+from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
+from alexlib.core import chkenv, sha256sum
 from alexlib.iters import link
 
 
@@ -63,22 +55,6 @@ def figsave(
 
 def eval_parents(path: Path, include: set, exclude: set) -> bool:
     """evaluates whether a path is included or excluded"""
-    parts = set(path.parts)
-    chk_include = not include or include.issubset(parts)
-    chk_exclude = not exclude or not exclude.intersection(parts)
-    return chk_include and chk_exclude
-
-
-# pylint: disable=too-many-arguments
-def path_search(
-    pattern: str,
-    start_path: Path = Path(eval("__file__")).parent,
-    listok: bool = False,
-    include: list[str] = None,
-    exclude: list[str] = None,
-    max_ascends: int = 8,
-) -> Path | list[Path]:
-    """searches for a path by pattern, ascending up to max_ascends times"""
     if isinstance(exclude, str):
         exclude = {exclude}
     elif exclude is None:
@@ -91,6 +67,22 @@ def path_search(
         include = set()
     else:
         include = set(include)
+    parts = set(path.parts)
+    chk_include = not include or include.issubset(parts)
+    chk_exclude = not exclude or not exclude.intersection(parts)
+    return chk_include and chk_exclude
+
+
+# pylint: disable=too-many-arguments
+def path_search(
+    pattern: str,
+    start_path: Path = Path(__file__).parent,
+    listok: bool = False,
+    include: list[str] = None,
+    exclude: list[str] = None,
+    max_ascends: int = 8,
+) -> Path | list[Path]:
+    """searches for a path by pattern, ascending up to max_ascends times"""
     n_ascends, search_path = 0, start_path
     while n_ascends <= max_ascends:
         try:
@@ -99,9 +91,16 @@ def path_search(
                 for x in search_path.rglob(pattern)
                 if eval_parents(x, include, exclude)
             ]
-            if found_paths:
-                return found_paths if listok else found_paths[0]
-        except IndexError:
+            if (len_ := len(found_paths)) == 1:
+                ret = found_paths[0]
+            elif len_ > 1 and listok:
+                ret = found_paths
+            elif len_ > 1:
+                raise ValueError(f"multiple {pattern} found in {search_path}")
+            else:
+                raise FileNotFoundError(f"no {pattern} found in {search_path}")
+            return ret
+        except FileNotFoundError:
             search_path = search_path.parent
             n_ascends += 1
     raise FileNotFoundError(f"no {pattern} found in {start_path}")
@@ -176,7 +175,7 @@ class SystemObject:
         self,
         include: list[str] | str = None,
         exclude: list[str] | str = None,
-        start_path: Path = Path(eval("__file__")).parent,
+        start_path: Path = Path(__file__).parent,
     ) -> Path:
         """gets path from name or path"""
         if include or self.include:
