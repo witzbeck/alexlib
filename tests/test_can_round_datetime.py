@@ -3,7 +3,7 @@ from datetime import datetime
 from unittest import main
 from unittest import TestCase
 
-from alexlib.constants import epoch
+from alexlib.constants import EPOCH
 from alexlib.time import CustomDatetime
 from alexlib.time import CustomTimedelta
 from alexlib.time import get_rand_datetime
@@ -20,7 +20,7 @@ class TestRoundDatetime(TestCase):
 
     def test_epoch_is_datetime(self) -> None:
         """Test that epoch is a datetime object."""
-        self.assertIsInstance(epoch, datetime)
+        self.assertIsInstance(EPOCH, datetime)
 
     def test_makes_rand_datetime(self) -> None:
         """Test that get_rand_datetime makes a CustomDatetime object."""

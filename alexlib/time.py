@@ -28,7 +28,7 @@ from functools import cached_property
 from logging import info
 from random import randint
 from time import perf_counter
-from typing import Callable
+from collections.abc import Callable
 
 from decorator import decorator
 from pandas import Timestamp
@@ -36,7 +36,7 @@ from pandas.tseries.holiday import Holiday
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
 
-from alexlib.constants import epoch_seconds
+from alexlib.constants import EPOCH_SECONDS
 
 
 class CustomTimedelta(timedelta):
@@ -50,7 +50,7 @@ class CustomTimedelta(timedelta):
     @property
     def epoch_self_dif(self) -> float:
         """returns the difference between the timedelta and epoch_seconds"""
-        return self.total_seconds() - epoch_seconds
+        return self.total_seconds() - EPOCH_SECONDS
 
     @staticmethod
     def _find_smallest_unit(td: timedelta):
@@ -72,7 +72,7 @@ class CustomTimedelta(timedelta):
 
     def __round__(self, other: timedelta) -> timedelta:
         """rounds the timedelta to the nearest other"""
-        diff = self.epoch_self_diff
+        diff = self.epoch_self_dif
         mod = diff % other.total_seconds()
         return self.__class__(seconds=diff - mod)
 
@@ -139,7 +139,7 @@ class CustomDatetime(datetime):
     @property
     def epoch_self_dif(self) -> float:
         """returns the difference between the datetime and epoch_seconds"""
-        return self.timestamp() - epoch_seconds
+        return self.timestamp() - EPOCH_SECONDS
 
     def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
         """returns the divmod of the datetime and epoch_seconds"""
@@ -148,7 +148,7 @@ class CustomDatetime(datetime):
     def __round__(self, td: timedelta) -> datetime:
         """rounds the datetime to the nearest td"""
         mod = self.epoch_self_dif % td.total_seconds()
-        return self.fromtimestamp(epoch_seconds + self.epoch_self_dif - mod)
+        return self.fromtimestamp(EPOCH_SECONDS + self.epoch_self_dif - mod)
 
 
 @decorator

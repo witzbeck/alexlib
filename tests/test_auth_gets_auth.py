@@ -20,7 +20,7 @@ from unittest import TestCase
 
 from alexlib.auth import Auth
 from alexlib.config import DotEnv
-from alexlib.constants import creds
+from alexlib.constants import CREDS
 
 proj = Path(__file__).parent.parent
 settings = DotEnv.from_path(proj / ".env")
@@ -36,7 +36,7 @@ class TestAuth(TestCase):
 
     def test_concat_getauth(self) -> None:
         """Test the Auth class"""
-        if (creds / f"{self.concat_name}.store").exists():
+        if (CREDS / f"{self.concat_name}.store").exists():
             auth = Auth(self.concat_name)
             self.assertIsInstance(auth, Auth)
         else:
@@ -45,7 +45,7 @@ class TestAuth(TestCase):
 
     def test_list_getauth(self) -> None:
         """Test the Auth class"""
-        if (creds / f"{self.concat_name}.store").exists():
+        if (CREDS / f"{self.concat_name}.store").exists():
             auth = Auth(self.list_name)
             self.assertIsInstance(auth, Auth)
         else:

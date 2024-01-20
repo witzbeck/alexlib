@@ -3,8 +3,6 @@ ignore=build,dist
 extension-pkg-whitelist=numpy,pandas
 jobs=4
 py-version=3.12
-load-plugins=
-    pylint.extensions.typing
 
 [MESSAGES CONTROL]
 disable=
