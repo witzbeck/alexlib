@@ -5,12 +5,14 @@
 *.env
 !*.json
 
+recipe/*.pdf
 debug.env
 *.code-workspace
 *.lock
 .vscode/
-
 .vscode
+
+# Logs
 tests/fixtures/cached_*_text.txt
 tags
 /my_txs

@@ -1,0 +1,41 @@
+{
+    "name": "The Best Chocolate Chip Cookie Recipe Ever",
+    "ingredients": [
+      { "name": "butter", "quantity": 1, "unit": "cup", "notes": "unsalted", "prep": "softened"},
+      { "name": "sugar", "quantity": 1, "unit": "cup", "notes": "granulated" },
+      { "name": "brown sugar", "quantity": 1, "unit": "cup", "notes": "light", "prep": "packed" },
+      { "name": "eggs", "quantity": 2, "notes": "large" },
+      { "name": "vanilla", "quantity": 2, "unit": "teaspoon"},
+      { "name": "baking soda", "quantity": 1, "unit": "teaspoon" },
+      { "name": "baking powder", "quantity": 0.5, "unit": "teaspoon" },
+      { "name": "salt", "quantity": 1, "unit": "teaspoon"},
+      { "name": "flour", "quantity": 2, "unit": "cup" },
+      { "name": "chocolate chips", "quantity": 2, "unit": "cup" }    ],
+    "equipment": [
+      { "name": "oven", "quantity": 1 },
+      { "name": "bowl", "quantity": 2, "size": "MM" },
+      { "name": "mixer", "quantity": 1 },
+      { "name": "spoon", "quantity": 1 },
+      { "name": "baking sheets", "quantity": 3 },
+      { "name": "measuring cups", "quantity": 1 },
+      { "name": "measuring spoons", "quantity": 1 }
+    ],
+      "steps": [
+      "Preheat the oven to 375°F.",
+      "Line baking sheets with parchment paper.",
+      "Combine flour, baking soda, baking powder, and salt in a bowl. Set Aside.",
+      "Cream together butter and sugar.",
+      "Beat in eggs and vanilla until fluffy.",
+      "Mix dry ingredients until combined.",
+      "Add chocolate chips and mix well.",
+      "Roll 2-3 tablespoons of dough at a time into balls and place them evenly spaced on the prepared cookie sheets.",
+      "Bake in preheated oven for approximately 8-10 minutes.",
+      "Take them out when they are just BARELY starting to turn brown.",
+      "Let them sit on the baking pan for 2 minutes before removing to cooling rack."
+    ],
+    "total_time": "30 minutes",
+    "prep_time": "10 minutes",
+    "cook_time": "8 minutes",
+    "servings": "36 cookies",
+    "calories": 183
+  }

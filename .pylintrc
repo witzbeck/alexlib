@@ -1,0 +1,22 @@
+[MASTER]
+ignore=build,dist
+extension-pkg-whitelist=numpy,pandas
+jobs=4
+py-version=3.12
+load-plugins=
+    pylint.extensions.typing
+
+[MESSAGES CONTROL]
+disable=
+    raise-missing-from,
+    inconsistent-return-statements,
+    too-many-public-methods,
+    import-error,
+    too-few-public-methods,
+    line-too-long,
+    eval-used,
+    too-many-lines,
+    too-many-arguments,
+    import-outside-toplevel,
+    syntax-error,
+    too-many-instance-attributes,
