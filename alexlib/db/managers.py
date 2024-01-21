@@ -38,10 +38,9 @@ Example:
 """
 
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from functools import cached_property, partial, wraps
-from logging import warning
+from functools import cached_property
+from logging import info, warning
 from pathlib import Path
 from shutil import copyfile
 from typing import Any
@@ -49,7 +48,7 @@ from sqlite3 import Cursor, connect as sqlite_connect
 
 from attr import field
 from pandas import DataFrame, read_sql
-from sqlalchemy import Connection, Engine, TextClause, create_engine
+from sqlalchemy import Connection, CursorResult, Engine, TextClause, create_engine
 from psycopg.errors import DuplicateSchema, UndefinedTable
 from sqlalchemy_utils import create_database, database_exists
 
@@ -62,40 +61,6 @@ from alexlib.files import File, path_search
 
 
 @dataclass
-class ConnectionManager:
-    """Connection manager class"""
-
-    connect_func: Callable = field(init=False, repr=False)
-
-    def with_connection(self, func: Callable) -> Callable:
-        """Decorator for creating and closing database connections"""
-
-        @wraps(func)
-        def with_connection_wrapper(self, *args, **kwargs) -> Any:
-            """Execute a function with a connection"""
-            dbmgr = self.connect_func()
-            result = func(self, dbmgr, *args, **kwargs)
-            dbmgr.close()
-            return result
-
-        return with_connection_wrapper
-
-    def with_cursor(self, func: Callable) -> Callable:
-        """Decorator for creating and closing cursors"""
-
-        @wraps(func)
-        @self.with_connection
-        def with_cursor_wrapper(self, dbmgr: Connection, *args, **kwargs) -> Any:
-            """Execute a function with a cursor"""
-            cursor = dbmgr.cursor()
-            result = func(self, cursor, *args, **kwargs)
-            dbmgr.commit()
-            return result
-
-        return with_cursor_wrapper
-
-
-@dataclass
 class DatabaseManager:
     """Database manager class"""
 
@@ -104,62 +69,52 @@ class DatabaseManager:
     schema_col: str = field(default="table_schema", repr=False)
     table_col: str = field(default="table_name", repr=False)
     engine: Engine = field(init=False, repr=False)
-    connect_func: Callable = field(init=False, repr=False)
+    cnxn: Connection = field(init=False, repr=False)
 
-    def with_connection(self, func: Callable) -> Callable:
-        """Decorator for creating and closing database connections"""
+    def __post_init__(self) -> None:
+        """sets attributes"""
+        if self.curl is not None:
+            self.engine = create_engine(self.curl)
+            self.cnxn = self.engine.connect()
+        else:
+            raise ValueError("need curl for engine")
 
-        @wraps(func)
-        def with_connection_wrapper(self, *args, **kwargs) -> Connection:
-            """Execute a function with a connection"""
-            dbmgr = self.connect_func()
-            result = func(self, dbmgr, *args, **kwargs)
-            dbmgr.close()
-            return result
+    def __del__(self) -> None:
+        """closes connection"""
+        if hasattr(self, "cnxn"):
+            self.cnxn.close()
+            del self.cnxn
+        if hasattr(self, "engine"):
+            del self.engine
 
-        return with_connection_wrapper
-
-    def with_cursor(self, func: Callable) -> Callable:
-        """Decorator for creating and closing cursors"""
-
-        @wraps(func)
-        @self.with_connection
-        def with_cursor_wrapper(self, cnxn: Connection, *args, **kwargs) -> Cursor:
-            """Execute a function with a cursor"""
-            cursor = cnxn.cursor()
-            result = func(self, cursor, *args, **kwargs)
-            cursor.commit()
-            return result
-
-        return with_cursor_wrapper
-
-    @with_cursor
     @staticmethod
-    def _execute_query(cursor: Cursor, query: str, params: tuple = None) -> Cursor:
+    def _execute_query(
+        cursor: Cursor, query: str, params: tuple = None
+    ) -> CursorResult:
         """Internal method to execute a query"""
         sql = SQL(query)
         if ";" in sql.clause:
             for part in sql.clause.split(";"):
                 if part:
-                    DatabaseManager._execute_query(cursor, part, params=params)
+                    DatabaseManager._execute_query(cursor, part)
         else:
             try:
-                cursor.execute(sql.encode("utf-8"), params=params)
-            except UnicodeDecodeError:
-                cursor.execute(sql.encode(), params=params)
+                cursor.execute(sql.clause, params=params)
+                cursor.commit()
             except UndefinedTable as e:
                 raise UndefinedTable(f"{e} - {sql.clause}")
         return cursor
 
-    def execute(self, query: SQL, params: tuple = None) -> Cursor:
+    def execute(self, query: SQL, params: tuple = None) -> CursorResult:
         """Execute a SQL query"""
-        cursor = self.connect_func().cursor()
-        return DatabaseManager._execute_query(cursor, query, params=params)
+        with self.cnxn.cursor() as cursor:
+            return DatabaseManager._execute_query(cursor, query, params=params)
 
     def executemany(self, query: str, params: list[tuple]) -> None:
         """Execute a SQL query multiple times"""
-        cursor = self.execute(query, params=params)
-        cursor.executemany(query, params)
+        with self.cnxn.cursor() as cursor:
+            cursor.executemany(query, params=params)
+            cursor.commit()
 
     def fetchone(
         self, query: str, params: tuple = None
@@ -497,8 +452,7 @@ class DatabaseManager:
 
     def get_all_schema_tables(self, schema: str) -> list[str]:
         """gets all tables in schema"""
-        info = self.schema_tables[schema]
-        return get_distinct_col_vals(info, self.table_col)
+        return get_distinct_col_vals(self.schema_tables[schema], self.table_col)
 
     def truncate_schema(self, schema: str) -> None:
         """truncates all tables in schema"""
@@ -523,10 +477,10 @@ class DatabaseManager:
 
     def mk_query(self, schema: str, table: str) -> SQL:
         """makes select * from table sql"""
-        info = self.info_schema_columns
-        info = info[info["table_schema"] == schema]
-        info = info[info["table_name"] == table]
-        return SQL.from_info_schema(schema, table, info)
+        info_ = self.info_schema_columns
+        info_ = info_[info_["table_schema"] == schema]
+        info_ = info_[info_["table_name"] == table]
+        return SQL.from_info_schema(schema, table, info_)
 
     def get_table(self, schema: str, table: str, nrows: int = None) -> DataFrame:
         """gets table from database"""
@@ -588,17 +542,16 @@ class SqlLiteManager(DatabaseManager):
     db_file: str = field(default=":memory:")
 
     def __post_init__(self) -> None:
-        if self.db_file:
-            self.connect_func = partial(sqlite_connect, self.db_file)
+        """sets attributes"""
+        self.engine = create_engine(f"sqlite:///{self.db_file}")
+        self.cnxn = self.engine.connect()
 
-    def execute_direct(self, query: str) -> None:
-        """Execute a SQL query directly"""
-        cnxn = self.connect_func()
-        cursor = cnxn.cursor()
-        cursor.execute(query)
-        cursor.commit()
-        cursor.close()
-        cnxn.close()
+    def __del__(self) -> None:
+        try:
+            self.cnxn.close()
+        except AttributeError:
+            info("no connection to close")
+        super().__del__()
 
     def backup_database(self, backup_path: str) -> None:
         """Backup the SQLite database to a specified path"""
@@ -630,7 +583,7 @@ class SqlLiteManager(DatabaseManager):
             file_conn.backup(memory_conn)
 
         # Update the connection function to the in-memory database
-        self.connect_func = lambda: memory_conn
+        self.cnxn = memory_conn
 
     def save_memory_database_to_file(self, file_path: str) -> None:
         """Save an in-memory SQLite database to a file"""
@@ -639,7 +592,7 @@ class SqlLiteManager(DatabaseManager):
 
         # Create a new file-based database connection
         file_conn = sqlite_connect(file_path)
-        memory_conn = self.connect_func()
+        memory_conn = sqlite_connect(":memory:")
 
         # Copy data from memory to file
         with memory_conn, file_conn:
@@ -647,7 +600,7 @@ class SqlLiteManager(DatabaseManager):
 
         # Update the connection function and db_file to the new file-based database
         self.db_file = file_path
-        self.connect_func = lambda: file_conn
+        self.cnxn = file_conn
 
 
 @dataclass

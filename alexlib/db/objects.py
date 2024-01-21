@@ -14,11 +14,13 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from random import choice
 from re import match
+from numpy import ndarray
 from pandas import DataFrame, Series
-from alexlib.db.managers import DatabaseManager
 
 from alexlib.df import series_col
 
+# Define a pattern for valid SQL object names.
+# Adjust the pattern as per your DB's naming rules.
 VALID_NAME_RULES = r"^[A-Za-z][A-Za-z0-9_]*$"
 
 
@@ -29,34 +31,29 @@ def get_abrv(table_name: str) -> str:
     return "".join(firsts)
 
 
-@dataclass(frozen=True)
+def validate_name(name: str) -> None:
+    """validates name"""
+    # This pattern allows alphanumeric characters and underscores, starting with a letter.
+    if name.isnumeric():
+        raise ValueError("name cannot be numeric")
+    # Check if the name matches the pattern
+    if not match(VALID_NAME_RULES, name):
+        raise ValueError("name must be alphanumeric and start with a letter")
+
+
+@dataclass(frozen=True, init=False)
 class Name(str):
     """wrapper for db object name"""
 
     def __new__(cls, content: str) -> str:
         """returns name as str"""
+        validate_name(content)
         return super().__new__(cls, content)
 
     @property
     def abrv(self) -> str:
         """returns abbreviation"""
         return get_abrv(self)
-
-    def validate(self) -> None:
-        """validates name"""
-        # Define a pattern for valid SQL object names.
-        # Adjust the pattern as per your DB's naming rules.
-        # This pattern allows alphanumeric characters and underscores, starting with a letter.
-
-        # Check if the name matches the pattern
-        if self.isnumeric():
-            raise ValueError("name cannot be numeric")
-        if not match(VALID_NAME_RULES, self):
-            raise ValueError("name must be alphanumeric and start with a letter")
-
-    def __post_init__(self) -> None:
-        """sets attributes"""
-        self.validate()
 
 
 @dataclass
@@ -82,7 +79,7 @@ class Column:
             self.schema_name = Name(self.schema_name)
 
     @cached_property
-    def distvals(self) -> list[str]:
+    def distvals(self) -> ndarray:
         """returns list of distinct values in series"""
         return self.series.unique()
 
@@ -174,28 +171,13 @@ class Table:
         cls_.df = df
         return cls_
 
-    @classmethod
-    def from_db(
-        cls,
-        dbmgr: DatabaseManager,
-        schema: str,
-        table: str,
-    ) -> "Table":
-        """makes table from database"""
-        df = dbmgr.get_table(schema, table)
-        return cls.from_df(schema, table, df)
-
 
 @dataclass
 class Schema:
     """wrapper for db schema"""
 
     name: Name = field()
-    tables: list[Table] = field(init=False)
-
-    def get_tables(self, dbmgr: DatabaseManager) -> list[Table]:
-        """returns list of table names"""
-        return dbmgr.schema_tables[self.name]
+    tables: list[Table] = field(default_factory=list, repr=False)
 
 
 @dataclass
@@ -203,15 +185,4 @@ class Database:
     """wrapper for db"""
 
     name: Name = field()
-    mgr: DatabaseManager = field(init=False, repr=False)
     schemas: list[Schema] = field(init=False)
-
-    @staticmethod
-    def get_schemas(dbmgr: DatabaseManager) -> list[Schema]:
-        """returns list of schema names"""
-        return dbmgr.allschemas
-
-    def __post_init__(self) -> None:
-        """sets attributes"""
-        self.mgr = DatabaseManager.from_auth(self.name)
-        self.schemas = Database.get_schemas(self.mgr)
