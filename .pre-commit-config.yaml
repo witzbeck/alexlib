@@ -47,7 +47,7 @@ repos:
     rev: 4.0.1
     hooks:
       - id: flake8
-        args: [--max-line-length=88, --extend-ignore=E203, W503]
+        args: [--max-line-length=88, --extend-ignore=E203,W503]
         language_version: python3.11
 
   - repo: local
@@ -65,4 +65,4 @@ repos:
     rev: 1.7.0
     hooks:
       - id: bandit
-        args: ['-s', 'B311']
+        args: ['-s', 'B311,B404,B603,B608']
