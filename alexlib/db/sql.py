@@ -16,17 +16,19 @@ Note:
 """
 
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
+from re import sub
 from subprocess import PIPE, Popen
 from pandas import DataFrame
 from sqlalchemy import TextClause, text
-from alexlib.db import get_table_abrv, onehot_case
+from alexlib.db.objects import Name
 
 from alexlib.df import get_distinct_col_vals
 from alexlib.files import File
 
 
-@dataclass
+@dataclass(init=False, frozen=True)
 class SQL(str):
     """wrapper for sqlalchemy TextClause"""
 
@@ -42,15 +44,41 @@ class SQL(str):
         """makes sql from File object"""
         return cls(file.text, **kwargs)
 
-    def __post_init__(self) -> None:
-        """adds query to clipboard if toclip is True"""
-        if self.toclip:
-            self.to_clipboard(str(self))
+    def __str__(self) -> str:
+        return super().__str__(self.sanitized)
+
+    def __new__(cls, *args, **kwargs) -> "SQL":
+        """creates new instance of SQL class"""
+        return super().__new__(cls, *args, **kwargs)
+
+    @property
+    def sanitized(self) -> str:
+        """
+        Sanitize input string for SQL queries by escaping potentially dangerous characters.
+        This is a basic method and not recommended for sanitizing queries directly.
+        Use parameterized queries wherever possible.
+
+        Parameters:
+        input_string (str): The input string to be sanitized.
+
+        Returns:
+        str: Sanitized string.
+        """
+        ret = self.replace("\n", " ").replace(";", "").replace("  ", " ")
+        ret = sub(r'["\']', "", ret)
+        return ret
 
     @property
     def clause(self) -> TextClause:
         """returns sqlalchemy TextClause"""
         return text(self)
+
+    def __post_init__(self) -> None:
+        """actions:
+        - adds query to clipboard if toclip is True
+        """
+        if self.toclip:
+            self.to_clipboard(str(self))
 
     @staticmethod
     def to_clipboard(txt: str) -> bool:
@@ -86,26 +114,40 @@ class SQL(str):
             raise FileExistsError("file already exists here. overwrite?")
         path.write_text(txt)
 
+    @staticmethod
+    def fmt_line(idx: int, col: str, abrv: str) -> str:
+        """formats line for select statement"""
+        comma = "," if idx else " "
+        return f"{comma}{abrv}.{col}\n"
+
     @classmethod
     def from_info_schema(
         cls,
-        schema: str,
-        table: str,
+        schema: Name,
+        table: Name,
         info_schema: DataFrame,
     ) -> "SQL":
         """makes select * from table query from info_schema"""
-        abrv = get_table_abrv(table)
-        lines = ["select\n"]
-        cols = list(info_schema.loc[:, "column_name"])
-        for i, col in enumerate(cols):
-            if i == 0:
-                comma = " "
-            else:
-                comma = ","
-            line = f"{comma}{abrv}.{col}\n"
-            lines.append(line)
-        lines.append(f"from {schema}.{table} {abrv}")
-        return cls("".join(lines))
+        if not isinstance(table, Name):
+            table = Name(table)
+        abrv = table.abrv
+        first = ["select\n"]
+        lines = [
+            cls.fmt_line(idx, col, abrv)
+            for idx, col in enumerate(info_schema.loc[:, "column_name"].tolist())
+        ]
+        last = [f"from {schema}.{table} {abrv}"]
+        return cls("".join(list(chain(first, lines, last))))
+
+
+def mk_view_text(name: str, sql: str) -> str:
+    """makes create view text"""
+    return f"CREATE VIEW {name} AS {sql}"
+
+
+def onehot_case(col: str, val: str) -> str:
+    """makes case statement for onehot encoding"""
+    return f"case when {col} = '{val}' then 1 else 0 end"
 
 
 def create_onehot_view(
@@ -133,3 +175,22 @@ def create_onehot_view(
         lines.append(f",{case_stmt} {new_col}\n")
     lines.append(f"from {schema}.{table}")
     return "".join(lines)
+
+
+def mk_info_sql(schema: str = None, table: str = None) -> str:
+    """makes information schema sql"""
+    sql = "select * from information_schema.columns"
+    hasschema = schema is not None
+    hastable = table is not None
+    hasboth = hasschema and hastable
+    haseither = hasschema or hastable
+    stext = f"table_schema = '{schema}'" if hasschema else ""
+    ttext = f"table_name = '{table}'" if hastable else ""
+    sqllist = [
+        sql,
+        "where" if haseither else "",
+        stext,
+        "and" if hasboth else "",
+        ttext,
+    ]
+    return " ".join(sqllist)

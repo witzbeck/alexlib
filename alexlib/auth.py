@@ -223,6 +223,20 @@ class Curl:
         )
 
     @cached_property
+    def mssql(self) -> str:
+        """returns a mssql connection string"""
+        return "".join(
+            [
+                self.system,
+                self.login,
+                "@",
+                self.hostport,
+                self.dbstr,
+                self.driverstr,
+            ]
+        )
+
+    @cached_property
     def postgres(self) -> str:
         """returns a postgres connection string"""
         deets = [

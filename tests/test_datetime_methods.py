@@ -12,9 +12,13 @@ from alexlib.time import get_rand_timedelta
 class TestNewDatetimeMethods(TestCase):
     """Test the new datetime methods."""
 
+    @property
+    def rand_datetime(self) -> CustomDatetime:
+        """Return random datetime."""
+        return get_rand_datetime()
+
     def setUp(self) -> None:
         """Set up the test case."""
-        self.dt = get_rand_datetime()
         self.now = datetime.now()
         self.thisyear = self.now.year
         self.xmas = CustomDatetime(self.thisyear, 12, 25)
@@ -23,7 +27,7 @@ class TestNewDatetimeMethods(TestCase):
 
     def test_isholiday(self) -> None:
         """Test isholiday method."""
-        self.assertIsInstance(self.dt.isholiday, bool)
+        self.assertIsInstance(self.rand_datetime.isholiday, bool)
         self.assertTrue(self.xmas.isholiday)
         notxmas = self.xmas + self.oneday
         self.assertFalse(notxmas.isholiday)
@@ -31,26 +35,34 @@ class TestNewDatetimeMethods(TestCase):
     def test_isweekday(self) -> None:
         """Test isweekday method."""
         for _ in range(10):
-            self.assertIsInstance(self.dt.isweekday, bool)
-            self.assertIsNot(self.dt.isweekday, self.dt.isweekend)
+            dt = self.rand_datetime
+            self.assertIsInstance(dt.isweekday, bool)
+            self.assertIsNot(dt.isweekday, dt.isweekend)
 
     def test_isbusinessday(self) -> None:
         """Test isbusinessday method."""
-        self.assertIsInstance(self.dt.get_last_busday(), datetime)
+        self.assertIsInstance(self.rand_datetime.get_last_busday(), datetime)
         for _ in range(10):
-            self.assertIsInstance(self.dt.isbusinessday, bool)
-            self.assertIsNot(self.dt.isbusinessday, self.dt.isholiday)
-            self.assertIsNot(self.dt.isbusinessday, self.dt.isweekend)
+            dt = self.rand_datetime
+            self.assertIsInstance(self.rand_datetime.isbusinessday, bool)
+            self.assertIsNot(
+                dt.isbusinessday,
+                dt.isholiday or dt.isweekend,
+                msg=f"{dt} is a holiday or weekend",
+            )
+            self.assertIsNot(dt.isbusinessday, dt.isweekend)
 
     def test_tomorrow(self) -> None:
         """Test tomorrow method."""
-        self.assertIsInstance(self.dt.tomorrow, datetime)
-        self.assertEqual(self.dt.tomorrow, self.dt + self.oneday)
+        dt = self.rand_datetime
+        self.assertIsInstance(dt.tomorrow, datetime)
+        self.assertEqual(dt.tomorrow, dt + self.oneday)
 
     def test_yesterday(self) -> None:
         """Test yesterday method."""
-        self.assertIsInstance(self.dt.yesterday, datetime)
-        self.assertEqual(self.dt.yesterday, self.dt - self.oneday)
+        dt = self.rand_datetime
+        self.assertIsInstance(dt.yesterday, datetime)
+        self.assertEqual(dt.yesterday, dt - self.oneday)
 
 
 if __name__ == "__main__":
