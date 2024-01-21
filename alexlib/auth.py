@@ -27,7 +27,7 @@ from random import choice, randint
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
 from alexlib.constants import CREDS
-from alexlib.core import read_json
+from alexlib.core import chkenv, read_json
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import RandGen
 from alexlib.files import File
@@ -612,6 +612,11 @@ class Auth:
         crypt = Cryptographer.from_key(key) if key else Cryptographer.new()
         store = SecretStore.from_path(path, key=crypt.key)
         return cls(name, store=store)
+
+    @classmethod
+    def from_env(cls, key: str = "AUTH") -> "Auth":
+        """returns an Auth object from an environment variable"""
+        return cls.from_path(Path(f"{chkenv(key)}.key"))
 
 
 @dataclass
