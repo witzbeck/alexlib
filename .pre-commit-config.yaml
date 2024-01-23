@@ -41,11 +41,11 @@ repos:
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
-    -   id: python-use-type-annotations
-    -   id: python-check-mock-methods
-    -   id: python-check-blanket-noqa
-    -   id: python-no-eval
-    -   id: python-no-log-warn
+      - id: python-use-type-annotations
+      - id: python-check-mock-methods
+      - id: python-check-blanket-noqa
+      - id: python-no-eval
+      - id: python-no-log-warn
 
   - repo: https://github.com/pycqa/flake8
     rev: 4.0.1

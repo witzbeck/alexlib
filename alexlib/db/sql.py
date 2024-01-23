@@ -63,9 +63,15 @@ class SQL(str):
     def __str__(self) -> str:
         return super().__str__(self.sanitized)
 
-    def __new__(cls, *args, **kwargs) -> "SQL":
+    def __new__(cls, content: str) -> "SQL":
         """creates new instance of SQL class"""
-        return super().__new__(cls, *args, **kwargs)
+        if isinstance(content, Path):
+            content = content.read_text()
+        elif isinstance(content, File):
+            content = content.text
+        elif not isinstance(content, (str, SQL)):
+            raise TypeError(f"content must be str, not {type(content)}")
+        return super().__new__(cls, content)
 
     @property
     def sanitized(self) -> str:
