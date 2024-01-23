@@ -27,9 +27,11 @@ class RecipeBase:
     @classmethod
     def from_json(cls, path: Path) -> "RecipeBase":
         """Creates a Recipe from a JSON object"""
+        if isinstance(path, str):
+            path = Path(path)
         if not path.exists():
             raise FileNotFoundError
-        d = loads(path.read_text())
+        d = loads(path.read_text(encoding="utf-8"))
         return cls.from_dict(d)
 
 
@@ -158,6 +160,8 @@ class Recipe(RecipeBase):
 
     def to_pdf(self, path: Path) -> None:
         """Saves the recipe as a PDF"""
+        if isinstance(path, str):
+            path = Path(path)
         doc = SimpleDocTemplate(path.name)
         elements = []
         elements.append(self.title_paragraph)
@@ -170,6 +174,6 @@ class Recipe(RecipeBase):
         doc.build(elements)
 
 
-cc_cookies = Recipe.from_json(Path("chocolate_chip_cookies.json"))
-print(cc_cookies.name, cc_cookies)
-cc_cookies.to_pdf(Path("chocolate_chip_cookies.pdf"))
+if __name__ == "__main__":
+    cc_cookies = Recipe.from_json("chocolate_chip_cookies.json")
+    cc_cookies.to_pdf("chocolate_chip_cookies.pdf")
