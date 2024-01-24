@@ -147,7 +147,7 @@ def envcast(
 ) -> Any:
     """converts output to specified type"""
     if isinstance(astype, str):
-        astype = eval(astype)
+        astype = eval(astype)  # nosec
     if not isinstance(astype, type):
         raise TypeError(f"astype must be type but is {type(astype)}")
     if issubclass(astype, list):
@@ -228,7 +228,7 @@ def show_dict(d: dict, indent: int = 4) -> None:
             show_dict(dict_)
         print("]")
     else:
-        d = {k: v for k, v in d.items() if not k.startswith("_")}
+        d = {k: v for k, v in d.items() if not str(k).startswith("_")}
         print(dumps(d, indent=indent))
 
 
@@ -317,7 +317,7 @@ def chkhash(path: Path, stored_hash: str) -> bool:
 
 def get_last_tag() -> str:
     """returns last git tag"""
-    return check_output(["git", "describe", "--tags"]).decode("ascii")
+    return check_output(["git", "describe", "--tags"]).decode("ascii")  # nosec
 
 
 def get_curent_version(tag: str) -> str:
