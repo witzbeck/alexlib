@@ -25,9 +25,10 @@ datetime module.
 from dataclasses import dataclass, field
 from datetime import datetime
 from datetime import timedelta
-from functools import cached_property
+from functools import cached_property, partial
 from logging import info
 from math import floor
+from os import getenv
 from random import randint
 from time import perf_counter
 from collections.abc import Callable
@@ -37,8 +38,13 @@ from pandas import Timestamp
 from pandas.tseries.holiday import Holiday
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
-
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Float
+from sqlalchemy.orm import declarative_base
 from alexlib.constants import EPOCH_SECONDS
+
+Base = declarative_base()
+
+get_env_user = partial(getenv, "USER")
 
 
 class CustomTimedelta(timedelta):
@@ -151,6 +157,49 @@ class CustomDatetime(datetime):
         """rounds the datetime to the nearest td"""
         mod = self.epoch_self_dif % td.total_seconds()
         return self.fromtimestamp(EPOCH_SECONDS + self.epoch_self_dif - mod)
+
+
+class Users(Base):
+    """A user class for storing user information."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, default=get_env_user)
+
+
+class TimerLog(Base):
+    """A timer log class for storing timer logs."""
+
+    __tablename__ = "timer_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True)
+    action = Column(String, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    duration = Column(Float, nullable=False)
+    duration_unit = Column(String, nullable=False)
+    additional_info = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        """Get the timer log representation."""
+        attrs = "\n".join(
+            [
+                f"{key}: {val}"
+                for key, val in {
+                    "id": self.id,
+                    "user_id": self.user_id,
+                    "action": self.action,
+                    "start_time": self.start_time,
+                    "end_time": self.end_time,
+                    "duration": self.duration,
+                }.items()
+                if val
+            ]
+        )
+        return "\n".join([f"{self.__class__.__name__}(", attrs, ")"])
 
 
 @dataclass(frozen=True)
