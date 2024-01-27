@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "alexlib"
 version = "0.2.0"
-description = ""
+description = "A toolset for data science, machine learning, and data engineering."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.12"
 pandas = "*"
 python-dotenv = "*"
 decorator = "*"

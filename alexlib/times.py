@@ -165,8 +165,8 @@ class TimerLabel:
     @staticmethod
     def _get_label_dict(
         seconds: float,
-        label_dict: dict[str, str],
         minunit: float,
+        label_dict: dict[str, str],
     ) -> dict[str, str]:
         """calculate the label dict"""
         minutes, seconds = divmod(seconds, 60)
@@ -184,11 +184,22 @@ class TimerLabel:
             raise ValueError(f"label_dict is empty but seconds are {seconds}")
         return label_dict
 
-    def __post_init__(self) -> None:
-        """Initialize the timer label."""
-        self.label_dict = self._get_label_dict(
-            self.seconds, self.label_dict, self.minunit
+    @staticmethod
+    def _get_label_str(label_dict: dict[str, str], roundto: int) -> str:
+        """calculate the label string"""
+        return " ".join(
+            [f"{round(val, roundto)} {key}" for key, val in label_dict.items()]
         )
+
+    def __str__(self) -> str:
+        """Get the timer label."""
+        return TimerLabel._get_label_str(
+            TimerLabel._get_label_dict(self.seconds, self.minunit, self.label_dict),
+            self.roundto,
+        )
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 @dataclass(slots=True)
@@ -230,10 +241,20 @@ class Timer:
         return self.hard_last_record - self.start
 
     @property
+    def elapsed_from_start_label(self) -> TimerLabel:
+        """Get the elapsed time representation."""
+        return TimerLabel(self.elapsed_from_start)
+
+    @property
     def elapsed_from_last(self) -> float:
         """Get the elapsed time."""
         soft = self.soft_last_record
         return self.hard_last_record - soft
+
+    @property
+    def elapsed_from_last_label(self) -> TimerLabel:
+        """Get the elapsed time representation."""
+        return TimerLabel(self.elapsed_from_last)
 
     def __enter__(self) -> "Timer":
         """Start the timer."""
