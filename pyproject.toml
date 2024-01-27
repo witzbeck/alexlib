@@ -31,9 +31,10 @@ pytest = "*"
 coverage = "*"
 ipykernel = "*"
 notebook = "*"
+pytest-cov = "^4.1.0"
 
-[tool.sqlfluff]
-dialect = "postgress"
+[tool.sqlfluff.core]
+dialect = "postgres"
 
 [tool.sqlfluff.rules]
 indent_unit = "space"
