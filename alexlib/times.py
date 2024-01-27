@@ -22,10 +22,12 @@ like business day calculations and US Federal Holiday determination. It is desig
 applications requiring custom date-time manipulations beyond the capabilities of the standard
 datetime module.
 """
+from dataclasses import dataclass, field
 from datetime import datetime
 from datetime import timedelta
 from functools import cached_property
 from logging import info
+from math import floor
 from random import randint
 from time import perf_counter
 from collections.abc import Callable
@@ -149,6 +151,97 @@ class CustomDatetime(datetime):
         """rounds the datetime to the nearest td"""
         mod = self.epoch_self_dif % td.total_seconds()
         return self.fromtimestamp(EPOCH_SECONDS + self.epoch_self_dif - mod)
+
+
+@dataclass(frozen=True)
+class TimerLabel:
+    """A timer label class for labeling timer records."""
+
+    seconds: float
+    label_dict: dict[str, str] = field(default_factory=dict)
+    roundto: int = field(default=3, repr=False)
+    minunit: float = field(default=0.1, repr=False)
+
+    @staticmethod
+    def _get_label_dict(
+        seconds: float,
+        label_dict: dict[str, str],
+        minunit: float,
+    ) -> dict[str, str]:
+        """calculate the label dict"""
+        minutes, seconds = divmod(seconds, 60)
+        if (min_ := floor(minutes)) > 0:
+            label_dict["min"] = min_
+        if seconds > minunit:
+            label_dict["sec"] = seconds
+        elif (mili := seconds * 10e3) > minunit:
+            label_dict["ms"] = mili
+        elif (micro := seconds * 10e6) > minunit:
+            label_dict["μs"] = micro
+        else:
+            label_dict["ns"] = seconds * 10e9
+        if not label_dict:
+            raise ValueError(f"label_dict is empty but seconds are {seconds}")
+        return label_dict
+
+    def __post_init__(self) -> None:
+        """Initialize the timer label."""
+        self.label_dict = self._get_label_dict(
+            self.seconds, self.label_dict, self.minunit
+        )
+
+
+@dataclass(slots=True)
+class Timer:
+    """A timer class for measuring execution time."""
+
+    start: float = field(default_factory=perf_counter, repr=False)
+    record: list[float] = field(default_factory=list, repr=False)
+
+    @staticmethod
+    def _log_time(time: float, record: list[float]) -> None:
+        """Log the time to the record."""
+        record.append(time)
+        return record
+
+    def log_perf_counter(self) -> None:
+        """Log the current time to the record."""
+        self.record = Timer._log_time(perf_counter(), self.record)
+
+    def __post_init__(self) -> None:
+        """Initialize the timer."""
+        self.record = Timer._log_time(self.start, self.record)
+
+    @property
+    def soft_last_record(self) -> float:
+        """Get the most recent time without logging."""
+        return self.record[-1]
+
+    @property
+    def hard_last_record(self) -> float:
+        """Get the most recent time with logging."""
+        ret = self.soft_last_record
+        self.log_perf_counter()
+        return ret
+
+    @property
+    def elapsed_from_start(self) -> float:
+        """Get the elapsed time."""
+        return self.hard_last_record - self.start
+
+    @property
+    def elapsed_from_last(self) -> float:
+        """Get the elapsed time."""
+        soft = self.soft_last_record
+        return self.hard_last_record - soft
+
+    def __enter__(self) -> "Timer":
+        """Start the timer."""
+        return self
+
+    def __exit__(self, *args) -> None:
+        """Stop the timer."""
+        self.log_perf_counter()
 
 
 @decorator

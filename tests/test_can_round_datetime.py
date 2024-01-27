@@ -4,10 +4,10 @@ from unittest import main
 from unittest import TestCase
 
 from alexlib.constants import EPOCH
-from alexlib.time import CustomDatetime
-from alexlib.time import CustomTimedelta
-from alexlib.time import get_rand_datetime
-from alexlib.time import get_rand_timedelta
+from alexlib.times import CustomDatetime
+from alexlib.times import CustomTimedelta
+from alexlib.times import get_rand_datetime
+from alexlib.times import get_rand_timedelta
 
 
 class TestRoundDatetime(TestCase):
