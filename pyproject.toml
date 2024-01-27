@@ -31,6 +31,22 @@ coverage = "*"
 ipykernel = "*"
 notebook = "*"
 
+[tool.sqlfluff]
+dialect = "postgress"
+
+[tool.sqlfluff.rules]
+indent_unit = "space"
+max_line_length = 120
+comma_style = "leading"
+
+[tool.sqlfluff.indentation]
+use_vertical_hanging_indent = true
+
+[tool.sqlfluff.layout]
+align_comments = true
+align_aliases = true
+align_joins = true
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
