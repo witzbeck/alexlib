@@ -490,9 +490,13 @@ class File(SystemObject):
         except UnicodeDecodeError:
             return self.path.read_text(encoding="utf8")
 
-    def text_to_clipboard(self) -> None:
+    def text_to_clipboard(
+        self,
+        toappend: str = "",
+        toprepend: str = "",
+    ) -> None:
         """copies file text to clipboard"""
-        return to_clipboard(self.text)
+        return to_clipboard(f"{toprepend}{self.text}{toappend}")
 
     @property
     def lines(self) -> list[str]:
@@ -785,9 +789,22 @@ class Directory(SystemObject):
         """gets directory representation"""
         return f"{self.__class__.__name__}({self.name})"
 
-    def get_type_filelist(self, type_: str) -> list[File]:
+    @staticmethod
+    def _get_type_filelist(
+        type_: str,
+        filelist: list[File],
+    ) -> list[File]:
         """gets file list by type"""
-        return [x for x in self.filelist if x.istype(type_) and isinstance(x, File)]
+        return [x for x in filelist if x.istype(type_) and isinstance(x, File)]
+
+    def get_type_filelist(
+        self,
+        type_: str,
+        allchildren: bool = False,
+    ) -> list[File]:
+        """gets file list by type"""
+        filelist = self.allchildfiles if allchildren else self.filelist
+        return Directory._get_type_filelist(type_, filelist)
 
     @property
     def csv_filelist(self) -> list[File]:
