@@ -215,13 +215,33 @@ def read_json(path: Path) -> dict[Hashable:Any]:
     return loads(path.read_text())
 
 
+def flatten_dict(
+    d: dict,
+    parent_key: str = None,
+    sep: str = ":",
+) -> dict[str:str]:
+    """concattenates keys to flatter dict"""
+    return {
+        f"{parent_key}{sep}{k}" if parent_key else k: v
+        for k, v in d.items()
+        for k, v in (
+            flatten_dict(v, k, sep=sep).items() if isinstance(v, dict) else [(k, v)]
+        )
+    }
+
+
 def get_attrs(
     obj: object,
     include_hidden: bool = False,
     include_dunder: bool = False,
 ) -> dict[str:Any]:
     """returns all attributes of object"""
-    attrs = vars(obj)
+    attrs = {
+        attr: getattr(obj, attr)
+        for attr in dir(obj)
+        if not callable(getattr(obj, attr))
+    }
+    print(attrs)
     if not include_dunder:
         attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
     if not include_hidden:
@@ -237,7 +257,7 @@ def show_dict(d: dict, indent: int = 4) -> None:
             show_dict(dict_)
         print("]")
     else:
-        d = {k: v for k, v in get_attrs(d)}
+        d = {k: v for k, v in get_attrs(d).items()}
         print(dumps(d, indent=indent))
 
 

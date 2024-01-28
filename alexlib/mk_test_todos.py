@@ -1,6 +1,8 @@
 from pathlib import Path
 
+from alexlib.core import flatten_dict
 from alexlib.files import Directory, File
+from alexlib.ml.llm_response import MarkdownResponse
 
 
 def get_single_file_test_cases(py_file: File) -> str:
@@ -57,5 +59,9 @@ def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None
 if __name__ == "__main__":
     module_ = Directory.from_path(Path(__file__).parent)
     testcase_files = get_existing_test_cases(module_, allchildren=True)
-    for testcase_file in testcase_files:
-        print(testcase_file)
+    testcases_responses = [MarkdownResponse.from_file(file) for file in testcase_files]
+    testcase_map = {
+        file.path.stem: resp.heading_step_map
+        for file, resp in zip(testcase_files, testcases_responses)
+    }
+    print(flatten_dict(testcase_map))

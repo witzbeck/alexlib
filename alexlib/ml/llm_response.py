@@ -17,6 +17,21 @@ DB_TEST_CASES_PATH = DB_PATH / DB_TEST_CASES
 @dataclass
 class LargeLanguageModelResponse:
     content: str = field(repr=False)
+    path: Path = field(default=None, repr=False)
+
+    @classmethod
+    def from_file(cls, file: File) -> "LargeLanguageModelResponse":
+        """Create a response from a file."""
+        return cls(file.text, path=file.path)
+
+    @classmethod
+    def from_path(cls, path: Path) -> "LargeLanguageModelResponse":
+        """Create a response from a path."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"{path} does not exist.")
+        return cls(path.read_text(), path=path)
 
     @cached_property
     def lines(self) -> list[str]:
@@ -48,22 +63,10 @@ class LargeLanguageModelResponse:
         """Process the content of a response."""
         pass
 
-    def from_file(cls, file: File) -> "LargeLanguageModelResponse":
-        """Create a response from a file."""
-        return cls(file.text)
-
-    def from_path(cls, path: Path) -> "LargeLanguageModelResponse":
-        """Create a response from a path."""
-        if not isinstance(path, Path):
-            path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"{path} does not exist.")
-        return cls(path.read_text())
-
     @staticmethod
     def get_title_from_filename(filename: str) -> str:
         """Get the title of a response from its filename."""
-        return filename.replace("_", " ").replace(".txt", "")
+        return filename.split(".")[0].replace("_", " ").title()
 
     @staticmethod
     def get_title_from_path(path: str) -> str:
