@@ -30,157 +30,130 @@ Typical usage example:
     file_faker.setup_dirs()
     file_faker.setup_files(file_faker.dirs)
 """
-from dataclasses import dataclass
-from dataclasses import field
-from datetime import datetime
-from datetime import timedelta
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from functools import partial
 from itertools import chain
 from pathlib import Path
-from random import choice
-from random import choices
-from random import randint
-from string import ascii_letters
-from string import printable
+from random import choice, randint
+from string import ascii_letters, digits, printable
+from alexlib.constants import ISTYPE_EXTS
 
-from alexlib.files import Directory
-from alexlib.files import File
+from alexlib.files import Directory, File
 
-letlist = list(ascii_letters)
-printlist = list(printable)
-vowels = list("aeiou")
-consonants = [x for x in letlist if x not in vowels]
+DIGITS = list(digits)
+LETTERS = list(ascii_letters)
+PRINTABLES = list(printable)
+VOWELS = list("aeiou")
+CONSONANTS = [x for x in LETTERS if x.lower() not in VOWELS]
 
 
-@dataclass
-class RandGen:
-    """generates random values"""
+def randintstr(min_int: int = 0, max_int: int = 10) -> str:
+    """returns a random integer between min_int and max_int as a string"""
+    return str(randint(min_int, max_int))
 
-    @staticmethod
-    def randint(min_int: int = 0, max_int: int = 10) -> int:
-        """returns a random integer between min_int and max_int"""
-        return randint(min_int, max_int)
 
-    @staticmethod
-    def _randintstr(**kwargs) -> str:
-        """returns a random integer between min_int and max_int as a string"""
-        return str(RandGen.randint(**kwargs))
+randdigit = partial(choice, DIGITS)
+randvowel = partial(choice, VOWELS)
+randprint = partial(choice, PRINTABLES)
+randlet = partial(choice, LETTERS)
+randfileext = partial(choice, ISTYPE_EXTS)
 
-    @staticmethod
-    def randintstr(n: int = None, **kwargs) -> str:
-        """returns a random integer between min_int and max_int as a string"""
 
-        def g() -> str:
-            return RandGen._randintstr(**kwargs)
+def infgen(
+    int_: bool = False,
+    intstr_: bool = False,
+    let_: bool = False,
+    printable_: bool = False,
+) -> int | str:
+    """generates an infinite stream of random integers or letters"""
+    if not (int_ or intstr_ or let_ or printable_):
+        raise ValueError("need choice")
+    funcs = []
+    if int_:
+        funcs.append(randint)
+    if intstr_:
+        funcs.append(randintstr)
+    if let_:
+        funcs.append(randlet)
+    if printable_:
+        funcs.append(randprint)
+    n = len(funcs)
+    if n == 0:
+        raise ValueError("need a func")
+    if n == 1:
+        func = funcs[0]
+        while True:
+            yield func()
+    else:
+        while True:
+            yield choice(funcs)()
 
-        func = choices if n else choice
-        arg = (g, n) if n else g
-        return func(arg)
 
-    @staticmethod
-    def randlet(
-        n: int = None,
-        vowels_: bool = False,
-    ) -> str:
-        """returns a random letter from the alphabet"""
-        lst = vowels if vowels_ else letlist
-        func = choices if n else choice
-        arg = (lst, n) if n else lst
-        return func(arg)
+def limgen(lim: int, concat: bool = True, **kwargs) -> list[str] | str:
+    """generates a limited stream of random integers or letters"""
+    infg = infgen(**kwargs)
+    gen = [next(infg) for _ in range(lim)]
+    return "".join(gen) if concat else gen
 
-    @staticmethod
-    def randprint(n: int = None) -> str:
-        """returns a random printable character"""
-        func = choices if n else choice
-        arg = (printlist, n) if n else printlist
-        return func(arg)
 
-    @staticmethod
-    def infgen(
-        int_: bool = False,
-        intstr_: bool = False,
-        let_: bool = False,
-        printable_: bool = False,
-    ) -> int | str:
-        """generates an infinite stream of random integers or letters"""
-        if not (int_ or intstr_ or let_ or printable_):
-            raise ValueError("need choice")
-        funcs = []
-        if int_:
-            funcs.append(RandGen.randint)
-        if intstr_:
-            funcs.append(RandGen.randintstr)
-        if let_:
-            funcs.append(RandGen.randlet)
-        if printable_:
-            funcs.append(RandGen.randprint)
-        n = len(funcs)
-        if n == 0:
-            raise ValueError("need a func")
-        if n == 1:
-            func = funcs[0]
-            while True:
-                yield func()
-        else:
-            while True:
-                yield choice(funcs)()
+def randfilename(
+    min_: int = 5,
+    max_: int = 12,
+    let_: bool = True,
+    intstr_: bool = True,
+) -> str:
+    """generates a random test name"""
+    name_len = randint(min_, max_)
+    name = limgen(name_len, intstr_=intstr_, let_=let_)
+    return f"{name}.{randfileext()}"
 
-    @staticmethod
-    def limgen(lim: int, concat: bool = True, **kwargs) -> list[str] | str:
-        """generates a limited stream of random integers or letters"""
-        infg = RandGen.infgen(**kwargs)
-        gen = [next(infg) for _ in range(lim)]
-        return "".join(gen) if concat else gen
 
-    @staticmethod
-    def mk_test_name(
-        min_: int = 5, max_: int = 12, let_: bool = True, intstr_: bool = True
-    ) -> str:
-        """generates a random test name"""
-        name_len = randint(min_, max_)
-        name = RandGen.limgen(name_len, intstr_=intstr_, let_=let_)
-        return "__test" + name
+def mk_test_filename(prefix: str = "__test") -> str:
+    """generates a random test name"""
+    return f"{prefix}{randfilename()}"
 
-    @staticmethod
-    def mk_test_ext(_min: int = 2, _max: int = 5) -> str:
-        """generates a random test extension"""
-        ext_len = randint(_min, _max)
-        ext = RandGen.limgen(ext_len, _let=True)
-        return ext.lower()
 
-    @staticmethod
-    def mk_text(lim: str = 100) -> str:
-        """generates a random text string"""
-        return RandGen.limgen(lim, printable=True)
+def randtext(lim: int = 100) -> str:
+    """generates a random text string"""
+    return limgen(lim, printable=True)
 
-    @staticmethod
-    def mk_dirname() -> str:
-        """generates a random directory name"""
-        return RandGen.mk_test_name(let_=True, intstr_=False)
 
-    @staticmethod
-    def mk_filename() -> str:
-        """generates a random file name"""
-        name = RandGen.mk_test_name()
-        ext = RandGen.mk_test_ext()
-        return f"{name}.{ext}"
+def randdirname() -> str:
+    """generates a random directory name"""
+    return mk_test_filename(let_=True, intstr_=False)
 
-    @staticmethod
-    def mk_timedelta(min_days: int = 10, max_days: int = 10_000) -> timedelta:
-        """generates a random timedelta"""
-        days = randint(min_days, max_days)
-        return timedelta(days=days)
 
-    @staticmethod
-    def mk_datetime(
-        min_year: int = 1990,
-        max_year: int = 2030,
-    ) -> datetime:
-        """generates a random datetime"""
-        year = randint(min_year, max_year)
-        month = randint(1, 12)
-        dt = datetime(year, month, 1)
-        td = RandGen.mk_timedelta()
-        return dt + td
+def randtimedelta(min_days: int = 10, max_days: int = 10_000) -> timedelta:
+    """generates a random timedelta"""
+    days = randint(min_days, max_days)
+    return timedelta(days=days)
+
+
+def randyear(min_year: int = 1990, max_year: int = 2030) -> int:
+    """generates a random year"""
+    return randint(min_year, max_year)
+
+
+def randmonth() -> int:
+    """generates a random month"""
+    return randint(1, 12)
+
+
+def randdatetime(
+    min_year: int = 1990,
+    max_year: int = 2030,
+) -> datetime:
+    """generates a random datetime"""
+    dt = datetime(
+        randyear(
+            min_year=min_year,
+            max_year=max_year,
+        ),
+        randmonth(),
+        1,
+    )
+    return dt + randtimedelta()
 
 
 @dataclass
@@ -203,8 +176,7 @@ class FileFaker:
     @staticmethod
     def mk_filepath(dirpath: Path) -> Path:
         """generates a random filepath"""
-        name = RandGen.mk_filename()
-        return dirpath / name
+        return dirpath / randfilename()
 
     @staticmethod
     def write_file(
@@ -217,8 +189,7 @@ class FileFaker:
             raise FileExistsError
         path.touch()
         if inc_text:
-            text = RandGen.mk_text()
-            path.write_text(text)
+            path.write_text(randtext())
         return File(path=path)
 
     @staticmethod
@@ -236,8 +207,7 @@ class FileFaker:
     @staticmethod
     def mk_dirpath(target_dir: Path) -> Path:
         """generates a random directory path"""
-        name = RandGen.mk_dirname()
-        return target_dir / name
+        return target_dir / randdirname()
 
     @staticmethod
     def write_dir(target_dir: Path) -> Directory:

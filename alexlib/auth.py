@@ -29,7 +29,7 @@ from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from alexlib.constants import CREDS
 from alexlib.core import chkenv, read_json
 from alexlib.crypto import Cryptographer, SecretValue
-from alexlib.fake import RandGen
+from alexlib.fake import randlet, randprint, randdigit
 from alexlib.files import File
 
 
@@ -39,7 +39,7 @@ class AuthPart:
 
     name: str
     length: int = field(default=10)
-    randsrc: Callable = field(default=RandGen.randlet)
+    randsrc: Callable = field(default=randlet)
 
     @classmethod
     def rand(cls) -> "AuthPart":
@@ -63,7 +63,7 @@ class Password(AuthPart):
     """constructs password objects"""
 
     length: int = field(default=12)
-    randsrc: Callable = field(default=RandGen.randprint)
+    randsrc: Callable = field(default=randprint)
 
 
 @dataclass
@@ -98,8 +98,8 @@ class Server:
             [
                 str(randint(180, 199)),
                 str(randint(160, 179)),
-                RandGen.randintstr(n=1),
-                RandGen.randintstr(n=3),
+                randdigit(n=1),
+                randdigit(n=3),
             ]
         )
 
@@ -110,7 +110,7 @@ class Server:
             [
                 "postgres",
                 choice(["dev", "test", "prod"]),
-                RandGen.randlet(n=6),
+                randlet(n=6),
                 choice(["local", "remote"]),
             ]
         )

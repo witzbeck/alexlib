@@ -19,6 +19,28 @@ COL_SUBS = {
     ">": "gt",
     "=": "eq",
 }
+ISTYPE_EXTS = [
+    "csv",
+    "json",
+    "parquet",
+    "pickle",
+    "xlsx",
+    "xls",
+    "txt",
+    "sql",
+    "py",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "cfg",
+    "conf",
+    "env",
+    "ipynb",
+    "md",
+    "rst",
+    "html",
+]
 SQL_SUBS = {k: v for k, v in COL_SUBS.items() if k in SQL_CHARS and k != " "}
 SQL_INFOSCHEMA_COL = "select * from information_schema.columns"
 
