@@ -1,38 +1,5 @@
 Creating a comprehensive set of test cases for the provided file involves testing each class and method systematically. Given the two classes `RandGen` and `FileFaker`, along with the helper function `pick_yn`, here's how the test cases could be structured:
 
-### 1. RandGen Class Test Cases
-#### 1.1 `randint`
-- Test with default parameters to ensure it returns an integer between 0 and 10.
-- Test with specific min and max integer values.
-- Test with negative min and max values.
-- Test with min greater than max, expecting an error.
-
-#### 1.2 `_randintstr` (Private Method)
-- Test similar scenarios as `randint` but ensure the output is a string.
-- Test edge cases like extremely large numbers.
-
-#### 1.3 `randintstr`
-- Test with various lengths `n`.
-- Test with additional parameters passed to the underlying `randint`.
-
-#### 1.4 `randlet`
-- Test for a single random letter (default parameters).
-- Test for a string of `n` random letters.
-- Test specifically for vowels and consonants (using `vowels_` parameter).
-
-#### 1.5 `randprint`
-- Test for a single random printable character.
-- Test for a string of `n` random printable characters.
-
-#### 1.6 `infgen`
-- Test each type of infinite generator (`int_`, `intstr_`, `let_`, `printable_`).
-- Test with multiple types specified.
-- Test error handling when no type is specified.
-
-#### 1.7 `limgen`
-- Test with various limits and types.
-- Test with `concat=True` and `concat=False`.
-
 #### 1.8 `mk_test_name`
 - Test with various ranges for `min_` and `max_`.
 - Test with combinations of `let_` and `intstr_`.

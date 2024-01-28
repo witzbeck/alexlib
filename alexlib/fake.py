@@ -36,7 +36,7 @@ from functools import partial
 from itertools import chain
 from pathlib import Path
 from random import choice, randint
-from string import ascii_letters, digits, printable
+from string import ascii_letters, digits, printable, punctuation, whitespace
 from alexlib.constants import ISTYPE_EXTS
 
 from alexlib.files import Directory, File
@@ -46,6 +46,8 @@ LETTERS = list(ascii_letters)
 PRINTABLES = list(printable)
 VOWELS = list("aeiou")
 CONSONANTS = [x for x in LETTERS if x.lower() not in VOWELS]
+WHITESPACE = list(whitespace)
+PUNCTUATION = list(punctuation)
 
 
 def randintstr(min_int: int = 0, max_int: int = 10) -> str:
@@ -53,34 +55,43 @@ def randintstr(min_int: int = 0, max_int: int = 10) -> str:
     return str(randint(min_int, max_int))
 
 
+def randrange(min_int: int = 1, max_int: int = 20) -> int:
+    """returns a range spanning min_int to max_int"""
+    return range(randint(min_int, max_int))
+
+
 randdigit = partial(choice, DIGITS)
 randvowel = partial(choice, VOWELS)
 randprint = partial(choice, PRINTABLES)
 randlet = partial(choice, LETTERS)
 randfileext = partial(choice, ISTYPE_EXTS)
+randpunct = partial(choice, PUNCTUATION)
+randwhitespace = partial(choice, WHITESPACE)
 
 
 def infgen(
-    int_: bool = False,
-    intstr_: bool = False,
-    let_: bool = False,
+    digit: bool = False,
+    vowel: bool = False,
+    letter: bool = False,
+    intstr: bool = False,
     printable_: bool = False,
+    punct: bool = False,
 ) -> int | str:
     """generates an infinite stream of random integers or letters"""
-    if not (int_ or intstr_ or let_ or printable_):
-        raise ValueError("need choice")
-    funcs = []
-    if int_:
-        funcs.append(randint)
-    if intstr_:
-        funcs.append(randintstr)
-    if let_:
-        funcs.append(randlet)
-    if printable_:
-        funcs.append(randprint)
-    n = len(funcs)
-    if n == 0:
-        raise ValueError("need a func")
+    funcs = [
+        x["func"]
+        for x in [
+            {"bool": digit, "func": randdigit},
+            {"bool": vowel, "func": randvowel},
+            {"bool": letter, "func": randlet},
+            {"bool": intstr, "func": randintstr},
+            {"bool": printable_, "func": randprint},
+            {"bool": punct, "func": randpunct},
+        ]
+        if x["bool"]
+    ]
+    if (n := len(funcs)) == 0:
+        raise ValueError("need choice(s)")
     if n == 1:
         func = funcs[0]
         while True:
