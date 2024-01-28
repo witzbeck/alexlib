@@ -1,5 +1,5 @@
 """symbolic_deductive_engine.py"""
-from alexlib.ml.response import (
+from alexlib.ml.llm_response import (
     Response,
     symbolic_deductive_engine_path,
 )

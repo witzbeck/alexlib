@@ -57,3 +57,5 @@ def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None
 if __name__ == "__main__":
     module_ = Directory.from_path(Path(__file__).parent)
     testcase_files = get_existing_test_cases(module_, allchildren=True)
+    for testcase_file in testcase_files:
+        print(testcase_file)

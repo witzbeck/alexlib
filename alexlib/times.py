@@ -23,8 +23,7 @@ applications requiring custom date-time manipulations beyond the capabilities of
 datetime module.
 """
 from dataclasses import dataclass, field
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import cached_property, partial
 from logging import info
 from math import floor
@@ -35,8 +34,7 @@ from collections.abc import Callable
 
 from decorator import decorator
 from pandas import Timestamp
-from pandas.tseries.holiday import Holiday
-from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.holiday import Holiday, USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Float
 from sqlalchemy.orm import declarative_base

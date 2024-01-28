@@ -7,6 +7,8 @@ from pathlib import Path
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
+from alexlib.ml.llm_response import LargeLanguageModelResponse
+
 
 @dataclass
 class RecipeBase:
@@ -72,7 +74,26 @@ class Ingredient(RecipeBase):
 
 
 @dataclass
-class Recipe(RecipeBase):
+class RecipeResponse(RecipeBase, LargeLanguageModelResponse):
+    """A recipe response is a text file with a title and a body of text."""
+
+    name: str = field()
+    ingredients: dict[str:str] = field()
+    equipment: list[str:str] = field()
+    steps: list[str] = field()
+    total_time: int | None = field(default=None)
+    prep_time: int | None = field(default=None)
+    cook_time: int | None = field(default=None)
+    servings: int | None = field(default=None)
+    calories: int | None = field(default=None)
+
+    def process_content(self) -> None:
+        """Process the content of a response."""
+        pass
+
+
+@dataclass
+class Recipe(RecipeResponse):
     """A recipe"""
 
     equipment: list[Ingredient] = field(default_factory=list)
