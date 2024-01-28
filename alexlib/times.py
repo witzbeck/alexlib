@@ -288,6 +288,26 @@ class Timer:
         return self.hard_last_record - self.start
 
     @property
+    def soft_elapsed_from_start(self) -> float:
+        """Get the elapsed time."""
+        return perf_counter() - self.start
+
+    @property
+    def soft_elapsed_from_start_label(self) -> TimerLabel:
+        """Get the elapsed time representation."""
+        return TimerLabel(self.soft_elapsed_from_start)
+
+    @property
+    def soft_elapsed_from_last(self) -> float:
+        """Get the elapsed time."""
+        return perf_counter() - self.soft_last_record
+
+    @property
+    def soft_elapsed_from_last_label(self) -> TimerLabel:
+        """Get the elapsed time representation."""
+        return TimerLabel(self.soft_elapsed_from_last)
+
+    @property
     def elapsed_from_start_label(self) -> TimerLabel:
         """Get the elapsed time representation."""
         return TimerLabel(self.elapsed_from_start)
@@ -302,6 +322,30 @@ class Timer:
     def elapsed_from_last_label(self) -> TimerLabel:
         """Get the elapsed time representation."""
         return TimerLabel(self.elapsed_from_last)
+
+    def log_from_start(
+        self,
+        msg: str = "",
+        soft: bool = False,
+    ) -> None:
+        """Log the elapsed time from start."""
+        if soft:
+            label = self.soft_elapsed_from_start_label
+        else:
+            label = self.elapsed_from_start_label
+        print(f"{msg} took {label}")
+
+    def log_from_last(
+        self,
+        msg: str = "",
+        soft: bool = False,
+    ) -> None:
+        """Log the elapsed time from last."""
+        if soft:
+            label = self.soft_elapsed_from_last_label
+        else:
+            label = self.elapsed_from_last_label
+        print(f"{msg} in {label}")
 
     def __enter__(self) -> "Timer":
         """Start the timer."""

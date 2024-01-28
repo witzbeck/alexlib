@@ -241,23 +241,21 @@ def get_attrs(
         for attr in dir(obj)
         if not callable(getattr(obj, attr))
     }
-    print(attrs)
-    if not include_dunder:
-        attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
     if not include_hidden:
         attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
+    if not include_dunder:
+        attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
     return attrs
 
 
 def show_dict(d: dict, indent: int = 4) -> None:
-    """prints dictionary"""
+    """prints dictionary or list of dictionaries"""
     if isinstance(d, list):
         print("[")
-        for dict_ in d:
-            show_dict(dict_)
+        _ = [print(dict_) for dict_ in d if not isinstance(dict_, dict)]
+        _ = [show_dict(dict_) for dict_ in d if isinstance(dict_, dict)]
         print("]")
     else:
-        d = {k: v for k, v in get_attrs(d).items()}
         print(dumps(d, indent=indent))
 
 

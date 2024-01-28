@@ -19,49 +19,30 @@ class LargeLanguageModelResponse:
     content: str = field(repr=False)
     path: Path = field(default=None, repr=False)
 
-    @classmethod
-    def from_file(cls, file: File) -> "LargeLanguageModelResponse":
-        """Create a response from a file."""
-        return cls(file.text, path=file.path)
+    @abstractmethod
+    def process_content(self) -> None:
+        """Process the content of a response."""
+        pass
 
-    @classmethod
-    def from_path(cls, path: Path) -> "LargeLanguageModelResponse":
-        """Create a response from a path."""
-        if not isinstance(path, Path):
-            path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"{path} does not exist.")
-        return cls(path.read_text(), path=path)
+    @abstractmethod
+    def index_content(self) -> None:
+        """Index the content of a response."""
+        pass
 
     @cached_property
     def lines(self) -> list[str]:
         """Get the lines of a response."""
         return [x.strip() for x in self.content.split("\n") if x]
 
-    @cached_property
-    def line_indexes(self) -> list[int]:
-        """Get the line indexes of a response."""
-        return [self.lines.index(x) for x in self.lines]
-
-    @cached_property
-    def line_index(self) -> dict[str, int]:
+    @property
+    def raw_line_index(self) -> dict[str, int]:
         """Get the line index of a response."""
-        return dict(zip(self.lines, self.line_indexes))
+        return {line: i for i, line in enumerate(self.lines)}
 
-    @cached_property
-    def step_lines(self) -> list[str]:
-        """Get the step lines of a response."""
-        return [x for x in self.lines if x.startswith("-")]
-
-    @cached_property
-    def step_indexes(self) -> list[int]:
-        """Get the step indexes of a response."""
-        return [self.lines.index(x) for x in self.step_lines]
-
-    @abstractmethod
-    def process_content(self) -> None:
-        """Process the content of a response."""
-        pass
+    @property
+    def line_indices(self) -> list[int]:
+        """Get the line indexes of a response."""
+        return list(self.raw_line_index.values())
 
     @staticmethod
     def get_title_from_filename(filename: str) -> str:
@@ -76,7 +57,7 @@ class LargeLanguageModelResponse:
     @staticmethod
     def get_filename_from_title(title: str) -> str:
         """Get the filename of a response from its title."""
-        return title.replace(" ", "_") + ".txt"
+        return f"{title.lower().replace(' ', '_')}.md"
 
     @property
     def title(self) -> str:
@@ -88,60 +69,117 @@ class LargeLanguageModelResponse:
         """Get the title parts of a response."""
         return self.title.split(" ")
 
+    @classmethod
+    def from_file(cls, file: File) -> "LargeLanguageModelResponse":
+        """Create a response from a file."""
+        return cls(file.text, path=file.path)
+
+    @classmethod
+    def from_path(cls, path: Path) -> "LargeLanguageModelResponse":
+        """Create a response from a path."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"{path} does not exist.")
+        return cls(path.read_text(), path=path)
+
 
 @dataclass
 class MarkdownResponse(LargeLanguageModelResponse):
     """A markdown response is a text file with a title and a body of text."""
 
-    @cached_property
-    def headings(self) -> list[str]:
-        """Get the headings of a response."""
-        return [x for x in self.lines if x.startswith("#")]
+    step_indices: list[int] = field(init=False, repr=False)
+    heading_indices: list[int] = field(init=False, repr=False)
+    has_steps: bool = field(init=False, repr=False)
+    has_headings: bool = field(init=False, repr=False)
+    first_content_line_index: int = field(init=False, repr=False)
+    last_content_line_index: int = field(init=False, repr=False)
+    preface: str = field(init=False, repr=False)
+    epilogue: str = field(init=False, repr=False)
+    formatted_heading_index: dict[str:int] = field(init=False, repr=False)
+    formatted_step_index: dict[str:int] = field(init=False, repr=False)
+    heading_step_index_map: dict[str, int] = field(init=False, repr=False)
+
+    @staticmethod
+    def rm_markdown_chars(text: str) -> str:
+        """Remove markdown characters from a string."""
+        return text.replace("*", "").replace("#", "").replace("-", "").strip()
 
     @property
-    def has_headings(self) -> bool:
-        """Check if a response has headings."""
-        return bool(self.headings)
+    def step_line_index(self) -> dict[str:int]:
+        """Get the step line index of a response."""
+        return {
+            k: v
+            for k, v in self.raw_line_index.items()
+            if k[0].isnumeric() or k[0] in "-*"
+        }
 
     @property
-    def first_content_line(self) -> int:
-        """Get the first content line of a response."""
-        return min(self.step_indexes, self.heading_indexes)
+    def heading_line_index(self) -> dict[str:int]:
+        """Get the heading line index of a response."""
+        return {k: v for k, v in self.raw_line_index.items() if k.startswith("#")}
 
     @property
-    def last_content_line(self) -> int:
-        """Get the last content line of a response."""
-        return max(self.step_indexes, self.heading_indexes)
+    def numbered_heading_index(self) -> dict[str:int]:
+        """Get the numbered heading index of a response."""
+        return {
+            k: v
+            for k, v in self.heading_line_index.items()
+            if max(y.isnumeric() for y in k)
+        }
 
-    @property
-    def preface(self) -> str:
-        """Get the preface of a response."""
-        return "\n".join(self.lines[: self.first_content_line])
+    def index_content(self) -> None:
+        """index the content of a response."""
+        self.step_indices = list(self.step_line_index.values())
+        self.heading_indices = list(self.heading_line_index.values())
+        self.has_steps = bool(self.step_indices)
+        self.has_headings = bool(self.heading_indices)
+        content_indices = self.step_indices + self.heading_indices
+        self.first_content_line_index = min(content_indices)
+        self.last_content_line_index = max(content_indices)
 
-    @property
-    def epilogue(self) -> str:
-        """Get the epilogue of a response."""
-        return "\n".join(self.lines[self.last_content_line + 1 :])
+    def process_content(self) -> None:
+        """Process the content of a response."""
+        if self.first_content_line_index:
+            self.preface = "\n".join(self.lines[: self.first_content_line_index])
+        if self.last_content_line_index:
+            self.epilogue = "\n".join(self.lines[self.last_content_line_index + 1 :])
+        self.formatted_heading_index = {
+            self.rm_markdown_chars(k): v for k, v in self.heading_line_index.items()
+        }
+        self.formatted_step_index = {
+            self.rm_markdown_chars(k): v for k, v in self.step_line_index.items()
+        }
+        self.heading_step_index_map = {
+            heading: [
+                step for step, k in self.formatted_step_index.items() if i < k < j
+            ]
+            for i, j, heading in zip(
+                self.heading_indices,
+                self.heading_indices[1:] + [self.last_content_line_index],
+                self.formatted_heading_index.keys(),
+            )
+        }
+        self.heading_step_index_map = {
+            k: v for k, v in self.heading_step_index_map.items() if v
+        }
+
+    def __post_init__(self) -> None:
+        """Post init."""
+        self.index_content()
+        self.process_content()
 
     @property
     def content_lines(self) -> list[str]:
         """Get the content lines of a response."""
-        return self.lines[self.first_content_line : self.last_content_line + 1]
-
-    @cached_property
-    def heading_indexes(self) -> list[int]:
-        """Get the heading indexes of a response."""
-        return [self.lines.index(x) for x in self.headings]
+        return self.lines[
+            self.first_content_line_index : self.last_content_line_index + 1
+        ]
 
     @property
     def has_numbered_headings(self) -> bool:
         """Check if a response has numbered headings."""
-        return bool(self.numbered_headings)
-
-    @cached_property
-    def heading_index(self) -> dict[str, int]:
-        """Get the heading index of a response."""
-        return dict(zip(self.headings, self.heading_indexes))
+        return bool(self.numbered_heading_index)
 
     @property
     def title_prefix(self) -> str:
@@ -162,32 +200,6 @@ class MarkdownResponse(LargeLanguageModelResponse):
     def text_suffix(self) -> str:
         """Get the text suffix of a response."""
         return self.lines[-1]
-
-    @property
-    def heading_step_index_map(self) -> dict[str, int]:
-        """Get the heading step index map of a response."""
-        heading_stagger = self.heading_indexes[1:] + [self.line_indexes[-1]]
-        return {
-            i: [k for k in self.step_indexes if i < k < j]
-            for i, j in zip(self.heading_indexes, heading_stagger)
-        }
-
-    @property
-    def heading_step_map(self) -> dict[str, list[str]]:
-        """Get the heading step map of a response."""
-        return {
-            self.lines[i]: [self.lines[k] for k in v]
-            for i, v in self.heading_step_index_map.items()
-        }
-
-    @property
-    def numbered_headings(self) -> list[str]:
-        """Get the numbered headings of a response."""
-        return [x.strip("*") for x in self.lines if max(y.isnumeric() for y in x)]
-
-    def process_content(self) -> None:
-        """Process the content of a response."""
-        pass
 
 
 @dataclass
@@ -218,7 +230,7 @@ class TestCase:
 
 
 @dataclass
-class TestCasesResponse(LargeLanguageModelResponse):
+class TestCasesResponse(MarkdownResponse):
     """A test cases response is a text file with a title and a body of text."""
 
     def process_content(self) -> None:

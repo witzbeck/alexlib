@@ -1,8 +1,10 @@
 from pathlib import Path
 
-from alexlib.core import flatten_dict
 from alexlib.files import Directory, File
 from alexlib.ml.llm_response import MarkdownResponse
+from alexlib.times import Timer
+
+MODULE_DIR = Directory.from_path(Path(__file__).parent)
 
 
 def get_single_file_test_cases(py_file: File) -> str:
@@ -34,9 +36,7 @@ def get_python_files(directory: Directory, allchildren: bool = False) -> list[Fi
     ]
 
 
-def get_existing_test_cases(
-    directory: Directory, allchildren: bool = False
-) -> list[File]:
+def get_test_case_files(directory: Directory, allchildren: bool = False) -> list[File]:
     """Get the test cases for all python files in a directory."""
     filelist = directory.allchildfiles if allchildren else directory.filelist
     return [file for file in filelist if "_test_cases" in file.name]
@@ -46,7 +46,7 @@ def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None
     """Loops through all python and test_cases files in a directory
     - allows for efficient utilization of an LLM for test case generation."""
     py_files = get_python_files(directory, allchildren=allchildren)
-    md_files = get_existing_test_cases(directory, allchildren=allchildren)
+    md_files = get_test_case_files(directory, allchildren=allchildren)
     for md_file in md_files:
         if md_file.nlines <= 10:
             print(f"{md_file} has too few lines. Deleting.\n")
@@ -56,12 +56,23 @@ def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None
         _ = get_single_file_test_cases(py_file)
 
 
+def get_responses_from_files(files: list[File]) -> list[MarkdownResponse]:
+    """Get the test case responses for markdown files in a directory."""
+    return [MarkdownResponse.from_file(file) for file in files]
+
+
 if __name__ == "__main__":
-    module_ = Directory.from_path(Path(__file__).parent)
-    testcase_files = get_existing_test_cases(module_, allchildren=True)
-    testcases_responses = [MarkdownResponse.from_file(file) for file in testcase_files]
-    testcase_map = {
-        file.path.stem: resp.heading_step_map
-        for file, resp in zip(testcase_files, testcases_responses)
-    }
-    print(flatten_dict(testcase_map))
+    t = Timer()
+    testcase_files = get_test_case_files(MODULE_DIR, allchildren=True)
+    testcases_responses = get_responses_from_files(testcase_files)
+    ncases_total, nsteps_total = 0, 0
+    for file, resp in zip(testcase_files, testcases_responses):
+        ncases = len(resp.heading_step_index_map)
+        nsteps = len(resp.step_indices)
+        ncases_total += ncases
+        nsteps_total += nsteps
+        print(file, f"has {ncases} cases and {nsteps} steps.")
+    print("\nNumber of files:", len(testcase_files))
+    print("Total number of cases:", ncases_total)
+    print("Total number of steps:", nsteps_total)
+    t.log_from_start()
