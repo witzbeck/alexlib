@@ -21,9 +21,9 @@ from functools import partial, wraps
 from itertools import chain
 from pathlib import Path
 from re import sub
-from subprocess import PIPE, Popen
 from pandas import DataFrame
 from sqlalchemy import TextClause, text
+from alexlib.core import to_clipboard
 from alexlib.db.objects import Name
 
 from alexlib.constants import COL_SUBS, SQL_INFOSCHEMA_COL
@@ -100,27 +100,7 @@ class SQL(str):
         - adds query to clipboard if toclip is True
         """
         if self.toclip:
-            self.to_clipboard(str(self))
-
-    @staticmethod
-    def to_clipboard(txt: str) -> bool:
-        """Copies text to the clipboard. Returns True if successful, False otherwise."""
-        command = "/usr/bin/pbcopy"
-
-        # Check if the command exists on the system
-        if not Path(command).exists():
-            print(f"Command {command} not found")
-            return False
-
-        try:
-            with Popen([command], stdin=PIPE, shell=False) as p:
-                p.stdin.write(txt.encode("utf-8"))  # Specify encoding if necessary
-                p.stdin.close()
-                retcode = p.wait()
-            return retcode == 0
-        except OSError as e:
-            print(f"Error during execution: {e}")
-            return False
+            to_clipboard(str(self))
 
     @staticmethod
     def mk_default_filename(

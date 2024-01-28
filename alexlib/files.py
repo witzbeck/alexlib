@@ -37,7 +37,7 @@ from pandas import DataFrame
 from sqlalchemy import Engine
 
 from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
-from alexlib.core import chkenv, sha256sum
+from alexlib.core import chkenv, sha256sum, to_clipboard
 from alexlib.iters import link
 
 
@@ -489,6 +489,10 @@ class File(SystemObject):
             return self.path.read_text()
         except UnicodeDecodeError:
             return self.path.read_text(encoding="utf8")
+
+    def text_to_clipboard(self) -> None:
+        """copies file text to clipboard"""
+        return to_clipboard(self.text)
 
     @property
     def lines(self) -> list[str]:

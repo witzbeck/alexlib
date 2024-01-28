@@ -24,7 +24,6 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps
 from json import JSONDecodeError
-from json import load
 from json import loads
 from logging import debug
 from os import getenv
@@ -32,7 +31,7 @@ from pathlib import Path
 from socket import AF_INET
 from socket import SOCK_STREAM
 from socket import socket
-from subprocess import check_output
+from subprocess import PIPE, Popen, check_output
 from typing import Any
 from typing import Hashable
 
@@ -213,11 +212,21 @@ def concat_lists(lists: list[list[Any]]) -> list[Any]:
 
 def read_json(path: Path) -> dict[Hashable:Any]:
     """reads json file"""
-    try:
-        ret = load(path.open())
-    except JSONDecodeError:
-        ret = loads(path.open().read())
-    return ret
+    return loads(path.read_text())
+
+
+def get_attrs(
+    obj: object,
+    include_hidden: bool = False,
+    include_dunder: bool = False,
+) -> dict[str:Any]:
+    """returns all attributes of object"""
+    attrs = vars(obj)
+    if not include_dunder:
+        attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
+    if not include_hidden:
+        attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
+    return attrs
 
 
 def show_dict(d: dict, indent: int = 4) -> None:
@@ -228,8 +237,35 @@ def show_dict(d: dict, indent: int = 4) -> None:
             show_dict(dict_)
         print("]")
     else:
-        d = {k: v for k, v in d.items() if not str(k).startswith("_")}
+        d = {k: v for k, v in get_attrs(d)}
         print(dumps(d, indent=indent))
+
+
+def to_clipboard(text: str) -> bool:
+    """Copies text to the clipboard. Returns True if successful, False otherwise."""
+    command = "/usr/bin/pbcopy"
+    # Check if the command exists on the system
+    if not Path(command).exists():
+        print(f"Command {command} not found")
+        return False
+    try:
+        with Popen([command], stdin=PIPE, shell=False) as p:
+            p.stdin.write(text.encode("utf-8"))  # Specify encoding if necessary
+            p.stdin.close()
+            retcode = p.wait()
+        return retcode == 0
+    except OSError as e:
+        print(f"Error during execution: {e}")
+        return False
+
+
+def copy_file_to_clipboard(path: Path) -> bool:
+    """Copies file to the clipboard. Returns True if successful, False otherwise."""
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} not found")
+    if not path.is_file():
+        raise ValueError(f"{path} is not a file")
+    return to_clipboard(path.read_text())
 
 
 def get_objects_by_attr(
@@ -247,7 +283,7 @@ class Object:
     @property
     def reg_attrs(self) -> dict[str:Any]:
         """returns all attributes except hidden ones"""
-        return {k: v for k, v in self.__dict__.items() if k[0] != "_"}
+        return {k: v for k, v in get_attrs(self)}
 
     @property
     def reg_attrs_keys(self) -> list[str]:
