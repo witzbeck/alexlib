@@ -18,36 +18,47 @@ matplotlib = "*"
 cryptography = "*"
 scipy = "*"
 scikit-learn = "*"
-pre-commit = "^3.6.0"
-pytest = "^7.4.4"
 reportlab = "^4.0.9"
 pillow = "^10.2.0"
-pylint = "^3.0.3"
 openai = "^1.8.0"
 pyarrow = "^15.0.0"
 
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.group.test.dependencies]
 pytest = "*"
-coverage = "*"
-ipykernel = "*"
-notebook = "*"
-pytest-cov = "^4.1.0"
+pytest-cov = "*"
+pytest-mock = "*"
+pytest-xdist = "*"
 
 [tool.sqlfluff.core]
+verbose = 2
 dialect = "postgres"
-
-[tool.sqlfluff.rules]
-indent_unit = "space"
+sql_file_exts = ".sql"
 max_line_length = 120
-comma_style = "leading"
+processes = 0
+rules = "core"
+
+[tool.sqlfluff.layout.type.comma]
+line_position = "leading"
+spacing_before = "touch"
 
 [tool.sqlfluff.indentation]
-use_vertical_hanging_indent = true
+indent_unit = "space"
+indented_then = false
+indented_joins = true
+trailing_comments = "after"
 
-[tool.sqlfluff.layout]
-align_comments = true
-align_aliases = true
-align_joins = true
+[tool.sqlfluff.layout.type.alias_expression]
+spacing_before = "align"
+align_scope = "file"
+
+[tool.sqlfluff.capitalisation]
+capitalisation_policy = "lower"
+
+[tool.sqlfluff.rules.aliasing.table]
+aliasing = "implicit"
+
+[tool.sqlfluff.rules.aliasing.column]
+aliasing = "implicit"
 
 [build-system]
 requires = ["poetry-core"]
