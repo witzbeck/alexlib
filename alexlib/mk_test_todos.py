@@ -95,25 +95,26 @@ def mk_llm_test_request(
         if pytest_filepath.exists():
             if len(pytest_filepath.read_text().split("\n")) < 10:
                 pytest_filepath.unlink()
-        pytest_filepath.touch(exist_ok=True)
-        tocopy = "\n".join(
-            [
-                f"""Write the unit tests for the following cases using the unittest framework.
-                Please use explicit imports.
-                Import the unittest components like this: from unittest import TestCase, main.
-                Make sure to import the module you're testing.
-                Make sure to import the function you're testing.
-                Please include a docstring for each test case, function, class, and the module.
-                The module name is 'alexlib.{module_name}'.\n""",
-                f"Test cases for {heading}:\n",
-                steps,
-                f"Here's the module text:\n\n{pyfile.text}\n",
-            ]
-        )
-        to_clipboard(tocopy)
-        input(
-            f"\nPaste the returned tests into {pytest_filepath.name}, then press enter.\n"
-        )
+        if not pytest_filepath.exists():
+            pytest_filepath.touch(exist_ok=True)
+            tocopy = "\n".join(
+                [
+                    f"""Write the unit tests for the following cases using the unittest framework.
+                    Please use explicit imports.
+                    Import the unittest components like this: from unittest import TestCase, main.
+                    Make sure to import the module you're testing.
+                    Make sure to import the function you're testing.
+                    Please include a docstring for each test case, function, class, and the module.
+                    The module name is 'alexlib.{module_name}'.\n""",
+                    f"Test cases for {heading}:\n",
+                    steps,
+                    f"Here's the module text:\n\n{pyfile.text}\n",
+                ]
+            )
+            to_clipboard(tocopy)
+            input(
+                f"\nPaste the returned tests into {pytest_filepath.name}, then press enter.\n"
+            )
 
 
 if __name__ == "__main__":
