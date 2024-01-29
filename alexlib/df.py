@@ -46,6 +46,8 @@ from alexlib.iters import rm_pattern
 
 def add_col(df: DataFrame, col: str, val: Any) -> DataFrame:
     """adds a column to a dataframe"""
+    if not isinstance(df, DataFrame):
+        raise TypeError(f"{df} not {DataFrame}")
     df.loc[:, col] = val
     return df
 

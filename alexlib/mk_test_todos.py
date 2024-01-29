@@ -1,10 +1,15 @@
 from pathlib import Path
+from alexlib.core import to_clipboard
 
 from alexlib.files import Directory, File
-from alexlib.ml.llm_response import MarkdownResponse
+from alexlib.ml.llm_response import MarkdownResponse, TestCaseResponse
 from alexlib.times import Timer
 
-MODULE_DIR = Directory.from_path(Path(__file__).parent)
+MODULE_PATH = Path(__file__).parent
+TESTS_PATH = MODULE_PATH.parent / "tests"
+
+MODULE_DIR = Directory.from_path(MODULE_PATH)
+TESTS_DIR = Directory.from_path(TESTS_PATH)
 
 
 def get_single_file_test_cases(py_file: File) -> str:
@@ -42,6 +47,14 @@ def get_test_case_files(directory: Directory, allchildren: bool = False) -> list
     return [file for file in filelist if "_test_cases" in file.name]
 
 
+def get_test_case_files_from_py_files(py_files: list[File]) -> list[File]:
+    """Get the test cases for all python files in a directory."""
+    return [
+        File.from_path(file.path.parent / f"{file.path.stem}_test_cases.md")
+        for file in py_files
+    ]
+
+
 def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None:
     """Loops through all python and test_cases files in a directory
     - allows for efficient utilization of an LLM for test case generation."""
@@ -56,22 +69,65 @@ def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None
         _ = get_single_file_test_cases(py_file)
 
 
-def get_responses_from_files(files: list[File]) -> list[MarkdownResponse]:
+def get_responses_from_files(
+    files: list[File],
+) -> list[MarkdownResponse]:
     """Get the test case responses for markdown files in a directory."""
     return [MarkdownResponse.from_file(file) for file in files]
 
 
+def mk_llm_test_request(
+    pyfile: File,
+    testcase_response: TestCaseResponse,
+) -> str:
+    for heading, cases in testcase_response.heading_step_map.items():
+        heading = (
+            "".join([x for x in heading if x.isalpha() or x in " _"])
+            .replace(" ", "_")
+            .strip("_")
+            .lower()
+        )
+        steps = "\n".join(cases)
+        pytest_filename = f"test_{pyfile.path.stem}_{heading}.py"
+        pytest_filepath = TESTS_PATH / pytest_filename
+        if pytest_filepath.exists():
+            if len(pytest_filepath.read_text().split("\n")) < 10:
+                pytest_filepath.unlink()
+            else:
+                print(f"{pytest_filepath} already exists. Skipping.\n")
+                continue
+
+        pytest_filepath.touch(exist_ok=True)
+        tocopy = "\n".join(
+            [
+                """Write the python unit tests for the following cases using the pytest framework.
+            Please use explicit imports. The package name is 'alexlib'.\n""",
+                steps,
+                f"Here's the module text:\n\n{pyfile.text}\n",
+            ]
+        )
+        to_clipboard(tocopy)
+        input(f"\nPaste the returned tests into {pytest_filepath}, then press enter.\n")
+
+
 if __name__ == "__main__":
     t = Timer()
-    testcase_files = get_test_case_files(MODULE_DIR, allchildren=True)
+    py_files = get_python_files(MODULE_DIR, allchildren=True)
+    testcase_files = get_test_case_files_from_py_files(py_files)
     testcases_responses = get_responses_from_files(testcase_files)
     ncases_total, nsteps_total = 0, 0
-    for file, resp in zip(testcase_files, testcases_responses):
-        ncases = len(resp.heading_step_index_map)
+    for pyfile, tcfile, resp in zip(
+        py_files,
+        testcase_files,
+        testcases_responses,
+    ):
+        mk_llm_test_request(pyfile, resp)
+        ncases = len(resp.heading_step_map)
         nsteps = len(resp.step_indices)
         ncases_total += ncases
         nsteps_total += nsteps
-        print(file, f"has {ncases} cases and {nsteps} steps.")
+        print(tcfile, f"has {ncases} cases and {nsteps} steps.")
+        break
     print("\nNumber of files:", len(testcase_files))
     print("Total number of cases:", ncases_total)
     print("Total number of steps:", nsteps_total)

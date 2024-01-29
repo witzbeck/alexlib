@@ -1,5 +1,6 @@
 """A response is a text file with a title and a body of text."""
 from abc import abstractmethod
+from itertools import chain
 from json import dumps
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -98,7 +99,26 @@ class MarkdownResponse(LargeLanguageModelResponse):
     epilogue: str = field(init=False, repr=False)
     formatted_heading_index: dict[str:int] = field(init=False, repr=False)
     formatted_step_index: dict[str:int] = field(init=False, repr=False)
-    heading_step_index_map: dict[str, int] = field(init=False, repr=False)
+    heading_step_map: dict[str, int] = field(init=False, repr=False)
+
+    @cached_property
+    def all_formatted_steps(self) -> list[str]:
+        """Get all formatted steps of a response."""
+        return list(self.formatted_step_index.keys())
+
+    @cached_property
+    def all_formatted_map_steps(self) -> list[str]:
+        """Get all formatted steps of a response."""
+        return list(chain.from_iterable(self.heading_step_map.values()))
+
+    @property
+    def headingless_steps(self) -> list[str]:
+        """Get the headingless steps of a response."""
+        return [
+            step
+            for step in self.all_formatted_steps
+            if step not in self.all_formatted_map_steps
+        ]
 
     @staticmethod
     def rm_markdown_chars(text: str) -> str:
@@ -150,7 +170,7 @@ class MarkdownResponse(LargeLanguageModelResponse):
         self.formatted_step_index = {
             self.rm_markdown_chars(k): v for k, v in self.step_line_index.items()
         }
-        self.heading_step_index_map = {
+        self.heading_step_map = {
             heading: [
                 step for step, k in self.formatted_step_index.items() if i < k < j
             ]
@@ -160,9 +180,8 @@ class MarkdownResponse(LargeLanguageModelResponse):
                 self.formatted_heading_index.keys(),
             )
         }
-        self.heading_step_index_map = {
-            k: v for k, v in self.heading_step_index_map.items() if v
-        }
+        self.heading_step_map = {k: v for k, v in self.heading_step_map.items() if v}
+        self.heading_step_map.update({"Miscellaneous": self.headingless_steps})
 
     def __post_init__(self) -> None:
         """Post init."""
@@ -230,12 +249,8 @@ class TestCase:
 
 
 @dataclass
-class TestCasesResponse(MarkdownResponse):
+class TestCaseResponse(MarkdownResponse):
     """A test cases response is a text file with a title and a body of text."""
-
-    def process_content(self) -> None:
-        """Process the content of a response."""
-        pass
 
 
 @dataclass
