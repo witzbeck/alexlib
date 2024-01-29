@@ -35,7 +35,7 @@ from datetime import datetime, timedelta
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from random import choice, randint
+from random import choice, choices, randint
 from string import ascii_letters, digits, printable, punctuation, whitespace
 from alexlib.constants import ISTYPE_EXTS
 
@@ -67,6 +67,20 @@ randlet = partial(choice, LETTERS)
 randfileext = partial(choice, ISTYPE_EXTS)
 randpunct = partial(choice, PUNCTUATION)
 randwhitespace = partial(choice, WHITESPACE)
+
+
+def join_choices(population: list[str], n: int = 1) -> str:
+    """joins n random choices from population"""
+    return "".join(choices(population, k=n))
+
+
+randdigits = partial(join_choices, DIGITS)
+randvowels = partial(join_choices, VOWELS)
+randprints = partial(join_choices, PRINTABLES)
+randlets = partial(join_choices, LETTERS)
+randfileexts = partial(choices, ISTYPE_EXTS)
+randpuncts = partial(join_choices, PUNCTUATION)
+randwhitespaces = partial(join_choices, WHITESPACE)
 
 
 def infgen(

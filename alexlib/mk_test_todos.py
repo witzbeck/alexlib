@@ -49,10 +49,11 @@ def get_test_case_files(directory: Directory, allchildren: bool = False) -> list
 
 def get_test_case_files_from_py_files(py_files: list[File]) -> list[File]:
     """Get the test cases for all python files in a directory."""
-    return [
+    ret = [
         File.from_path(file.path.parent / f"{file.path.stem}_test_cases.md")
         for file in py_files
     ]
+    return [file for file in ret if file.path.exists()]
 
 
 def get_test_cases_loop(directory: Directory, allchildren: bool = False) -> None:
@@ -120,22 +121,20 @@ def mk_llm_test_request(
 if __name__ == "__main__":
     t = Timer()
     py_files = get_python_files(MODULE_DIR, allchildren=True)
-    testcase_files = get_test_case_files_from_py_files(py_files)
-    testcases_responses = get_responses_from_files(testcase_files)
     ncases_total, nsteps_total = 0, 0
-    for pyfile, tcfile, resp in zip(
-        py_files,
-        testcase_files,
-        testcases_responses,
-    ):
+    for pyfile in py_files:
+        tcfile = File.from_path(
+            pyfile.path.parent / f"{pyfile.path.stem}_test_cases.md"
+        )
+        if not tcfile.path.exists():
+            continue
+        resp = TestCaseResponse.from_file(tcfile)
         mk_llm_test_request(pyfile, resp)
         ncases = len(resp.heading_step_map)
         nsteps = len(resp.step_indices)
         ncases_total += ncases
         nsteps_total += nsteps
         print(tcfile, f"has {ncases} cases and {nsteps} steps.")
-        break
-    print("\nNumber of files:", len(testcase_files))
     print("Total number of cases:", ncases_total)
     print("Total number of steps:", nsteps_total)
     t.log_from_start()

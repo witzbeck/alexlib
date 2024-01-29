@@ -29,7 +29,7 @@ from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from alexlib.constants import CREDS
 from alexlib.core import chkenv, read_json
 from alexlib.crypto import Cryptographer, SecretValue
-from alexlib.fake import randlet, randprint, randdigit
+from alexlib.fake import limgen, randlets, randdigit, randdigits
 from alexlib.files import File
 
 
@@ -38,13 +38,37 @@ class AuthPart:
     """constructs authentication parts"""
 
     name: str
-    length: int = field(default=10)
-    randsrc: Callable = field(default=randlet)
+
+    @property
+    def length(self) -> int:
+        """returns the length of the AuthPart object"""
+        return len(self.name)
 
     @classmethod
-    def rand(cls) -> "AuthPart":
+    def rand(
+        cls,
+        minlen: int = 6,
+        maxlen: int = 12,
+        digit: bool = False,
+        vowel: bool = False,
+        letter: bool = False,
+        intstr: bool = False,
+        printable_: bool = False,
+        punct: bool = False,
+    ) -> "AuthPart":
         """returns a random AuthPart object"""
-        return cls(cls.randsrc(n=cls.length))
+        len_ = randint(minlen, maxlen)
+        return cls(
+            limgen(
+                len_,
+                digit=digit,
+                vowel=vowel,
+                letter=letter,
+                intstr=intstr,
+                printable_=printable_,
+                punct=punct,
+            )
+        )
 
     def __repr__(self) -> str:
         """returns the repr of the AuthPart object"""
@@ -57,13 +81,22 @@ class Username(AuthPart):
 
     length: int = field(default=6)
 
+    @classmethod
+    def rand(cls, minlen: int = 6, maxlen: int = 12) -> "Username":
+        """returns a random Username object"""
+        return super().rand(minlen=minlen, maxlen=maxlen, letter=True)
+
 
 @dataclass
 class Password(AuthPart):
     """constructs password objects"""
 
     length: int = field(default=12)
-    randsrc: Callable = field(default=randprint)
+
+    @classmethod
+    def rand(cls, minlen: int = 12, maxlen: int = 24) -> "Password":
+        """returns a random Password object"""
+        return super().rand(minlen=minlen, maxlen=maxlen, printable_=True)
 
 
 @dataclass
@@ -98,8 +131,8 @@ class Server:
             [
                 str(randint(180, 199)),
                 str(randint(160, 179)),
-                randdigit(n=1),
-                randdigit(n=3),
+                randdigit(),
+                randdigits(3),
             ]
         )
 
@@ -110,7 +143,7 @@ class Server:
             [
                 "postgres",
                 choice(["dev", "test", "prod"]),
-                randlet(n=6),
+                randlets(6),
                 choice(["local", "remote"]),
             ]
         )
