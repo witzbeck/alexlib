@@ -81,6 +81,8 @@ def mk_llm_test_request(
     testcase_response: TestCaseResponse,
 ) -> str:
     for heading, cases in testcase_response.heading_step_map.items():
+        parent_name, stem = pyfile.path.parent.name, pyfile.path.stem
+        module_name = stem if parent_name == "alexlib" else f"{parent_name}.{stem}"
         heading = (
             "".join([x for x in heading if x.isalpha() or x in " _"])
             .replace(" ", "_")
@@ -100,8 +102,14 @@ def mk_llm_test_request(
         pytest_filepath.touch(exist_ok=True)
         tocopy = "\n".join(
             [
-                """Write the python unit tests for the following cases using the pytest framework.
-            Please use explicit imports. The package name is 'alexlib'.\n""",
+                f"""Write the unit tests for the following cases using the unittest framework.
+                Please use explicit imports.
+                Import the unittest components like this: from unittest import TestCase, main.
+                Make sure to import the module you're testing.
+                Make sure to import the function you're testing.
+                Please include a docstring for each test case, function, class, and the module.
+                The module name is 'alexlib.{module_name}'.\n""",
+                f"Test cases for {heading}:\n",
                 steps,
                 f"Here's the module text:\n\n{pyfile.text}\n",
             ]

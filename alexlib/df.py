@@ -149,9 +149,21 @@ def ts_col_to_dt(
 
 
 def set_type_list(df: DataFrame, type_: Any, cols: list[str]) -> DataFrame:
-    """sets the type of columns in df to type"""
-    for col in cols:
-        df.loc[:, col] = df.loc[:, col].astype(type_)
+    """
+    Efficiently sets the type of specified columns in a DataFrame.
+
+    Args:
+    df (DataFrame): The DataFrame to modify.
+    type_ (Any): The new data type to be applied.
+    cols (list[str]): A list of column names to change the type.
+
+    Returns:
+    DataFrame: The modified DataFrame with updated column types.
+    """
+
+    # Using .astype() with a dictionary allows conversion of multiple columns in a single call
+    df = df.astype({col: type_ for col in cols if col in df.columns})
+
     return df
 
 
@@ -162,6 +174,12 @@ def drop_invariate_cols(df: DataFrame) -> DataFrame:
 
 def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
     """splits a dataframe into a head or tail slice"""
+    if not 0 < ratio < 1:
+        raise ValueError(f"{ratio} not between 0 and 1")
+    if not isinstance(df, DataFrame):
+        raise TypeError(f"{df} not {DataFrame}")
+    if not isinstance(ratio, float):
+        raise TypeError(f"{ratio} not {float}")
     to = int(len(df) * ratio)
     return df.head(to) if head else df.tail(to)
 
