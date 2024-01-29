@@ -95,10 +95,6 @@ def mk_llm_test_request(
         if pytest_filepath.exists():
             if len(pytest_filepath.read_text().split("\n")) < 10:
                 pytest_filepath.unlink()
-            else:
-                print(f"{pytest_filepath} already exists. Skipping.\n")
-                continue
-
         pytest_filepath.touch(exist_ok=True)
         tocopy = "\n".join(
             [
@@ -115,7 +111,9 @@ def mk_llm_test_request(
             ]
         )
         to_clipboard(tocopy)
-        input(f"\nPaste the returned tests into {pytest_filepath}, then press enter.\n")
+        input(
+            f"\nPaste the returned tests into {pytest_filepath.name}, then press enter.\n"
+        )
 
 
 if __name__ == "__main__":
