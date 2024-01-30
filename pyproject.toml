@@ -30,6 +30,16 @@ pytest-cov = "*"
 pytest-mock = "*"
 pytest-xdist = "*"
 
+[tool.pytest]
+addopts = [
+    "--cov=alexlib", 
+    "--cov-report=term-missing", 
+    "--cov-report=md",
+    "--cov-report=html", 
+    "--cov-fail-under=80", 
+    "--cov-branch"
+]
+
 [tool.sqlfluff.core]
 verbose = 2
 dialect = "postgres"
