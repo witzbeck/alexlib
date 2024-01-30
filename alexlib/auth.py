@@ -39,6 +39,10 @@ class AuthPart:
 
     name: str
 
+    def __str__(self) -> str:
+        """returns the name of the AuthPart object"""
+        return self.name
+
     @property
     def length(self) -> int:
         """returns the length of the AuthPart object"""

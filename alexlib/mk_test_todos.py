@@ -100,11 +100,9 @@ def mk_llm_test_request(
             pytest_filepath.touch(exist_ok=True)
             tocopy = "\n".join(
                 [
-                    f"""Write the unit tests for the following cases using the unittest framework.
-                    Please use explicit imports.
+                    f"""Write comprehensive and detailed unit tests in Python for the supplied code using the unittest framework.
                     Import the unittest components like this: from unittest import TestCase, main.
-                    Make sure to import the module you're testing.
-                    Make sure to import the function you're testing.
+                    Make sure to import the modules and functions you're testing explicitly.
                     Please include a docstring for each test case, function, class, and the module.
                     The module name is 'alexlib.{module_name}'.\n""",
                     f"Test cases for {heading}:\n",
