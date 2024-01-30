@@ -212,6 +212,8 @@ def concat_lists(lists: list[list[Any]]) -> list[Any]:
 
 def read_json(path: Path) -> dict[Hashable:Any]:
     """reads json file"""
+    if isinstance(path, dict):
+        return path
     return loads(path.read_text())
 
 

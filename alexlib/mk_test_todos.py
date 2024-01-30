@@ -100,7 +100,8 @@ def mk_llm_test_request(
             pytest_filepath.touch(exist_ok=True)
             tocopy = "\n".join(
                 [
-                    f"""Write comprehensive and detailed unit tests in Python for the supplied code using the unittest framework.
+                    f"""Write comprehensive and detailed unit test cases and the code that will test them
+                    in Python for the supplied code using the unittest framework.
                     Import the unittest components like this: from unittest import TestCase, main.
                     Make sure to import the modules and functions you're testing explicitly.
                     Please include a docstring for each test case, function, class, and the module.

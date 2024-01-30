@@ -15,12 +15,11 @@ The module uses `dataclasses` for structured data management, `functools` and `i
 Usage:
 This module is intended for developers who need to manage authentication and secrets in a secure and organized manner. It's particularly useful in scenarios where credentials need to be stored, retrieved, and used dynamically in a secure way.
 """
-from ast import literal_eval
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property, partial
 from itertools import product
-from json import dump, dumps, loads
+from json import dumps, loads
 from pathlib import Path
 from random import choice, randint
 
@@ -31,6 +30,15 @@ from alexlib.core import chkenv, read_json
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randlets, randdigit, randdigits
 from alexlib.files import File
+
+
+AUTH_TEMPLATE = {
+    "username": "",
+    "password": "",
+    "host": "",
+    "port": "",
+    "database": "",
+}
 
 
 @dataclass
@@ -688,17 +696,6 @@ class AuthGenerator:
         """returns the keys defining an auth object's name"""
         return self.def_auth_dict.keys()
 
-    @cached_property
-    def auth_template(self) -> dict[str:str]:
-        """returns a dict of possible auth fields"""
-        return {
-            "username": "",
-            "password": "",
-            "host": "",
-            "port": "",
-            "database": "",
-        }
-
     @staticmethod
     def mk_product_dict(**kwargs) -> dict[str:list]:
         """returns a dict of all possible auth templates"""
@@ -707,40 +704,31 @@ class AuthGenerator:
 
     def mk_all_templates(self) -> dict[str:dict]:
         """returns a dict of all possible auth templates"""
-        tmp = AuthGenerator.auth_template
-        pdict = AuthGenerator.mk_product_dict(**self.def_auth_dict)
-        for d in pdict.values():
-            d.update(tmp)
-        return pdict
-
-    @cached_property
-    def here(self) -> Path:
-        """returns the directory of this file"""
-        return Path(literal_eval("__file__")).parent
+        product_dict = AuthGenerator.mk_product_dict(**self.def_auth_dict)
+        for d in product_dict.values():
+            d.update(AUTH_TEMPLATE)
+        return product_dict
 
     @staticmethod
     def to_json(dict_: dict[str:str], path: Path) -> None:
         """writes dict to path"""
-        dump(dict_, path.open("w"), indent=4)
+        path.write_text(dumps(dict_, indent=4))
 
     def write_template_file(self) -> None:
         """writes template file to path"""
         AuthGenerator.to_json(self.mk_all_templates(), self.path)
 
     @property
-    def pathexists(self) -> bool:
-        """returns True if template file exists"""
-        return self.path.exists()
-
-    @property
     def towrite(self) -> bool:
         """returns True if template file should be written"""
-        return (not self.pathexists) or self.overwrite
+        return (not self.path.exists()) or self.overwrite
 
     def __post_init__(self) -> None:
         """writes the template file to path"""
         if self.path is None:
-            self.path = self.here / f"{self.name}.json"
+            creds = Path.home() / ".creds"
+            creds.mkdir(exist_ok=True)
+            self.path = creds / f"{self.name}.json"
         if self.towrite:
             self.write_template_file()
 
