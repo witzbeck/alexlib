@@ -39,6 +39,7 @@ addopts = [
     "--cov-fail-under=80", 
     "--cov-branch"
 ]
+testpaths = ["tests"]
 
 [tool.sqlfluff.core]
 verbose = 2
