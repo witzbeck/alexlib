@@ -15,8 +15,9 @@ Usage:
 Run this module directly to execute all tests:
     python -m unittest path/to/this/file.py
 """
-from os import getenv
+from os import environ
 from pathlib import Path
+from random import choice
 from unittest import main
 from unittest import TestCase
 
@@ -28,9 +29,16 @@ class TestConfigFile(TestCase):
 
     def setUp(self) -> None:
         """Set up the test case."""
-        self.dotenv = DotEnv.from_path(Path(__file__).parent.parent / ".env")
-        self.rand_key = self.dotenv.rand_key
-        self.rand_val = getenv(self.rand_key)
+        dotenv_path = Path(__file__).parent.parent / ".env"
+        if dotenv_path.exists():
+            self.dotenv = DotEnv.from_path(dotenv_path)
+            self.rand_key = self.dotenv.rand_key
+            self.rand_val = self.dotenv.envdict[self.rand_key]
+        else:
+            self.dotenv = dict(environ)
+            self.rand_key = choice(list(self.dotenv.keys()))
+            self.rand_val = self.dotenv[self.rand_key]
+            # self.skipTest("No .env file found.")
 
     def test_dotenv_init(self) -> None:
         """Test the dotenv init."""

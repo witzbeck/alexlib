@@ -19,11 +19,10 @@ from unittest import main
 from unittest import TestCase
 
 from alexlib.auth import Auth
-from alexlib.config import DotEnv
 from alexlib.constants import CREDS
 
 proj = Path(__file__).parent.parent
-settings = DotEnv.from_path(proj / ".env")
+dotenv_path = proj / ".env"
 
 
 class TestAuth(TestCase):
