@@ -26,12 +26,12 @@ from json import dumps
 from json import JSONDecodeError
 from json import loads
 from logging import debug
-from os import getenv
+from os import environ, getenv
 from pathlib import Path
 from socket import AF_INET
 from socket import SOCK_STREAM
 from socket import socket
-from subprocess import PIPE, Popen, check_output
+from subprocess import PIPE, Popen
 from typing import Any
 from typing import Hashable
 
@@ -258,7 +258,13 @@ def show_dict(d: dict, indent: int = 4) -> None:
         _ = [show_dict(dict_) for dict_ in d if isinstance(dict_, dict)]
         print("]")
     else:
+        d = {k: v for k, v in d.items() if not k.startswith("_")}
         print(dumps(d, indent=indent))
+
+
+def show_environ() -> None:
+    """prints environment variables"""
+    show_dict(dict(environ))
 
 
 def to_clipboard(text: str) -> bool:
@@ -371,11 +377,6 @@ def chkhash(path: Path, stored_hash: str) -> bool:
     return sha256sum(path) == stored_hash
 
 
-def get_last_tag() -> str:
-    """returns last git tag"""
-    return check_output(["git", "describe", "--tags"]).decode("ascii")  # nosec
-
-
 def get_curent_version(tag: str) -> str:
     """returns current version"""
     if tag.startswith("v"):
@@ -392,12 +393,6 @@ class Version:
     major: int
     minor: int
     patch: int
-
-    @classmethod
-    def from_tag(cls):
-        """returns version from git tag"""
-        parts = get_curent_version(get_last_tag()).split(".")
-        return cls(*parts)
 
     def __iter__(self):
         """returns version as iterable"""

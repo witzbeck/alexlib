@@ -10,7 +10,6 @@ on:
     paths-ignore:
       - "**/*.md"
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -61,13 +60,13 @@ jobs:
     #----------------------------------------------
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-      run: poetry install --no-interaction --no-root
+      run: poetry install --with test --no-interaction --no-root
     
     #----------------------------------------------
     # install your root project, if required
     #----------------------------------------------
     - name: Install project
-      run: poetry install --no-interaction
+      run: poetry install --with test --no-interaction
     
     #----------------------------------------------
     # run test suite
@@ -75,4 +74,4 @@ jobs:
     - name: Run tests
       run: |
         poetry source .venv/bin/activate
-        poetry run pytest tests/
+        poetry run pytest tests/ -n auto
