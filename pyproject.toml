@@ -25,6 +25,7 @@ pyarrow = "^15.0.0"
 requests = "^2.31.0"
 
 [tool.poetry.group.test.dependencies]
+sqlfluff = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-mock = "*"
