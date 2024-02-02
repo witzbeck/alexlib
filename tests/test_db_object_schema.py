@@ -2,7 +2,6 @@
 from unittest import TestCase, main
 
 from alexlib.db.objects import Schema
-from alexlib.db.managers import SqlLiteManager
 
 
 class TestSchema(TestCase):
@@ -10,7 +9,6 @@ class TestSchema(TestCase):
 
     def setUp(self):
         """Assuming setup for a test database and schema"""
-        self.dbmgr = SqlLiteManager()
         self.test_schema = Schema("test_schema")
 
     def test_tables(self):

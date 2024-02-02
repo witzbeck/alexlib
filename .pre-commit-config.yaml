@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: poetry-check
         name: poetry-check
-        entry: poetry run poetry check
+        entry: poetry check
         language: system
         types: [python]
         pass_filenames: false
@@ -13,57 +13,47 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      - id: requirements-txt-fixer
-      - id: trailing-whitespace
       - id: end-of-file-fixer
-      - id: check-added-large-files
-      - id: check-case-conflict
       - id: check-json
       - id: check-xml
       - id: check-toml
       - id: check-yaml
-      - id: check-merge-conflict
       - id: fix-byte-order-marker
       - id: check-docstring-first
 
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
     hooks:
-      - id: black
-        language_version: python3.12
-
-  - repo: https://github.com/pylint-dev/pylint
-    rev: v3.0.3
-    hooks:
-      - id: pylint
-        args: [--rcfile=.pylintrc]
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
-    -   id: python-use-type-annotations
-    -   id: python-check-mock-methods
-    -   id: python-check-blanket-noqa
-    -   id: python-no-eval
-    -   id: python-no-log-warn
+      - id: python-use-type-annotations
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 4.0.1
-    hooks:
-      - id: flake8
-        args: [--max-line-length=88, --extend-ignore=E203,W503]
-        language_version: python3.11
+  -   repo: local
+      hooks:
+      -   id: pytest-check
+          name: pytest with coverage
+          entry: poetry run pytest --cov=alexlib
+          language: system
+          types: [python]
+          pass_filenames: false
+          always_run: true
 
-  - repo: local
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 2.3.5
     hooks:
-      - id: pytest-check
-        name: pytest-check
-        entry: poetry run pytest
-        language: system
-        types: [python]
-        pass_filenames: false
-        always_run: true
-        files: \.py$
+      - id: sqlfluff-fix
+        name: SQLFluff Fix
+        types: [sql]
+        entry: sqlfluff fix --force --config ./pyproject.toml
+      - id: sqlfluff-lint
+        name: SQLFluff Lint
+        types: [sql]
+        entry: sqlfluff lint --config ./pyproject.toml
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.0

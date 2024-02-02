@@ -97,11 +97,6 @@ class SecretValue:
         """returns the length of the value"""
         return len(str(self))
 
-    @cached_property
-    def here(self) -> Path:
-        """returns the path of the file that called this function"""
-        return Path(eval("__file__"))
-
     @property
     def as_pair(self) -> tuple[str, str]:
         """returns a tuple with the class name and the value"""
@@ -210,9 +205,17 @@ class Cryptographer:
         """encrypts bytes"""
         return self.fernet.encrypt(bytes_)
 
+    def encrypt_str(self, str_: str) -> bytes:
+        """encrypts str"""
+        return self.encrypt_bytes(str_.encode(self.encoding))
+
     def decrypt_bytes(self, bytes_: bytes) -> bytes:
         """decrypts bytes"""
         return self.fernet.decrypt(bytes_)
+
+    def decrypt_str(self, bytes_: bytes) -> str:
+        """decrypts bytes to str"""
+        return self.decrypt_bytes(bytes_).decode(self.encoding)
 
     @staticmethod
     def read_bytes(path: Path) -> bytes:

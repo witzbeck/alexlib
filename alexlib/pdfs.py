@@ -1,11 +1,14 @@
 """PDF utilities for Cookbook"""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from re import match
 
 from reportlab.lib.fonts import _tt2ps_map
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen.canvas import Canvas
+
+from alexlib.files import File
 
 
 @dataclass
@@ -144,51 +147,7 @@ def export_recipe_to_pdf(
     recipe.draw()
 
 
-RECIPE = """
-### Classic Homemade White Bread
-
-#### Ingredients
-
-- 3 cups all-purpose flour, plus extra for dusting
-- 1 packet (2¼ tsp) active dry yeast
-- 1 cup warm water (around 110°F or 45°C)
-- 2 tablespoons sugar
-- 1 tablespoon salt
-- 2 tablespoons unsalted butter, softened
-- Optional: 1 egg (for egg wash)
-
-#### Instructions
-
-1. **Activate the Yeast:** In a large bowl, dissolve the sugar in warm water. Sprinkle yeast over the top and let it sit for about 10 minutes, until it becomes frothy.
-
-2. **Make the Dough:** Add salt, butter, and flour to the yeast mixture. Mix until a shaggy dough forms. Knead the dough on a floured surface for about 8-10 minutes, until it's smooth and elastic.
-
-3. **First Rise:** Place the dough in a lightly oiled bowl, turning it once to coat all sides with oil. Cover with a damp cloth and let it rise in a warm place for about 1 hour, or until it doubles in size.
-
-4. **Shape the Bread:** Punch down the dough and turn it out onto a lightly floured surface. Shape it into a loaf and place it in a greased 9x5 inch loaf pan.
-
-5. **Second Rise:** Cover the loaf and let it rise for about 30 minutes, or until it puffs up just above the rim of the pan.
-
-6. **Preheat Oven:** Preheat your oven to 375°F (190°C).
-
-7. **Optional Egg Wash:** If desired, lightly beat an egg with a tablespoon of water and brush it over the top of the loaf. This gives the bread a beautiful golden crust.
-
-8. **Bake:** Bake for about 30 minutes, or until the bread is golden brown and sounds hollow when tapped on the bottom.
-
-9. **Cool:** Remove the bread from the oven and let it cool in the pan for a few minutes. Then, transfer it to a wire rack to cool completely.
-
-10. **Slice and Serve:** Slice the bread and serve it warm, or store it in an airtight container for up to 3 days. Enjoy!
-
-#### Notes
-
-- **Yeast:** If you're using instant yeast, you can skip the first step and add the yeast directly to the flour. You may also need to reduce the rise times by 10-15 minutes.
-- **Flour:** You can use bread flour instead of all-purpose flour for a chewier loaf.
-- **Butter:** You can use olive oil instead of butter for a dairy-free loaf.
-- **Egg Wash:** This is optional, but it gives the bread a beautiful golden crust.
-- **Storage:** Store the bread in an airtight container at room temperature for up to 3 days. You can also freeze it for up to 3 months.
-- **Serving Suggestions:** This bread is delicious on its own, but it's also great with a pat of butter, a drizzle of honey, or a sprinkle of cinnamon sugar.
-
-"""
+RECIPE = File.from_path(Path(__file__).parent / "homemade_bread_recipe.txt").text
 
 if __name__ == "__main__":
     export_recipe_to_pdf(RECIPE, "homemade_bread_recipe.pdf")

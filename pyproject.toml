@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "alexlib"
 version = "0.2.0"
-description = ""
+description = "A toolset for data science, machine learning, and data engineering."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.12"
 pandas = "*"
 python-dotenv = "*"
 decorator = "*"
@@ -18,18 +18,59 @@ matplotlib = "*"
 cryptography = "*"
 scipy = "*"
 scikit-learn = "*"
-pre-commit = "^3.6.0"
-pytest = "^7.4.4"
 reportlab = "^4.0.9"
 pillow = "^10.2.0"
-pylint = "^3.0.3"
 openai = "^1.8.0"
+pyarrow = "^15.0.0"
+requests = "^2.31.0"
 
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.group.test.dependencies]
 pytest = "*"
-coverage = "*"
-ipykernel = "*"
-notebook = "*"
+pytest-cov = "*"
+pytest-mock = "*"
+pytest-xdist = "*"
+
+[tool.pytest]
+addopts = [
+    "--cov=alexlib", 
+    "--cov-report=term-missing", 
+    "--cov-report=md",
+    "--cov-report=html", 
+    "--cov-fail-under=80", 
+    "--cov-branch"
+]
+testpaths = ["tests"]
+
+[tool.sqlfluff.core]
+verbose = 2
+dialect = "postgres"
+sql_file_exts = ".sql"
+max_line_length = 120
+processes = 0
+rules = "core"
+
+[tool.sqlfluff.layout.type.comma]
+line_position = "leading"
+spacing_before = "touch"
+
+[tool.sqlfluff.indentation]
+indent_unit = "space"
+indented_then = false
+indented_joins = true
+trailing_comments = "after"
+
+[tool.sqlfluff.layout.type.alias_expression]
+spacing_before = "align"
+align_scope = "file"
+
+[tool.sqlfluff.capitalisation]
+capitalisation_policy = "lower"
+
+[tool.sqlfluff.rules.aliasing.table]
+aliasing = "implicit"
+
+[tool.sqlfluff.rules.aliasing.column]
+aliasing = "implicit"
 
 [build-system]
 requires = ["poetry-core"]

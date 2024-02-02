@@ -22,6 +22,7 @@ This module is intended to be used in Python applications for centralized manage
 and environment variables, simplifying tasks such as setting up logging, reading configuration files, and
 environment variable manipulation.
 """
+
 from dataclasses import dataclass, field
 from logging import INFO, basicConfig
 from os import environ
@@ -32,6 +33,11 @@ from typing import Any
 from alexlib.constants import DATETIME_FORMAT
 from alexlib.core import envcast, isnone
 from alexlib.files import Directory, File
+
+ConfigFormat = str
+ConfigType = type[str]
+ConfigValue = str
+ConfigKey = str
 
 
 @dataclass

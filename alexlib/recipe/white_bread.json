@@ -1,0 +1,37 @@
+{
+    "name": "Classic Homemade White Bread",
+    "ingredients": [
+      { "name": "all-purpose flour", "quantity": 3, "unit": "cups", "notes": "extra for dusting" },
+      { "name": "active dry yeast", "quantity": 2.25, "unit": "teaspoon", "notes": "1 packet" },
+      { "name": "warm water", "quantity": 1, "unit": "cup", "notes": "around 110°F or 45°C" },
+      { "name": "sugar", "quantity": 2, "unit": "tablespoons" },
+      { "name": "salt", "quantity": 1, "unit": "tablespoon" },
+      { "name": "unsalted butter", "quantity": 2, "unit": "tablespoons", "prep": "softened" },
+      { "name": "egg", "quantity": 1, "notes": "optional, for egg wash" }
+    ],
+    "equipment": [
+      { "name": "large bowl", "quantity": 1 },
+      { "name": "9x5 inch loaf pan", "quantity": 1 },
+      { "name": "oven", "quantity": 1 },
+      { "name": "damp cloth", "quantity": 1 },
+      { "name": "wire rack", "quantity": 1 },
+      { "name": "brush", "quantity": 1, "notes": "for egg wash, optional" }
+    ],
+    "steps": [
+      "Activate the Yeast: Dissolve sugar in warm water, sprinkle yeast over the top, and let sit for about 10 minutes until frothy.",
+      "Make the Dough: Add salt, butter, and flour to yeast mixture, mix to form shaggy dough. Knead on floured surface for 8-10 minutes until smooth and elastic.",
+      "First Rise: Place dough in lightly oiled bowl, cover with damp cloth, let rise in warm place for 1 hour or until doubled in size.",
+      "Shape the Bread: Punch down dough, shape into a loaf, place in greased loaf pan.",
+      "Second Rise: Cover loaf, let rise for 30 minutes or until puffs up above the rim of pan.",
+      "Preheat Oven: Preheat oven to 375°F (190°C).",
+      "Optional Egg Wash: Beat egg with tablespoon of water, brush over loaf.",
+      "Bake: Bake for 30 minutes or until golden brown and sounds hollow when tapped.",
+      "Cool: Remove bread from oven, cool in pan for a few minutes, then transfer to wire rack to cool completely.",
+      "Slice and Serve: Slice bread, serve warm or store in airtight container for up to 3 days."
+    ],
+    "total_time": "2 hours 40 minutes",
+    "prep_time": "20 minutes",
+    "cook_time": "30 minutes",
+    "servings": "1 loaf",
+    "notes": "Use instant yeast to skip activation step; bread flour for chewier loaf; olive oil for dairy-free loaf; egg wash for golden crust; store at room temperature or freeze for up to 3 months; serving suggestions include butter, honey, or cinnamon sugar."
+}

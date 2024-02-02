@@ -4,22 +4,51 @@ from pathlib import Path
 from string import ascii_letters, digits
 
 
-ENVS = ["dev", "test", "prod"]
+ENVIRONMENTS = ["dev", "test", "prod"]
 SQL_CHARS = f"{ascii_letters} _{digits}"
-QG_SUBS = {
+COL_SUBS = {
     " ": "_",
     "-": "_",
-    "#": "NUMBER",
-    "&": "AND",
+    "#": "number",
+    "&": "and",
     "/": "_",
-    "%": "PERCENT",
+    "%": "percent",
     ".": "",
+    ",": "",
+    "<": "lt",
+    ">": "gt",
+    "=": "eq",
 }
-QG_KEYS = list(QG_SUBS.keys())
+ISTYPE_EXTS = [
+    "csv",
+    "json",
+    "parquet",
+    "pickle",
+    "xlsx",
+    "xls",
+    "txt",
+    "sql",
+    "py",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "cfg",
+    "conf",
+    "env",
+    "ipynb",
+    "md",
+    "rst",
+    "html",
+]
+SQL_SUBS = {k: v for k, v in COL_SUBS.items() if k in SQL_CHARS and k != " "}
+SQL_INFOSCHEMA_COL = "select * from information_schema.columns"
+
+SQL_KEYS = list(SQL_SUBS.keys())
 
 DATE_FORMAT = "%Y-%m-%d"
 TIME_FORMAT = "%H:%M:%S"
-DATETIME_FORMAT = DATE_FORMAT + " " + TIME_FORMAT
+DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
 EPOCH = datetime(1000, 1, 1)
 EPOCH_SECONDS = EPOCH.timestamp()
 

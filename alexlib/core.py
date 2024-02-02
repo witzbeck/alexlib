@@ -24,7 +24,6 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps
 from json import JSONDecodeError
-from json import load
 from json import loads
 from logging import debug
 from os import getenv
@@ -32,7 +31,7 @@ from pathlib import Path
 from socket import AF_INET
 from socket import SOCK_STREAM
 from socket import socket
-from subprocess import check_output
+from subprocess import PIPE, Popen, check_output
 from typing import Any
 from typing import Hashable
 
@@ -147,7 +146,7 @@ def envcast(
 ) -> Any:
     """converts output to specified type"""
     if isinstance(astype, str):
-        astype = eval(astype)
+        astype = eval(astype)  # nosec
     if not isinstance(astype, type):
         raise TypeError(f"astype must be type but is {type(astype)}")
     if issubclass(astype, list):
@@ -213,23 +212,80 @@ def concat_lists(lists: list[list[Any]]) -> list[Any]:
 
 def read_json(path: Path) -> dict[Hashable:Any]:
     """reads json file"""
-    try:
-        ret = load(path.open())
-    except JSONDecodeError:
-        ret = loads(path.open().read())
-    return ret
+    if isinstance(path, dict):
+        return path
+    return loads(path.read_text())
+
+
+def flatten_dict(
+    d: dict,
+    parent_key: str = None,
+    sep: str = ":",
+) -> dict[str:str]:
+    """concattenates keys to flatter dict"""
+    return {
+        f"{parent_key}{sep}{k}" if parent_key else k: v
+        for k, v in d.items()
+        for k, v in (
+            flatten_dict(v, k, sep=sep).items() if isinstance(v, dict) else [(k, v)]
+        )
+    }
+
+
+def get_attrs(
+    obj: object,
+    include_hidden: bool = False,
+    include_dunder: bool = False,
+) -> dict[str:Any]:
+    """returns all attributes of object"""
+    attrs = {
+        attr: getattr(obj, attr)
+        for attr in dir(obj)
+        if not callable(getattr(obj, attr))
+    }
+    if not include_hidden:
+        attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
+    if not include_dunder:
+        attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
+    return attrs
 
 
 def show_dict(d: dict, indent: int = 4) -> None:
-    """prints dictionary"""
+    """prints dictionary or list of dictionaries"""
     if isinstance(d, list):
         print("[")
-        for dict_ in d:
-            show_dict(dict_)
+        _ = [print(dict_) for dict_ in d if not isinstance(dict_, dict)]
+        _ = [show_dict(dict_) for dict_ in d if isinstance(dict_, dict)]
         print("]")
     else:
-        d = {k: v for k, v in d.items() if not k.startswith("_")}
         print(dumps(d, indent=indent))
+
+
+def to_clipboard(text: str) -> bool:
+    """Copies text to the clipboard. Returns True if successful, False otherwise."""
+    command = "/usr/bin/pbcopy"
+    # Check if the command exists on the system
+    if not Path(command).exists():
+        print(f"Command {command} not found")
+        return False
+    try:
+        with Popen([command], stdin=PIPE, shell=False) as p:
+            p.stdin.write(text.encode("utf-8"))  # Specify encoding if necessary
+            p.stdin.close()
+            retcode = p.wait()
+        return retcode == 0
+    except OSError as e:
+        print(f"Error during execution: {e}")
+        return False
+
+
+def copy_file_to_clipboard(path: Path) -> bool:
+    """Copies file to the clipboard. Returns True if successful, False otherwise."""
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} not found")
+    if not path.is_file():
+        raise ValueError(f"{path} is not a file")
+    return to_clipboard(path.read_text())
 
 
 def get_objects_by_attr(
@@ -247,7 +303,7 @@ class Object:
     @property
     def reg_attrs(self) -> dict[str:Any]:
         """returns all attributes except hidden ones"""
-        return {k: v for k, v in self.__dict__.items() if k[0] != "_"}
+        return {k: v for k, v in get_attrs(self)}
 
     @property
     def reg_attrs_keys(self) -> list[str]:
@@ -317,7 +373,7 @@ def chkhash(path: Path, stored_hash: str) -> bool:
 
 def get_last_tag() -> str:
     """returns last git tag"""
-    return check_output(["git", "describe", "--tags"]).decode("ascii")
+    return check_output(["git", "describe", "--tags"]).decode("ascii")  # nosec
 
 
 def get_curent_version(tag: str) -> str:

@@ -7,6 +7,8 @@ from pathlib import Path
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
+from alexlib.ml.llm_response import LargeLanguageModelResponse
+
 
 @dataclass
 class RecipeBase:
@@ -27,9 +29,11 @@ class RecipeBase:
     @classmethod
     def from_json(cls, path: Path) -> "RecipeBase":
         """Creates a Recipe from a JSON object"""
+        if isinstance(path, str):
+            path = Path(path)
         if not path.exists():
             raise FileNotFoundError
-        d = loads(path.read_text())
+        d = loads(path.read_text(encoding="utf-8"))
         return cls.from_dict(d)
 
 
@@ -70,7 +74,26 @@ class Ingredient(RecipeBase):
 
 
 @dataclass
-class Recipe(RecipeBase):
+class RecipeResponse(RecipeBase, LargeLanguageModelResponse):
+    """A recipe response is a text file with a title and a body of text."""
+
+    name: str = field()
+    ingredients: dict[str:str] = field()
+    equipment: list[str:str] = field()
+    steps: list[str] = field()
+    total_time: int | None = field(default=None)
+    prep_time: int | None = field(default=None)
+    cook_time: int | None = field(default=None)
+    servings: int | None = field(default=None)
+    calories: int | None = field(default=None)
+
+    def process_content(self) -> None:
+        """Process the content of a response."""
+        pass
+
+
+@dataclass
+class Recipe(RecipeResponse):
     """A recipe"""
 
     equipment: list[Ingredient] = field(default_factory=list)
@@ -158,6 +181,8 @@ class Recipe(RecipeBase):
 
     def to_pdf(self, path: Path) -> None:
         """Saves the recipe as a PDF"""
+        if isinstance(path, str):
+            path = Path(path)
         doc = SimpleDocTemplate(path.name)
         elements = []
         elements.append(self.title_paragraph)
@@ -170,6 +195,6 @@ class Recipe(RecipeBase):
         doc.build(elements)
 
 
-cc_cookies = Recipe.from_json(Path("chocolate_chip_cookies.json"))
-print(cc_cookies.name, cc_cookies)
-cc_cookies.to_pdf(Path("chocolate_chip_cookies.pdf"))
+if __name__ == "__main__":
+    cc_cookies = Recipe.from_json("chocolate_chip_cookies.json")
+    cc_cookies.to_pdf("chocolate_chip_cookies.pdf")

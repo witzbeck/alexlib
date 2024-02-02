@@ -44,7 +44,7 @@ from numpy import array
 from pandas import DataFrame
 from pandas import Series
 
-from alexlib.time import timeit
+from alexlib.times import timeit
 
 
 def get_primes(n: int) -> list[int]:

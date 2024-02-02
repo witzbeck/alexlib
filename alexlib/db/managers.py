@@ -37,127 +37,98 @@ Example:
 
 """
 
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
-from logging import info, warning
+from logging import info
 from pathlib import Path
 from shutil import copyfile
 from typing import Any
-from sqlite3 import Cursor, connect as sqlite_connect
+from sqlite3 import Cursor as SQLiteCursor, connect as sqlite_connect
+from sqlite3 import Connection as SQLiteConnection
 
-from attr import field
 from pandas import DataFrame, read_sql
-from sqlalchemy import Connection, CursorResult, Engine, TextClause, create_engine
-from psycopg.errors import DuplicateSchema, UndefinedTable
+from psycopg import Cursor
+from psycopg.errors import UndefinedTable
+from sqlalchemy import Connection, Engine, create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from alexlib.auth import Auth, Curl
+from alexlib.config import Settings
 from alexlib.core import ping
-from alexlib.db.objects import Name
+from alexlib.db.objects import Name, Schema, Table
 from alexlib.db.sql import SQL, mk_view_text
+from alexlib.db.sql import create_cmd, drop_cmd, truncate_table_cmd
 from alexlib.df import get_distinct_col_vals
-from alexlib.files import File, path_search
+from alexlib.files import File
+
+
+def create_memory_db() -> SQLiteConnection:
+    """creates memory database"""
+    return sqlite_connect(":memory:", check_same_thread=False)
 
 
 @dataclass
-class DatabaseManager:
-    """Database manager class"""
+class ExecutionManager:
+    """Base execution manager class"""
 
-    db_file: str = field(default=None)
-    curl: Curl = field(repr=False, default=None)
-    schema_col: str = field(default="table_schema", repr=False)
-    table_col: str = field(default="table_name", repr=False)
-    engine: Engine = field(init=False, repr=False)
-    cnxn: Connection = field(init=False, repr=False)
+    engine: Engine = field(repr=False)
+    cursor: Cursor = field(repr=False, init=False)
 
     def __post_init__(self) -> None:
         """sets attributes"""
-        if self.curl is not None:
-            self.engine = create_engine(self.curl)
-            self.cnxn = self.engine.connect()
-        else:
-            raise ValueError("need curl for engine")
+        self.cursor = self.engine.connect().cursor()
 
     def __del__(self) -> None:
-        """closes connection"""
-        if hasattr(self, "cnxn"):
-            self.cnxn.close()
-            del self.cnxn
-        if hasattr(self, "engine"):
-            del self.engine
+        """closes cursor"""
+        self.cursor.close()
+        self.engine.dispose()
 
-    @staticmethod
-    def _execute_query(
-        cursor: Cursor, query: str, params: tuple = None
-    ) -> CursorResult:
-        """Internal method to execute a query"""
-        sql = SQL(query)
-        if ";" in sql.clause:
-            for part in sql.clause.split(";"):
-                if part:
-                    DatabaseManager._execute_query(cursor, part)
-        else:
-            try:
-                cursor.execute(sql.clause, params=params)
-                cursor.commit()
-            except UndefinedTable as e:
-                raise UndefinedTable(f"{e} - {sql.clause}")
-        return cursor
-
-    def execute(self, query: SQL, params: tuple = None) -> CursorResult:
+    def execute(self, query: SQL, params: tuple = None) -> Cursor:
         """Execute a SQL query"""
-        with self.cnxn.cursor() as cursor:
-            return DatabaseManager._execute_query(cursor, query, params=params)
+        self.cursor.execute(query, params=params)
+        self.cursor.commit()
+        return self.cursor
 
     def executemany(self, query: str, params: list[tuple]) -> None:
         """Execute a SQL query multiple times"""
-        with self.cnxn.cursor() as cursor:
-            cursor.executemany(query, params=params)
-            cursor.commit()
+        self.cursor.executemany(query, params=params)
+        self.cursor.commit()
 
     def fetchone(
         self, query: str, params: tuple = None
     ) -> str | int | float | bool | None:
         """Fetch data from the database"""
         cursor = self.execute(query, params=params)
-        return cursor.fetchone()[0]
+        ret = cursor.fetchone()
+        try:
+            return ret[0]
+        except IndexError:
+            return ret
 
-    def fetchall(self, query: str, params: tuple = None) -> DataFrame:
+    def fetchall(self, query: str, params: tuple = None) -> tuple[tuple]:
         """Fetch data from the database"""
         cursor = self.execute(query, params=params)
         return cursor.fetchall()
 
-    def fetchmany(self, query: str, many: int, params: tuple = None) -> DataFrame:
+    def fetchmany(self, query: str, many: int, params: tuple = None) -> tuple[tuple]:
         """Fetch data from the database"""
-        cursor = self.execute(query, params=params)
+        cursor = self.cursor.execute(query, params=params)
         return cursor.fetchmany(many)
 
-    def create_table(self, table_name: str, columns: str) -> None:
-        """Create a table"""
-        query = f"CREATE TABLE IF NOT EXISTS {Name(table_name)} ({columns})"
-        self.execute(query)
+    def fetchdf(self, query: str, params: tuple = None) -> DataFrame:
+        """Fetch data from the database"""
+        return read_sql(query, self.engine, params=params)
 
-    def insert(self, table_name: str, columns: tuple, values: tuple) -> None:
-        """Insert rows into a table"""
+    def fetchcol(self, query: str, params: tuple = None, idx: int = 0) -> list:
+        """Fetch data from the database"""
+        return [row[idx] for row in self.fetchall(query, params=params)]
 
-        # Validate the table and column names
-        table_name = Name(table_name)
-        col_placeholder = ", ".join([Name(col) for col in columns])  # Column names
 
-        # Construct column and value placeholders
-        val_placeholder = ", ".join(["?" for _ in values])  # Value placeholders
+@dataclass
+class RecordManager:
+    """Base record manager class"""
 
-        # Construct the SQL query
-        query = (
-            f"INSERT INTO {table_name} ({col_placeholder}) VALUES ({val_placeholder})"
-        )
-
-        # Prepare the parameters for the query
-        params = values
-
-        # Execute the query
-        self.execute(query, params)
+    exec_mgr: ExecutionManager = field(repr=False)
 
     def select(
         self,
@@ -186,7 +157,28 @@ class DatabaseManager:
             query += f" WHERE {where_clause}"
             params = where_params
 
-        return self.fetchall(query, params=params)
+        return self.exec_mgr.fetchall(query, params=params)
+
+    def insert(self, table_name: str, columns: tuple, values: tuple) -> None:
+        """Insert rows into a table"""
+
+        # Validate the table and column names
+        table_name = Name(table_name)
+        col_placeholder = ", ".join([Name(col) for col in columns])  # Column names
+
+        # Construct column and value placeholders
+        val_placeholder = ", ".join(["?" for _ in values])  # Value placeholders
+
+        # Construct the SQL query
+        query = (
+            f"INSERT INTO {table_name} ({col_placeholder}) VALUES ({val_placeholder})"
+        )
+
+        # Prepare the parameters for the query
+        params = values
+
+        # Execute the query
+        self.exec_mgr.execute(query, params)
 
     def update(self, table_name: str, set_clause: dict, where_clause: dict) -> None:
         """Update rows in a table"""
@@ -211,7 +203,7 @@ class DatabaseManager:
         params = tuple(set_clause.values()) + tuple(where_clause.values())
 
         # Execute the query
-        self.execute(query, params=params)
+        self.exec_mgr.execute(query, params=params)
 
     def delete(
         self,
@@ -232,7 +224,123 @@ class DatabaseManager:
         query = f"DELETE FROM {table_name} WHERE {where_statement}"
 
         # Execute the query
-        self.execute(query, params=where_params)
+        self.exec_mgr.execute(query, params=where_params)
+
+
+@dataclass
+class BaseObjectManager:
+    """Base object manager class"""
+
+    exec_mgr: ExecutionManager = field(repr=False)
+    object_type: str = field(default=None, repr=False)
+    object_col: str = field(default=None, repr=False)
+
+    def drop(self, name: str, schema: str = None) -> None:
+        """drops object"""
+        self.exec_mgr.execute(drop_cmd(self.object_type, name, schema=schema))
+
+    def create(self, name: str, schema: str = None) -> None:
+        """creates object"""
+        if not isinstance(name, Name):
+            name = Name(name)
+        self.exec_mgr.execute(create_cmd(self.object_type, name, schema=schema))
+
+
+@dataclass
+class SchemaManager(BaseObjectManager):
+    """Schema manager class"""
+
+    object_type: str = field(default="schema", repr=False)
+    object_col: str = field(default="table_schema", repr=False)
+
+    def exists(self, name: str) -> bool:
+        """checks if schema exists"""
+        return name in [
+            self.exec_mgr.fetchall(
+                "select schema_name from information_schema.schemata"
+            )
+        ]
+
+    def truncate(self, schema: Schema) -> None:
+        """truncates schema"""
+        return [
+            self.exec_mgr.execute(truncate_table_cmd(name, schema=schema))
+            for name in schema.tables
+        ]
+
+
+@dataclass
+class TableManager(BaseObjectManager):
+    """Table manager class"""
+
+    object_type: str = field(default="table", repr=False)
+    object_col: str = field(default="table_name", repr=False)
+    schema: Schema = field(default=None, repr=False)
+
+    def truncate(self, name: str, schema: str = None) -> None:
+        """truncates table"""
+        self.exec_mgr.execute(truncate_table_cmd(name, schema=schema))
+
+    def drop_schema_tables(self) -> None:
+        """drops all tables in schema"""
+        self.drop(self.schema.name)
+        self.create(self.schema.name)
+
+    def drop_table_pattern(self, pattern: str) -> None:
+        """drops tables matching pattern"""
+        return [self.drop(table) for table in self.schema.tables if pattern in table]
+
+
+@dataclass
+class ViewManager(TableManager):
+    """View manager class"""
+
+    object_type: str = field(default="view", repr=False)
+
+    # pylint: disable=arguments-renamed
+    def create(self, name: str, sql: SQL) -> None:
+        """makes view in database"""
+        statement = mk_view_text(name, sql)
+        return self.exec_mgr.execute(statement)
+
+
+@dataclass
+class ColumnManager(BaseObjectManager):
+    """Column manager class"""
+
+    object_type: str = field(default="column", repr=False)
+    object_col: str = field(default="column_name", repr=False)
+    table: Table = field(default=None, repr=False)
+
+
+@dataclass
+class BaseConnectionManager:
+    """Connection manager class"""
+
+    curl: Curl = field(repr=False, default=None)
+    db_path: Path = field(repr=False, default=None)
+    engine: Engine = field(init=False, repr=False)
+    cnxn: Connection = field(init=False, repr=False)
+    exec_mgr: ExecutionManager = field(init=False, repr=False)
+    settings: Settings = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """sets attributes"""
+        if self.curl is not None:
+            self.engine = create_engine(self.curl)
+            self.cnxn = self.engine.connect()
+            self.exec_mgr = ExecutionManager(self.engine)
+        else:
+            raise ValueError("need curl for engine")
+
+    def __del__(self) -> None:
+        """closes connection"""
+        if hasattr(self, "cnxn"):
+            self.cnxn.close()
+            del self.cnxn
+        if hasattr(self, "engine"):
+            self.engine.dispose()
+            del self.exec_mgr
 
     @property
     def isopen(self) -> bool:
@@ -269,7 +377,7 @@ class DatabaseManager:
             dialect=dialect,
             sid=sid,
         )
-        return cls(str(curl))
+        return cls(curl)
 
     @classmethod
     def from_auth(cls, auth: str | tuple[str] | Auth) -> "DatabaseManager":
@@ -277,25 +385,39 @@ class DatabaseManager:
         auth = Auth(auth) if not isinstance(auth, Auth) else auth
         return cls(curl=auth.curl)
 
-    def get_df(self, sql: SQL | str | TextClause, params: tuple = None) -> DataFrame:
-        """gets dataframe from sql"""
-        sql = SQL(sql) if not isinstance(sql, SQL) else sql
-        return read_sql(sql.clause, self.engine, params=params)
+    @classmethod
+    def from_env(cls) -> "DatabaseManager":
+        """makes connection from environment variables"""
+        return cls.from_auth(Auth.from_env())
+
+
+@dataclass
+class QueryManager:
+    """Handles database queries and data operations."""
+
+    exec_mgr: ExecutionManager = field(repr=False)
+    schema_col: str = field(default="table_schema", repr=False)
+    table_col: str = field(default="table_name", repr=False)
+
+    @cached_property
+    def info_schema_schemata(self) -> DataFrame:
+        """gets info schema"""
+        return self.exec_mgr.fetchdf("select * from information_schema.schemata")
 
     @cached_property
     def info_schema_tables(self) -> DataFrame:
         """gets info schema"""
-        return self.get_df("select * from information_schema.tables")
+        return self.exec_mgr.fetchdf("select * from information_schema.tables")
 
     @cached_property
     def info_schema_columns(self) -> DataFrame:
         """gets info schema"""
-        return self.get_df("select * from information_schema.columns")
+        return self.exec_mgr.fetchdf("select * from information_schema.columns")
 
     @cached_property
     def allschemas(self) -> list[str]:
         """gets list of schemas"""
-        return get_distinct_col_vals(self.info_schema_tables, self.schema_col)
+        return self.info_schema_schemata[self.schema_col].tolist()
 
     def schema_exists(self, schema: str) -> bool:
         """checks if schema exists"""
@@ -308,37 +430,86 @@ class DatabaseManager:
             schema: self.get_all_schema_tables(schema) for schema in self.allschemas
         }
 
-    def file_to_db(
+    def get_record_count(self, schema: str, table: str) -> int:
+        """gets record count for table"""
+        sql = f"select count(*) from {schema}.{table}"
+        return self.exec_mgr.fetchone(sql)
+
+    @property
+    def get_table_row_counts(self) -> dict[str : dict[str:int]]:
+        """gets row counts for all tables"""
+        return {
+            schema: {table: self.get_record_count(schema, table) for table in tables}
+            for schema, tables in self.schema_tables.items()
+        }
+
+    def table_exists(self, schema: str, table: str) -> bool:
+        """checks if table exists"""
+        try:
+            return table in self.schema_tables[schema]
+        except KeyError:
+            return False
+
+    def get_all_schema_tables(self, schema: str) -> list[str]:
+        """gets all tables in schema"""
+        return get_distinct_col_vals(self.schema_tables[schema], self.table_col)
+
+    def get_last_val(self, schema: str, table: str, id_col: str, val_col: str) -> Any:
+        """gets last value in column"""
+        last_rec = self.get_last_record(schema, table, id_col)
+        return last_rec.loc[0, val_col]
+
+    def get_last_id(self, schema: str, table: str, id_col: str) -> int:
+        """gets last id in table"""
+        return self.get_last_val(schema, table, id_col, id_col)
+
+    def get_last_record(
         self,
-        file: File,
         schema: str,
         table: str,
-        engine: Engine = None,
-        if_exists: str = "replace",
-        index: bool = False,
-    ) -> None:
-        """writes file to database"""
-        if file.issql:
-            engine = self.engine
-        if not isinstance(schema, str):
-            schema = str(schema)
-        df = file.get_df(engine=engine)
-        df.to_sql(
-            table,
-            self.engine,
-            schema=schema,
-            if_exists=if_exists,
-            index=index,
-        )
+        id_col: str,
+    ) -> DataFrame:
+        """gets last record in table"""
+        last_id = self.get_last_id(schema, table, id_col)
+        sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
+        return self.exec_mgr.fetchone(sql)
 
-    def sql_to_file(
-        self,
-        sqlfile: File,
-        writepath: Path,
-    ) -> None:
-        """writes data from executed query to file"""
-        df = sqlfile.get_df(eng=self.engine)
-        return File.df_to_file(df, writepath)
+
+@dataclass
+class DatabaseManager:
+    """Database manager class"""
+
+    cnxn_mgr: BaseConnectionManager = field(
+        default_factory=BaseConnectionManager.from_env, repr=False
+    )
+    query_mgr: QueryManager = field(init=False, repr=False)
+    exec_mgr: ExecutionManager = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """sets attributes"""
+        self.exec_mgr = ExecutionManager(self.cnxn_mgr.engine)
+        self.query_mgr = QueryManager(exec_mgr=self.exec_mgr)
+
+    def __del__(self) -> None:
+        """closes connection"""
+        try:
+            del self.query_mgr
+        except AttributeError:
+            info("no query manager")
+        try:
+            del self.exec_mgr
+        except AttributeError:
+            info("no execution manager")
+        try:
+            del self.cnxn_mgr
+        except AttributeError:
+            info("no connection manager")
+
+    @classmethod
+    def from_auth(cls, auth: str | tuple[str] | Auth) -> "DatabaseManager":
+        """makes connection from auth"""
+        auth = Auth(auth) if not isinstance(auth, Auth) else auth
+        return cls(cnxn_mgr=BaseConnectionManager.from_auth(auth))
 
     def show_row_counts(
         self,
@@ -350,7 +521,7 @@ class DatabaseManager:
         if not system_schemas:
             d = {
                 k: v
-                for k, v in self.schema_tables.items()
+                for k, v in self.query_mgr.schema_tables.items()
                 if k not in ["information_schema", "pg_catalog"]
             }
         if isinstance(schema, str):
@@ -367,240 +538,115 @@ class DatabaseManager:
             for tbl in tables:
                 try:
                     sql = f'SELECT count(*) FROM {schema_}."{tbl}"'
-                    rows = self.fetchone(sql)
+                    rows = self.query_mgr.fetchone(sql)
                     print(f"\t{schema_}.{tbl} = {rows} rows")
                 except UndefinedTable:
                     print(f"\t{schema_}.{tbl} = UndefinedTable")
 
-    @property
-    def table_rows(self) -> dict[str : dict[str:int]]:
-        """gets row counts for all tables"""
-        return {
-            schema: {
-                table: self.get_record_count(schema, table, print_=False)
-                for table in tables
-            }
-            for schema, tables in self.schema_tables.items()
-        }
-
-    def table_exists(self, schema: str, table: str) -> bool:
-        """checks if table exists"""
-        try:
-            return table in self.schema_tables[schema]
-        except KeyError:
-            return False
-
-    @staticmethod
-    def mk_cmd_sql(
-        cmd: str, obj_type: str, obj_name: str, schema: str = None, addl_cmd: str = ""
-    ) -> SQL:
-        """makes sql for object commands"""
-        if obj_type not in ["table", "view"]:
-            name = obj_name
-        elif schema is None:
-            name = obj_name
-        else:
-            name = f"{schema}.{obj_name}"
-        return SQL(f"{cmd} {obj_type} {name} {addl_cmd}")
-
-    def obj_cmd(self, *args, **kwargs) -> None:
-        """runs object command"""
-        sql = DatabaseManager.mk_cmd_sql(*args, **kwargs)
-        self.execute(sql.clause)
-
-    def create_schema(self, schema: str) -> None:
-        """creates schema"""
-        try:
-            self.obj_cmd("create", "schema", schema)
-        except DuplicateSchema:
-            print(f"schema[{schema}] already exists")
-
-    def drop_schema(self, schema: str) -> None:
-        """drops schema"""
-        self.obj_cmd("drop", "schema", schema, addl_cmd="cascade")
-
-    def drop_all_schema_tables(self, schema: str) -> None:
-        """drops all tables in schema"""
-        self.drop_schema(schema)
-        self.create_schema(schema)
-
-    def drop_table(self, schema: str, table: str, cascade: bool = True) -> None:
-        """drops table"""
-        addl_cmd = "cascade" if cascade else ""
-        self.obj_cmd("drop", "table", table, schema=schema, addl_cmd=addl_cmd)
-
-    def drop_table_pattern(
+    def file_to_db(
         self,
-        pattern: str,
+        file: File,
         schema: str,
-        cascade: bool = True,
+        table: str,
+        engine: Engine = None,
+        if_exists: str = "replace",
+        index: bool = False,
     ) -> None:
-        """drops tables matching pattern"""
-        return [
-            self.drop_table(schema, tab, cascade=cascade)
-            for tab in self.get_all_schema_tables(schema)
-            if pattern in tab
-        ]
+        """writes file to database"""
+        if file.issql:
+            engine = self.cnxn_mgr.engine
+        if not isinstance(schema, str):
+            schema = str(schema)
+        df = file.get_df(engine=engine)
+        df.to_sql(
+            table,
+            self.cnxn_mgr.engine,
+            schema=schema,
+            if_exists=if_exists,
+            index=index,
+        )
 
-    def drop_view(self, schema: str, view: str) -> None:
-        """drops view"""
-        self.obj_cmd("drop", "view", view, schema=schema)
+    def sql_to_file(
+        self,
+        sqlfile: File,
+        writepath: Path,
+    ) -> None:
+        """writes data from executed query to file"""
+        df = sqlfile.get_df(eng=self.cnxn_mgr.engine)
+        return File.df_to_file(df, writepath)
 
-    def truncate_table(self, schema: str, table: str) -> None:
-        """truncates table"""
-        self.obj_cmd("truncate", "table", table, schema=schema)
-
-    def get_all_schema_tables(self, schema: str) -> list[str]:
-        """gets all tables in schema"""
-        return get_distinct_col_vals(self.schema_tables[schema], self.table_col)
-
-    def truncate_schema(self, schema: str) -> None:
-        """truncates all tables in schema"""
-        tabs = self.get_all_schema_tables(schema)
-        for tab in tabs:
-            self.truncate_table(schema, tab)
-
-    def df_from_sqlfile(self, filename: str, path: Path = None) -> DataFrame:
+    def get_df_from_sqlfile(self, path: Path) -> DataFrame:
         """gets dataframe from sql file"""
-        if path is None:
-            path = path_search(filename)
-        return self.execute(SQL.from_path(path).clause)
+        return self.exec_mgr.fetchdf(SQL.from_path(path).clause)
 
     def df_to_db(self, df: DataFrame, schema: str, table: str, **kwargs) -> None:
         """writes dataframe to database"""
-        if schema not in self.allschemas:
-            try:
-                self.create_schema(schema)
-            except DuplicateSchema:
-                warning(f"schema[{schema}] already exists")
-        df.to_sql(table, self.engine, schema=schema, **kwargs)
-
-    def mk_query(self, schema: str, table: str) -> SQL:
-        """makes select * from table sql"""
-        info_ = self.info_schema_columns
-        info_ = info_[info_["table_schema"] == schema]
-        info_ = info_[info_["table_name"] == table]
-        return SQL.from_info_schema(schema, table, info_)
-
-    def get_table(self, schema: str, table: str, nrows: int = None) -> DataFrame:
-        """gets table from database"""
-        tbl = f"{schema}.{table}"
-        params = (tbl, nrows) if nrows else (tbl,)
-        sql = "select * from ?"
-        if nrows:
-            sql += " limit ?"
-        return self.get_df(sql, params=params)
-
-    def mk_view(self, name: str, sql: str) -> None:
-        """makes view in database"""
-        statement = mk_view_text(name, sql)
-        return self.execute(statement)
-
-    def get_last_id(self, schema: str, table: str, id_col: str) -> int:
-        """gets last id in table"""
-        sql = f"select max({id_col}) from {schema}.{table}"
-        try:
-            id_int = self.fetchone(sql)
-            ret = 1 if id_int is None else int(id_int)
-        except UndefinedTable:
-            ret = 1
-        return ret
-
-    def get_next_id(self, *args) -> int:
-        """gets next id in table"""
-        return self.get_last_id(*args) + 1
-
-    def get_last_record(
-        self,
-        schema: str,
-        table: str,
-        id_col: str,
-    ) -> DataFrame:
-        """gets last record in table"""
-        last_id = self.get_last_id(schema, table, id_col)
-        sql = f"select * from {schema}.{table} where {id_col} = {last_id}"
-        return self.fetchone(sql)
-
-    def get_record_count(self, schema: str, table: str, print_: bool = True) -> int:
-        """gets record count for table"""
-        sql = f"select count(*) from {schema}.{table}"
-        val = self.fetchone(sql)
-        if print_:
-            print(f"{schema}.{table} record count: {val}")
-        return val
-
-    def get_last_val(self, schema: str, table: str, id_col: str, val_col: str) -> Any:
-        """gets last value in column"""
-        last_rec = self.get_last_record(schema, table, id_col)
-        return last_rec.loc[0, val_col]
+        df.to_sql(table, self.cnxn_mgr.engine, schema=schema, **kwargs)
 
 
 @dataclass
-class SqlLiteManager(DatabaseManager):
-    """SqlLite manager class"""
+class SQLiteFileManager:
+    """SQLLite backup manager class"""
 
-    db_file: str = field(default=":memory:")
+    db_path: Path = field()
+    backup_path: str = field(default="backup.db", repr=False)
+    db_cnxn: SQLiteConnection = field(init=False, repr=False)
+    backup_cnxn: SQLiteConnection = field(init=False, repr=False)
+
+    @property
+    def ismemory(self) -> bool:
+        """checks if database is in memory"""
+        return self.db_path == ":memory:"
+
+    def backup_database(self) -> None:
+        """Backup the SQLite database to a specified path"""
+        if self.ismemory:
+            self.db_cnxn.backup(self.backup_path)
+        else:
+            copyfile(self.db_path, self.backup_path)
+
+    def restore_database(self) -> None:
+        """Backup the SQLite database to a specified path"""
+        if self.ismemory:
+            query = "".join(self.backup_cnxn.iterdump())
+            self.db_cnxn.executescript(query)
+        else:
+            copyfile(self.backup_path, self.db_path)
 
     def __post_init__(self) -> None:
         """sets attributes"""
-        self.engine = create_engine(f"sqlite:///{self.db_file}")
-        self.cnxn = self.engine.connect()
+        self.db_cnxn = sqlite_connect(self.db_path)
+        self.backup_cnxn = sqlite_connect(self.backup_path)
 
     def __del__(self) -> None:
-        try:
-            self.cnxn.close()
-        except AttributeError:
-            info("no connection to close")
-        super().__del__()
+        """closes connection"""
+        self.db_cnxn.close()
+        self.backup_cnxn.close()
 
-    def backup_database(self, backup_path: str) -> None:
-        """Backup the SQLite database to a specified path"""
-        if self.db_file != ":memory:":
-            copyfile(self.db_file, backup_path)
 
-    def restore_database(self, backup_path: str) -> None:
-        """Restore the SQLite database from a backup"""
-        if Path(backup_path).exists():
-            copyfile(backup_path, self.db_file)
+@dataclass
+class SQLiteManager(DatabaseManager):
+    """SqlLite manager class"""
 
-    def check_integrity(
-        self,
-    ) -> bool:
+    db_path: str = field(default=":memory:")
+    backup_path: str = field(default="backup.db", repr=False)
+    cursor_obj: SQLiteCursor = field(default=SQLiteCursor, repr=False)
+    cnxn: SQLiteConnection = field(init=False, repr=False)
+    file_mgr: SQLiteFileManager = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """sets attributes"""
+        self.engine = create_engine(f"sqlite:///{self.db_path}")
+        self.cnxn = self.engine.connect()
+        self.file_mgr = SQLiteFileManager(self.db_path, self.backup_path)
+
+    def check_integrity(self) -> bool:
         """Check the integrity of the SQLite database"""
-        return self.fetchone("PRAGMA integrity_check") == "ok"
-
-    def load_database_to_memory(self) -> None:
-        """Load a file-based SQLite database into memory"""
-        if self.db_file == ":memory:":
-            raise ValueError("The database is already in memory.")
-
-        # Create a new in-memory database
-        memory_conn = sqlite_connect(":memory:")
-        file_conn = sqlite_connect(self.db_file)
-
-        # Copy data from file to memory
-        with memory_conn, file_conn:
-            file_conn.backup(memory_conn)
-
-        # Update the connection function to the in-memory database
-        self.cnxn = memory_conn
-
-    def save_memory_database_to_file(self, file_path: str) -> None:
-        """Save an in-memory SQLite database to a file"""
-        if self.db_file != ":memory:":
-            raise ValueError("The current database is not in memory.")
-
-        # Create a new file-based database connection
-        file_conn = sqlite_connect(file_path)
-        memory_conn = sqlite_connect(":memory:")
-
-        # Copy data from memory to file
-        with memory_conn, file_conn:
-            memory_conn.backup(file_conn)
-
-        # Update the connection function and db_file to the new file-based database
-        self.db_file = file_path
-        self.cnxn = file_conn
+        cursor = self.cnxn.cursor()
+        cursor.execute("PRAGMA integrity_check")
+        ret = cursor.fetchone()[0] == "ok"
+        cursor.close()
+        return ret
 
 
 @dataclass
@@ -608,7 +654,7 @@ class MSSQLManager(DatabaseManager):
     """MSSQL manager class"""
 
     def __post_init__(self) -> None:
-        self.engine = create_engine(self.curl.mssql)
+        self.engine = create_engine(self.cnxn_mgr.curl.mssql)
         if not database_exists(self.engine.url):
             create_database(self.engine.url)
 
@@ -619,6 +665,6 @@ class PostgresManager(DatabaseManager):
     """Postgres manager class"""
 
     def __post_init__(self) -> None:
-        self.engine = create_engine(self.curl.postgres)
+        self.engine = create_engine(self.cnxn_mgr.curl.postgres)
         if not database_exists(self.engine.url):
             create_database(self.engine.url)
