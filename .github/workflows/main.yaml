@@ -73,5 +73,5 @@ jobs:
     #----------------------------------------------
     - name: Run tests
       run: |
-        poetry source .venv/bin/activate
+        poetry shell
         poetry run pytest tests/ -n auto
