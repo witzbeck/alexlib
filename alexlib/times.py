@@ -24,15 +24,15 @@ datetime module.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from functools import cached_property, partial
+from functools import cached_property, partial, wraps
 from logging import info
 from math import floor
 from os import getenv
 from random import randint
 from time import perf_counter
 from collections.abc import Callable
+from typing import Any
 
-from decorator import decorator
 from pandas import Timestamp
 from pandas.tseries.holiday import Holiday, USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
@@ -40,130 +40,11 @@ from sqlalchemy import JSON, Column, DateTime, Integer, String, Float
 from sqlalchemy.orm import declarative_base
 from alexlib.constants import EPOCH_SECONDS
 
+ONEDAY = timedelta(days=1)
+
 Base = declarative_base()
 
 get_env_user = partial(getenv, "USER")
-
-
-class CustomTimedelta(timedelta):
-    """custom timedelta class with extra methods"""
-
-    @classmethod
-    def rand(cls) -> timedelta():
-        """Generate a random timedelta object."""
-        return cls(seconds=get_rand_timedelta().total_seconds())
-
-    @property
-    def epoch_self_dif(self) -> float:
-        """returns the difference between the timedelta and epoch_seconds"""
-        return self.total_seconds() - EPOCH_SECONDS
-
-    @staticmethod
-    def _find_smallest_unit(td: timedelta):
-        """returns the smallest unit of time in a timedelta"""
-        # Check each unit, starting from the largest to the smallest
-        if td.days != 0:
-            ret = "days"
-        elif td.seconds != 0:
-            ret = "seconds"
-        elif td.microseconds != 0:
-            ret = "microseconds"
-        else:
-            ret = "zero"  # Handle the case where timedelta is zero
-        return ret
-
-    def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
-        """returns the divmod of the timedelta and epoch_seconds"""
-        return divmod(self.epoch_self_dif, td.total_seconds())
-
-    def __round__(self, other: timedelta) -> timedelta:
-        """rounds the timedelta to the nearest other"""
-        diff = self.epoch_self_dif
-        mod = diff % other.total_seconds()
-        return self.__class__(seconds=diff - mod)
-
-
-class CustomDatetime(datetime):
-    """custom datetime class with extra methods"""
-
-    @classmethod
-    def rand(cls) -> datetime:
-        """Generate a random datetime object."""
-        return cls.fromtimestamp(get_rand_datetime().timestamp())
-
-    @cached_property
-    def holidays(self) -> list[Holiday]:
-        """returns a list of US Federal Holidays"""
-        return [x.date() for x in USFederalHolidayCalendar().holidays().to_pydatetime()]
-
-    @property
-    def isholiday(self) -> bool:
-        """
-        Check if the current date is a holiday.
-        Returns:
-            bool: True if the current date is a holiday, False otherwise.
-        """
-        return self.date() in self.holidays
-
-    @property
-    def isweekday(self) -> bool:
-        """Check if the current date is a weekday."""
-        return self.isoweekday() <= 5
-
-    @property
-    def isweekend(self) -> bool:
-        """Check if the current date is a weekend."""
-        return not self.isweekday
-
-    @property
-    def isbusinessday(self) -> bool:
-        """Check if the current date is a business day."""
-        return not (self.isholiday or self.isweekend)
-
-    @property
-    def yesterday(self) -> datetime:
-        """returns the previous day"""
-        return self - timedelta(days=1)
-
-    @property
-    def tomorrow(self) -> datetime:
-        """returns the next day"""
-        return self + timedelta(days=1)
-
-    @cached_property
-    def one_busday(self) -> BDay:
-        """returns a pandas business day offset"""
-        return BDay(1)
-
-    def get_last_busday(self) -> datetime:
-        """returns the last business day"""
-        chkdate = Timestamp(self.yesterday)
-        while chkdate in self.holidays:
-            chkdate = chkdate - self.one_busday
-        return chkdate.to_pydatetime()
-
-    @property
-    def epoch_self_dif(self) -> float:
-        """returns the difference between the datetime and epoch_seconds"""
-        return self.timestamp() - EPOCH_SECONDS
-
-    def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
-        """returns the divmod of the datetime and epoch_seconds"""
-        return divmod(self.epoch_self_dif, td.total_seconds())
-
-    def __round__(self, td: timedelta) -> datetime:
-        """rounds the datetime to the nearest td"""
-        mod = self.epoch_self_dif % td.total_seconds()
-        return self.fromtimestamp(EPOCH_SECONDS + self.epoch_self_dif - mod)
-
-
-class Users(Base):
-    """A user class for storing user information."""
-
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, default=get_env_user)
 
 
 class TimerLog(Base):
@@ -293,9 +174,10 @@ class Timer:
         return perf_counter() - self.start
 
     @property
-    def soft_elapsed_from_start_label(self) -> TimerLabel:
-        """Get the elapsed time representation."""
-        return TimerLabel(self.soft_elapsed_from_start)
+    def elapsed_from_last(self) -> float:
+        """Get the elapsed time."""
+        soft = self.soft_last_record
+        return self.hard_last_record - soft
 
     @property
     def soft_elapsed_from_last(self) -> float:
@@ -303,49 +185,63 @@ class Timer:
         return perf_counter() - self.soft_last_record
 
     @property
-    def soft_elapsed_from_last_label(self) -> TimerLabel:
+    def soft_start_label(self) -> TimerLabel:
+        """Get the elapsed time representation."""
+        return TimerLabel(self.soft_elapsed_from_start)
+
+    @property
+    def soft_last_label(self) -> TimerLabel:
         """Get the elapsed time representation."""
         return TimerLabel(self.soft_elapsed_from_last)
 
     @property
-    def elapsed_from_start_label(self) -> TimerLabel:
+    def from_start_label(self) -> TimerLabel:
         """Get the elapsed time representation."""
         return TimerLabel(self.elapsed_from_start)
 
     @property
-    def elapsed_from_last(self) -> float:
-        """Get the elapsed time."""
-        soft = self.soft_last_record
-        return self.hard_last_record - soft
-
-    @property
-    def elapsed_from_last_label(self) -> TimerLabel:
+    def from_last_label(self) -> TimerLabel:
         """Get the elapsed time representation."""
         return TimerLabel(self.elapsed_from_last)
 
+    @staticmethod
+    def log(
+        msg_start: str,
+        label: TimerLabel,
+        msg_end: str,
+        toprint: bool = True,
+    ) -> str:
+        """Log the elapsed time."""
+        start = f"{msg_start} " if msg_start else ""
+        end = f" {msg_end}" if msg_end else ""
+        msg = f"{start}{label}{end}"
+        if toprint:
+            print(msg)
+        return msg
+
     def log_from_start(
         self,
-        msg: str = "",
+        msg_start: str = "",
+        msg_end: str = "",
         soft: bool = False,
-    ) -> None:
+        toprint: bool = True,
+    ) -> str:
         """Log the elapsed time from start."""
-        if soft:
-            label = self.soft_elapsed_from_start_label
-        else:
-            label = self.elapsed_from_start_label
-        print(f"{msg} took {label}")
+        msg_start = f"{msg_start} took" if msg_start else msg_start
+        label = self.soft_start_label if soft else self.from_start_label
+        return Timer.log(msg_start, label, msg_end, toprint=toprint)
 
     def log_from_last(
         self,
-        msg: str = "",
+        msg_start: str = "",
+        msg_end: str = "",
         soft: bool = False,
+        toprint: bool = True,
     ) -> None:
         """Log the elapsed time from last."""
-        if soft:
-            label = self.soft_elapsed_from_last_label
-        else:
-            label = self.elapsed_from_last_label
-        print(f"{msg} in {label}")
+        msg_start = f"{msg_start} took" if msg_start else msg_start
+        label = self.soft_last_label if soft else self.from_last_label
+        return Timer.log(msg_start, label, msg_end, toprint=toprint)
 
     def __enter__(self) -> "Timer":
         """Start the timer."""
@@ -356,45 +252,68 @@ class Timer:
         self.log_perf_counter()
 
 
-@decorator
-def timeit(func: Callable, *args, niter: int = None, **kwargs) -> None:
-    """Decorator that times the execution of a function."""
-    unit_index, threshold, roundto = 0, 0.09, 6
-    units = ["s", "ms", "μs", "ns"]
-    pc1 = perf_counter()
-    result = func(*args, **kwargs) if niter is None else [func() for _ in range(niter)]
-    dif = perf_counter() - pc1
-    while dif <= threshold:
-        unit_index += 1
-        dif *= 10e3
-    loopstr = f" in {niter} loops" if niter is not None else ""
-    res = f"{str(round(dif, roundto))} {units[unit_index]}"
-    msg = f"{func.__name__} took {res}{loopstr}"
-    try:
-        nres = len(result) if niter is None else sum(len(x) for x in result)
-        msg = f"{msg} and returned {nres} results"
-    except TypeError:
-        info("timeit: result is not iterable")
-    print(msg)
-    return result
+def timeit(niter: int = None, toprint: bool = True) -> Callable:
+    """
+    Decorator factory that creates a decorator to time the execution of a function.
+    - Allows specifying the number of iterations (niter) and whether to print the timing (toprint).
+    - Must be called with parentheses when used as a decorator factory.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            timer = Timer()
+            if niter is None:
+                # Execute the function once if niter is not provided
+                result = func(*args, **kwargs)
+            else:
+                # Execute the function niter times and collect results in a list
+                result = [func(*args, **kwargs) for _ in range(niter)]
+
+            msg_start = func.__name__
+            msg_end = f"over {niter} loops" if niter is not None else ""
+
+            try:
+                # Try to calculate the number of results if iterable
+                nres = (
+                    len(result)
+                    if niter is None
+                    else sum(len(x) if hasattr(x, "__len__") else 1 for x in result)
+                )
+                msg_end = f"{msg_end} and returned {nres} results"
+                if niter:
+                    avg_label = TimerLabel(timer.soft_elapsed_from_start / niter)
+                    print(f"\nAverage time per loop: {avg_label}")
+            except TypeError:
+                # Handle non-iterable result
+                info(f"Function {func.__name__} does not return an iterable")
+
+            # Log the timing information
+            timer.log_from_start(msg_start, msg_end, toprint=toprint, soft=True)
+
+            return result
+
+        return wrapper
+
+    return decorator
 
 
-def get_rand_datetime() -> CustomDatetime:
+def get_rand_datetime() -> datetime:
     """Generate a random datetime object."""
-    return CustomDatetime(
-        randint(2, 3000),
+    return datetime(
+        randint(1000, 2500),
         randint(1, 12),
         randint(1, 28),
         randint(0, 23),
         randint(0, 59),
         randint(0, 59),
-        randint(0, 1000000),
+        randint(0, 1_000_000),
     )
 
 
-def get_rand_timedelta() -> CustomTimedelta:
+def get_rand_timedelta() -> timedelta:
     """Generate a random timedelta object."""
-    return CustomTimedelta(
+    return timedelta(
         weeks=randint(0, 100),
         days=randint(0, 30),
         hours=randint(0, 23),
@@ -402,3 +321,163 @@ def get_rand_timedelta() -> CustomTimedelta:
         seconds=randint(0, 59),
         microseconds=randint(0, 1000000),
     )
+
+
+class CustomTimedelta(timedelta):
+    """custom timedelta class with extra methods"""
+
+    def __new__(cls, *args, **kwargs):
+        """create a new instance of the class"""
+        if args and isinstance(args[0], (CustomTimedelta, timedelta)):
+            instance = args[0]
+            attrs = ["days", "seconds", "microseconds"]
+            args = [
+                getattr(instance, attr) for attr in attrs if hasattr(instance, attr)
+            ]
+        return super().__new__(cls, *args, **kwargs)
+
+    @classmethod
+    def rand(cls) -> timedelta():
+        """Generate a random timedelta object."""
+        return cls(seconds=get_rand_timedelta().total_seconds())
+
+    @property
+    def epoch_self_dif(self) -> float:
+        """returns the difference between the timedelta and epoch_seconds"""
+        return self.total_seconds() - EPOCH_SECONDS
+
+    @staticmethod
+    def _find_smallest_unit(td: timedelta):
+        """returns the smallest unit of time in a timedelta"""
+        # Check each unit, starting from the largest to the smallest
+        if td.days != 0:
+            ret = "days"
+        elif td.seconds != 0:
+            ret = "seconds"
+        elif td.microseconds != 0:
+            ret = "microseconds"
+        else:
+            ret = "zero"  # Handle the case where timedelta is zero
+        return ret
+
+    def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
+        """returns the divmod of the timedelta and epoch_seconds"""
+        return divmod(self.epoch_self_dif, td.total_seconds())
+
+    def __round__(self, other: timedelta) -> timedelta:
+        """rounds the timedelta to the nearest other"""
+        diff = self.epoch_self_dif
+        mod = diff % other.total_seconds()
+        return self.__class__(seconds=diff - mod)
+
+
+class CustomDatetime(datetime):
+    """custom datetime class with extra methods"""
+
+    def __new__(cls, *args, **kwargs):
+        """create a new instance of the class"""
+        if args and isinstance(args[0], (CustomDatetime, datetime)):
+            instance = args[0]
+            attrs = [
+                "year",
+                "month",
+                "day",
+                "hour",
+                "minute",
+                "second",
+                "microsecond",
+                "tzinfo",
+            ]
+            args = [
+                getattr(instance, attr) for attr in attrs if hasattr(instance, attr)
+            ]
+        return super().__new__(cls, *args, **kwargs)
+
+    def __round__(self, td: timedelta) -> datetime:
+        """rounds the datetime to the nearest td"""
+        mod = self.epoch_self_dif % td.total_seconds()
+        return self.fromtimestamp(EPOCH_SECONDS + self.epoch_self_dif - mod)
+
+    @classmethod
+    def rand(cls) -> datetime:
+        """Generate a random datetime object."""
+        return cls.fromtimestamp(get_rand_datetime().timestamp())
+
+    @cached_property
+    def holidays(self) -> list[Holiday]:
+        """returns a list of US Federal Holidays"""
+        return [x.date() for x in USFederalHolidayCalendar().holidays().to_pydatetime()]
+
+    @property
+    def isholiday(self) -> bool:
+        """
+        Check if the current date is a holiday.
+        Returns:
+            bool: True if the current date is a holiday, False otherwise.
+        """
+        return self.date() in self.holidays
+
+    @property
+    def isweekday(self) -> bool:
+        """Check if the current date is a weekday."""
+        return self.isoweekday() <= 5
+
+    @property
+    def isweekend(self) -> bool:
+        """Check if the current date is a weekend."""
+        return not self.isweekday
+
+    @property
+    def isbusinessday(self) -> bool:
+        """Check if the current date is a business day."""
+        return not (self.isholiday or self.isweekend)
+
+    @classmethod
+    def from_day_offset(cls, offset: int) -> "CustomDatetime":
+        """returns a datetime with the day offset"""
+        return cls.now() + timedelta(days=offset)
+
+    @property
+    def yesterday(self) -> "CustomDatetime":
+        """returns the previous day"""
+        return self - ONEDAY
+
+    @property
+    def tomorrow(self) -> "CustomDatetime":
+        """returns the next day"""
+        return self + ONEDAY
+
+    @cached_property
+    def one_busday(self) -> BDay:
+        """returns a pandas business day offset"""
+        return BDay(1)
+
+    def get_last_busday(self) -> datetime:
+        """returns the last business day"""
+        chkdate = Timestamp(self.yesterday)
+        while chkdate in self.holidays:
+            chkdate = chkdate - self.one_busday
+        return CustomDatetime(chkdate.to_pydatetime())
+
+    @property
+    def epoch_self_dif(self) -> float:
+        """returns the difference between the datetime and epoch_seconds"""
+        return self.timestamp() - EPOCH_SECONDS
+
+    def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
+        """returns the divmod of the datetime and epoch_seconds"""
+        return divmod(self.epoch_self_dif, td.total_seconds())
+
+
+class Users(Base):
+    """A user class for storing user information."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, default=get_env_user)
+
+
+if __name__ == "__main__":
+    get_rand_datetime()
+    get_rand_timedelta()

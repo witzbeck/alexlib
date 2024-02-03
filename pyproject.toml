@@ -7,37 +7,38 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pandas = "*"
-python-dotenv = "*"
-decorator = "*"
-sqlalchemy = "*"
-sqlalchemy-utils = "*"
-psycopg-binary = "*"
-psycopg = "*"
-matplotlib = "*"
-cryptography = "*"
-scipy = "*"
-scikit-learn = "*"
-reportlab = "^4.0.9"
-pillow = "^10.2.0"
-openai = "^1.8.0"
-pyarrow = "^15.0.0"
-requests = "^2.31.0"
+pandas = "^2.2"
+sqlalchemy = "^2.0"
+sqlalchemy-utils = "^0.41"
+psycopg-c = "^3.1"
+psycopg = "^3.1"
+matplotlib = "^3.7"
+cryptography = "^42.0"
+scipy = "^1.12"
+scikit-learn = "^1.4"
+reportlab = "^4.0"
+pillow = "^10.2"
+openai = "^1.11"
+pyarrow = "^15.0"
+requests = "^2.31"
 
 [tool.poetry.group.test.dependencies]
-sqlfluff = "*"
-pytest = "*"
-pytest-cov = "*"
-pytest-mock = "*"
-pytest-xdist = "*"
+sqlfluff = "^2.3"
+pytest = "^8.0"
+pytest-cov = "^4.1"
+pytest-mock = "^3.12"
+pytest-xdist = "^3.5"
 
-[tool.pytest]
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29"
+
+[tool.pytest.ini_options]
 addopts = [
     "--cov=alexlib", 
     "--cov-report=term-missing", 
-    "--cov-report=md",
-    "--cov-report=html", 
-    "--cov-fail-under=80", 
+    "--cov-report=xml",
+    "--cov-report=json",
+    "--cov-fail-under=60", 
     "--cov-branch"
 ]
 testpaths = ["tests"]

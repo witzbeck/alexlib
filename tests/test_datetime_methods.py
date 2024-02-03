@@ -4,7 +4,7 @@ from datetime import timedelta
 from unittest import main
 from unittest import TestCase
 
-from alexlib.times import CustomDatetime
+from alexlib.times import CustomDatetime, CustomTimedelta
 from alexlib.times import get_rand_datetime
 from alexlib.times import get_rand_timedelta
 
@@ -15,7 +15,7 @@ class TestNewDatetimeMethods(TestCase):
     @property
     def rand_datetime(self) -> CustomDatetime:
         """Return random datetime."""
-        return get_rand_datetime()
+        return CustomDatetime.rand()
 
     def setUp(self) -> None:
         """Set up the test case."""
@@ -23,7 +23,7 @@ class TestNewDatetimeMethods(TestCase):
         self.thisyear = self.now.year
         self.xmas = CustomDatetime(self.thisyear, 12, 25)
         self.oneday = timedelta(days=1)
-        self.td = get_rand_timedelta()
+        self.td = CustomTimedelta.rand()
 
     def test_isholiday(self) -> None:
         """Test isholiday method."""
@@ -63,6 +63,24 @@ class TestNewDatetimeMethods(TestCase):
         dt = self.rand_datetime
         self.assertIsInstance(dt.yesterday, datetime)
         self.assertEqual(dt.yesterday, dt - self.oneday)
+
+    def test_get_last_busday(self) -> None:
+        """Test get_last_busday method."""
+        dt = self.rand_datetime
+        last_busday = dt.get_last_busday()
+        self.assertIsInstance(last_busday, CustomDatetime)
+        if dt.yesterday.isbusinessday:
+            self.assertEqual(last_busday, dt.yesterday)
+        else:
+            self.assertLess(last_busday, dt)
+
+    def test_get_rand_datetime(self) -> None:
+        """Test get_rand_datetime function."""
+        self.assertIsInstance(get_rand_datetime(), datetime)
+
+    def test_get_rand_timedelta(self) -> None:
+        """Test get_rand_timedelta function."""
+        self.assertIsInstance(get_rand_timedelta(), timedelta)
 
 
 if __name__ == "__main__":

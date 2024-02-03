@@ -5,6 +5,7 @@ specifically focusing on the functionality and reliability of the Directory clas
 """
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase, main
 from alexlib.files import Directory, File
 
@@ -18,15 +19,16 @@ class TestDirectory(TestCase):
 
     def setUp(self):
         """Set up resources for all tests."""
-        self.test_dir = Path("test_directory")
-        self.test_dir.mkdir(exist_ok=True)
+        self.test_dir = TemporaryDirectory()
+        self.addCleanup(self.test_dir.cleanup)
+        self.test_dir_path = Path(self.test_dir.name)
+        self.directory = Directory.from_path(self.test_dir_path)
         # Create subdirectories and files for testing
-        (self.test_dir / "subdir").mkdir(exist_ok=True)
-        (self.test_dir / "file.txt").write_text("Test file content")
-        (self.test_dir / "subdir" / "subfile.txt").write_text(
+        (self.test_dir_path / "subdir").mkdir(exist_ok=True)
+        (self.test_dir_path / "file.txt").write_text("Test file content")
+        (self.test_dir_path / "subdir" / "subfile.txt").write_text(
             "Subdirectory file content"
         )
-        self.directory = Directory.from_path(Path("test_directory"))
 
     def tearDown(self):
         """Clean up resources after all tests."""
@@ -36,13 +38,20 @@ class TestDirectory(TestCase):
         """Test the instantiation and basic properties of the Directory class."""
         self.assertIsInstance(self.directory, Directory)
         self.assertTrue(self.directory.isdir)
-        self.assertEqual(self.directory.name, "test_directory")
+        self.assertEqual(self.directory.name, self.test_dir_path.name)
 
     def test_directory_specific_properties(self):
         """Test directory-specific property methods like `contents`, `dirlist`, and `filelist`."""
-        self.assertTrue(any(self.directory.contents))
-        self.assertTrue(any(isinstance(d, Directory) for d in self.directory.dirlist))
-        self.assertTrue(any(isinstance(f, File) for f in self.directory.filelist))
+        with TemporaryDirectory() as td:
+            subdir = Path(td) / "subdir"
+            subdir.mkdir()
+            (subdir / "file.txt").write_text("Test file content")
+            directory = Directory.from_path(Path(td))
+            self.assertTrue(any(directory.contents))
+            self.assertTrue(
+                any(isinstance(d, Directory) for d in self.directory.dirlist)
+            )
+            self.assertTrue(any(isinstance(f, File) for f in self.directory.filelist))
 
     def test_directory_manipulation_methods(self):
         """Test directory manipulation methods like `get_latest_file`, `rm_files`, and `teardown`."""
