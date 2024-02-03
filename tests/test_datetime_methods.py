@@ -41,16 +41,15 @@ class TestNewDatetimeMethods(TestCase):
 
     def test_isbusinessday(self) -> None:
         """Test isbusinessday method."""
-        self.assertIsInstance(self.rand_datetime.get_last_busday(), datetime)
         for _ in range(10):
             dt = self.rand_datetime
+            last_busday = dt.get_last_busday()
+            self.assertIsInstance(last_busday, datetime)
             self.assertIsInstance(self.rand_datetime.isbusinessday, bool)
-            self.assertIsNot(
-                dt.isbusinessday,
-                dt.isholiday or dt.isweekend,
-                msg=f"{dt} is a holiday or weekend",
-            )
-            self.assertIsNot(dt.isbusinessday, dt.isweekend)
+            if dt.isbusinessday:
+                self.assertFalse(dt.isholiday or dt.isweekend)
+            else:
+                self.assertTrue(dt.isholiday or dt.isweekend)
 
     def test_tomorrow(self) -> None:
         """Test tomorrow method."""
