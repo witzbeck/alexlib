@@ -5,6 +5,8 @@ from alexlib.files import Directory, File
 from alexlib.ml.llm_response import MarkdownResponse, TestCaseResponse
 from alexlib.times import Timer
 
+
+PY_FILE_PATTERN = "files"
 MODULE_PATH = Path(__file__).parent
 TESTS_PATH = MODULE_PATH.parent / "tests"
 
@@ -100,11 +102,10 @@ def mk_llm_test_request(
             pytest_filepath.touch(exist_ok=True)
             tocopy = "\n".join(
                 [
-                    f"""Write comprehensive and detailed unit test cases and the code that will test them
-                    in Python for the supplied code using the unittest framework.
-                    Import the unittest components like this: from unittest import TestCase, main.
-                    Make sure to import the modules and functions you're testing explicitly.
-                    Please include a docstring for each test case, function, class, and the module.
+                    f"""Write comprehensive and detailed implementations of the test cases
+                    for the supplied code using the unittest framework.
+                    Please use explicit imports and avoid wildcard imports.
+                    Please include a docstring for each function, class, and the module.
                     The module name is 'alexlib.{module_name}'.\n""",
                     f"Test cases for {heading}:\n",
                     steps,
@@ -120,6 +121,7 @@ def mk_llm_test_request(
 if __name__ == "__main__":
     t = Timer()
     py_files = get_python_files(MODULE_DIR, allchildren=True)
+    py_files = [file for file in py_files if PY_FILE_PATTERN in file.name]
     ncases_total, nsteps_total = 0, 0
     for pyfile in py_files:
         tcfile = File.from_path(

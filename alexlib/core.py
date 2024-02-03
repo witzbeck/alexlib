@@ -44,7 +44,8 @@ def get_local_tz() -> timezone:
 def isnone(w: str) -> bool:
     """checks if input is None or empty string"""
     if isinstance(w, str):
-        ret = w.lower() == "none" or len(w) == 0
+        processed_str = w.strip().lower()
+        ret = processed_str == "none" or len(processed_str) == 0
     else:
         ret = w is None
     return ret
@@ -59,8 +60,15 @@ def istrue(w: str | int) -> bool:
     elif isinstance(w, int):
         ret = bool(w)
     elif isinstance(w, str):
-        ret = w.lower() == "true" or w.lower() == "t"
+        processed_str = w.strip().lower()
+        ret = processed_str == "true" or processed_str == "t"
+        ret = not (processed_str == "false" or processed_str == "f") if ret else ret
         ret = bool(int(w)) if w.isnumeric() else ret
+    else:
+        try:
+            ret = bool(w)
+        except TypeError:
+            ret = False
     return ret
 
 
@@ -90,7 +98,9 @@ def asdict(
 
 def aslist(val: str, sep: str = ",") -> list[Any]:
     """converts string to list"""
-    if val.startswith("[") and val.endswith("]"):
+    if val == "":
+        ret = []
+    elif val.startswith("[") and val.endswith("]"):
         try:
             ret = loads(val)
         except JSONDecodeError:

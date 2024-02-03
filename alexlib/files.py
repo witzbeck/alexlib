@@ -127,12 +127,12 @@ class SystemObject:
     @property
     def isfile(self) -> bool:
         """checks if path is a file"""
-        return self.path.is_file()
+        return self.path.is_file() or self.__class__.__name__ == "File"
 
     @property
     def isdir(self) -> bool:
         """checks if path is a directory"""
-        return self.path.is_dir()
+        return self.path.is_dir() or self.__class__.__name__ == "Directory"
 
     @cached_property
     def sysobj_names(self) -> list[str]:
@@ -219,16 +219,16 @@ class SystemObject:
             ret = self.name
         return ret
 
-    def set_name(self) -> None:
+    def set_name(self, name: str) -> None:
         """sets name from path or name"""
-        self.name = self.get_name()
+        self.name = name if name else self.get_name()
 
     def __post_init__(self) -> None:
         """sets path and name"""
         self.set_path()
         if not isinstance(self.path, Path):
             raise TypeError(f"{self.path} is not Path")
-        self.set_name()
+        self.set_name(self.get_name())
         if not isinstance(self.name, str):
             raise TypeError(f"{self.name} is not str")
 
@@ -438,7 +438,7 @@ class File(SystemObject):
             newpath.unlink()
         self.path.rename(self.path.parent / name)
         self.path = newpath
-        self.set_name()
+        self.set_name(name)
 
     def istype(self, suffix: str) -> bool:
         """checks if file is of type"""
@@ -656,7 +656,7 @@ class File(SystemObject):
     @classmethod
     def from_df(cls, df: DataFrame, path: Path):
         """writes dataframe to file"""
-        funcname = f"to_{path.suffix}"
+        funcname = f"to_{path.suffix.strip('.')}"
         func = getattr(df, funcname)
         func(path)
         return cls(path=path)
@@ -988,7 +988,7 @@ class Directory(SystemObject):
             raise ValueError("invalid type")
 
         self.path = path / name
-        self.set_name()
+        self.set_name(name)
 
         if not self.exists:
             ret = SystemObject(
