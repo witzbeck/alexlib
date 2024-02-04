@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "alexlib"
-version = "0.3.0"
+version = "0.4.0"
 description = "A toolset for data science, machine learning, and data engineering."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
@@ -36,8 +36,6 @@ ipykernel = "^6.29"
 addopts = [
     "--cov=alexlib", 
     "--cov-report=term-missing", 
-    "--cov-report=xml",
-    "--cov-report=json",
     "--cov-fail-under=60", 
     "--cov-branch"
 ]

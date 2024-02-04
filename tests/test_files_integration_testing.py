@@ -6,7 +6,8 @@ from shutil import rmtree
 from tempfile import mkdtemp
 from unittest import TestCase, main
 from pathlib import Path
-from alexlib.files import Directory, File, eval_parents
+from alexlib.files.objects import Directory, File
+from alexlib.files.utils import eval_parents
 
 
 class TestAlexLibFiles(TestCase):

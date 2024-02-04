@@ -1,5 +1,6 @@
 from unittest import TestCase, main
-from alexlib.files import figsave, path_search, eval_parents, copy_csv_str
+from alexlib.files.objects import Directory, File
+from alexlib.files.utils import figsave, path_search, eval_parents, copy_csv_str
 
 
 class TestUtilityFunctions(TestCase):
@@ -58,20 +59,20 @@ class TestFile(TestCase):
 
     def setUp(self):
         """Setup common resources for testing File."""
-        pass  # Implementation of the setup
+        File  # Implementation of the setup
 
     def test_read_write_operations(self):
         """Test reading, writing, and modifying file contents."""
         # Setup: Create a File instance
         # Test: Read, write, append, prepend, and replace text
         # Verify: File contents are updated as expected
-        pass  # Implementation of the test case
+        File.write_lines  # Implementation of the test case
 
     def test_file_type_checks(self):
         """Test file type checking methods like iscsv, isjson, etc."""
         # Setup: Create File instances with different types
         # Verify: Type checking methods return correct boolean values
-        pass  # Implementation of the test case
+        File.istype  # Implementation of the test case
 
     # Additional tests for other methods and properties of File
 
@@ -83,14 +84,14 @@ class TestDirectory(TestCase):
 
     def setUp(self):
         """Setup common resources for testing Directory."""
-        pass  # Implementation of the setup
+        Directory  # Implementation of the setup
 
     def test_directory_operations(self):
         """Test operations specific to directories, such as listing contents."""
         # Setup: Create a Directory instance
         # Test: List files, directories, perform operations like add_header_to_files
         # Verify: Directory contents and states are manipulated as expected
-        pass  # Implementation of the test case
+        Directory.get_type_filelist  # Implementation of the test case
 
     # Additional tests for other methods and properties of Directory
 

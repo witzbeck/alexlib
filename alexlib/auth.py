@@ -29,7 +29,7 @@ from alexlib.constants import CREDS
 from alexlib.core import chkenv, read_json
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randlets, randdigit, randdigits
-from alexlib.files import File
+from alexlib.files.objects import File
 
 
 AUTH_TEMPLATE = {

@@ -32,7 +32,7 @@ from pandas import DataFrame
 from sqlalchemy import Engine
 
 from alexlib.core import chkenv
-from alexlib.files import Directory, File
+from alexlib.files.objects import Directory, File
 
 
 def execute_query(

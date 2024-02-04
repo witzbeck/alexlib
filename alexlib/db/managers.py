@@ -53,13 +53,13 @@ from sqlalchemy import Connection, Engine, create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from alexlib.auth import Auth, Curl
-from alexlib.config import Settings
+from alexlib.files.config import Settings
 from alexlib.core import ping
 from alexlib.db.objects import Name, Schema, Table
 from alexlib.db.sql import SQL, mk_view_text
 from alexlib.db.sql import create_cmd, drop_cmd, truncate_table_cmd
 from alexlib.df import get_distinct_col_vals
-from alexlib.files import File
+from alexlib.files.objects import File
 
 
 def create_memory_db() -> SQLiteConnection:

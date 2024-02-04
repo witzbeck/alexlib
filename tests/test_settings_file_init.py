@@ -28,7 +28,7 @@ from pathlib import Path
 from unittest import main
 from unittest import TestCase
 
-from alexlib.config import Settings
+from alexlib.files.config import Settings
 
 
 class TestConfigFile(TestCase):

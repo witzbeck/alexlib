@@ -28,7 +28,7 @@ from alexlib.db.objects import Name
 
 from alexlib.constants import COL_SUBS, SQL_INFOSCHEMA_COL
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.files import File
+from alexlib.files.objects import File
 
 LOGICALS = ["and", "or"]
 

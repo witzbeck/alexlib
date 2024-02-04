@@ -6,7 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from alexlib.files import File
+from alexlib.files.objects import File
 
 ML_PATH = Path(__file__).parent
 PROJ_PATH = ML_PATH.parent

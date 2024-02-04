@@ -7,7 +7,7 @@ specifically focusing on the functionality and reliability of the Directory clas
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main
-from alexlib.files import Directory, File
+from alexlib.files.objects import Directory, File
 
 
 class TestDirectory(TestCase):

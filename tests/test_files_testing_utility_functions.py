@@ -8,8 +8,10 @@ including file and directory operations, manipulation, searching, and database i
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main
-from alexlib.files import figsave, eval_parents, path_search
 from matplotlib.figure import Figure
+
+from alexlib.files.objects import path_search
+from alexlib.files.utils import eval_parents, figsave
 
 
 class TestFigsSave(TestCase):

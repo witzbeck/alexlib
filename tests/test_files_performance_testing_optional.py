@@ -2,13 +2,15 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 from unittest import TestCase, main
 from unittest.mock import patch, MagicMock
-from alexlib.files import (
-    figsave,
-    eval_parents,
-    path_search,
+from alexlib.files.objects import (
     SystemObject,
     File,
     Directory,
+)
+from alexlib.files.utils import (
+    path_search,
+    eval_parents,
+    figsave,
 )
 
 
@@ -54,7 +56,7 @@ class TestEvalParents(TestCase):
 class TestPathSearch(TestCase):
     """Tests for the path_search function."""
 
-    @patch("alexlib.files.Path.rglob")
+    @patch("pathlib.Path.rglob")
     def test_path_search_found(self, mock_rglob):
         """Test path_search successfully finds the specified pattern."""
         pattern = "test_file.txt"

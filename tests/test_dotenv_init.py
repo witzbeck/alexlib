@@ -19,7 +19,7 @@ from pathlib import Path
 from unittest import main
 from unittest import TestCase
 
-from alexlib.config import DotEnv
+from alexlib.files.config import DotEnv
 
 
 class TestConfigFile(TestCase):

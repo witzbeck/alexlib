@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from alexlib.core import datetime, chkenv
 from alexlib.db import Connection
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.config import DotEnv
+from alexlib.files.config import DotEnv
 from alexlib.iters import keys, link
 from alexlib.maths import discrete_exp_dist
 
@@ -495,7 +495,10 @@ class Parameters:
         }
         _dict = _dict[self.model_type]
         _keys = keys(_dict)
-        innotrand = lambda x: (x in _keys and not self.randomsearch)
+
+        def innotrand(x: str) -> bool:
+            return x in _keys and not self.randomsearch
+
         if innotrand("clf__learning_rate") and self.model_type != "mlp":
             _dict.update({"clf__learning_rate": discrete_exp_dist(1, 4)})
         if innotrand("clf__C"):

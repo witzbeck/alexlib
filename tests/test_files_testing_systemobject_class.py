@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main
-from alexlib.files import SystemObject
+from alexlib.files.objects import SystemObject
 
 
 class TestSystemObject(TestCase):

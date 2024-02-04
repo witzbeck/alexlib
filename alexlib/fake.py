@@ -39,7 +39,7 @@ from random import choice, choices, randint
 from string import ascii_letters, digits, printable, punctuation, whitespace
 from alexlib.constants import ISTYPE_EXTS
 
-from alexlib.files import Directory, File
+from alexlib.files.objects import Directory, File
 
 DIGITS = list(digits)
 LETTERS = list(ascii_letters)

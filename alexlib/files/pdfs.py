@@ -8,7 +8,7 @@ from reportlab.lib.fonts import _tt2ps_map
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen.canvas import Canvas
 
-from alexlib.files import File
+from alexlib.files.objects import File
 
 
 @dataclass

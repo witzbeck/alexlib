@@ -4,7 +4,7 @@ from unittest import TestCase, main
 from pathlib import Path
 from pandas import DataFrame
 
-from alexlib.files import File, Directory
+from alexlib.files.objects import File, Directory
 
 
 class TestFileOperations(TestCase):

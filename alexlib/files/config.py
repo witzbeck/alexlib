@@ -32,7 +32,7 @@ from typing import Any
 
 from alexlib.constants import DATETIME_FORMAT
 from alexlib.core import envcast, isnone
-from alexlib.files import Directory, File
+from alexlib.files.objects import Directory, File
 
 ConfigFormat = str
 ConfigType = type[str]

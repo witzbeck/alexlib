@@ -32,86 +32,13 @@ from pathlib import Path
 from random import choice
 from typing import Any
 
-from matplotlib.pyplot import savefig
 from pandas import DataFrame
 from sqlalchemy import Engine
 
 from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
 from alexlib.core import chkenv, sha256sum, to_clipboard
+from alexlib.files.utils import path_search
 from alexlib.iters import link
-
-
-def figsave(
-    name: str,
-    dirpath: Path,
-    fmt: str = "png",
-    **kwargs,  # use bb_inches=tight if cutoff
-) -> bool:
-    """save a figure to a path"""
-    path = dirpath / f"{name}.{fmt}"
-    savefig(path, format=fmt, **kwargs)
-    return path.exists()
-
-
-def eval_parents(path: Path, include: set, exclude: set) -> bool:
-    """evaluates whether a path is included or excluded"""
-    if isinstance(exclude, str):
-        exclude = {exclude}
-    elif exclude is None:
-        exclude = set()
-    else:
-        exclude = set(exclude)
-    if isinstance(include, str):
-        include = {include}
-    elif include is None:
-        include = set()
-    else:
-        include = set(include)
-    parts = set(path.parts)
-    chk_include = not include or include.issubset(parts)
-    chk_exclude = not exclude or not exclude.intersection(parts)
-    return chk_include and chk_exclude
-
-
-# pylint: disable=too-many-arguments
-def path_search(
-    pattern: str,
-    start_path: Path = Path(__file__).parent,
-    listok: bool = False,
-    include: list[str] = None,
-    exclude: list[str] = None,
-    max_ascends: int = 8,
-) -> Path | list[Path]:
-    """searches for a path by pattern, ascending up to max_ascends times"""
-    n_ascends, search_path = 0, start_path
-    while n_ascends <= max_ascends:
-        try:
-            found_paths = [
-                x
-                for x in search_path.rglob(pattern)
-                if eval_parents(x, include, exclude)
-            ]
-            if (len_ := len(found_paths)) == 1:
-                ret = found_paths[0]
-            elif len_ > 1 and listok:
-                ret = found_paths
-            elif len_ > 1:
-                raise ValueError(f"multiple {pattern} found in {search_path}")
-            else:
-                raise FileNotFoundError(f"no {pattern} found in {search_path}")
-            return ret
-        except FileNotFoundError:
-            search_path = search_path.parent
-            n_ascends += 1
-    raise FileNotFoundError(f"no {pattern} found in {start_path}")
-
-
-def copy_csv_str(table_name: str, csv_path: Path) -> str:
-    """generates a copy statement for a csv file"""
-    return f"""COPY {table_name} FROM '{csv_path}'
-    DELIMITER ','
-    CSV HEADER
-    """
 
 
 @dataclass
@@ -1016,14 +943,3 @@ class Directory(SystemObject):
     def __floordiv__(self, other: SystemObject | str) -> SystemObject:
         """divides directory by other"""
         return self.__div__(other)
-
-
-def update_file_version(
-    version: str,
-    path: Path,
-) -> None:
-    """updates file version"""
-    file = File.from_path(path)
-    newline = f"version = {version}"
-    newlines = [newline if x.startswith("version") else x for x in file.lines]
-    file.write_lines(newlines)

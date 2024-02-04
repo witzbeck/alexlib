@@ -1,7 +1,7 @@
 from pathlib import Path
 from alexlib.core import to_clipboard
 
-from alexlib.files import Directory, File
+from alexlib.files.objects import Directory, File
 from alexlib.ml.llm_response import MarkdownResponse, TestCaseResponse
 from alexlib.times import Timer
 

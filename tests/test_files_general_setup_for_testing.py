@@ -2,10 +2,10 @@ from unittest import TestCase, main
 from unittest.mock import patch, mock_open
 from pathlib import Path
 import os
-from alexlib.files import (
-    eval_parents,
+from alexlib.files.objects import (
     SystemObject,
 )
+from alexlib.files.utils import eval_parents
 
 
 def mock_path_exists(return_value=True):
