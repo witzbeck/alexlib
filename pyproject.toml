@@ -21,6 +21,7 @@ pillow = "^10.2"
 openai = "^1.11"
 pyarrow = "^15.0"
 requests = "^2.31"
+statsmodels = "^0.14.1"
 
 [tool.poetry.group.test.dependencies]
 sqlfluff = "^2.3"
