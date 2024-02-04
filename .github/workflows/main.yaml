@@ -74,5 +74,3 @@ jobs:
     - name: Run tests
       run: |
         poetry run pytest --cov=alexlib --cov-report=xml -n auto
-        poetry run sqlfluff fix --force --config ./pyproject.toml
-        poetry run sqlfluff lint --config ./pyproject.toml

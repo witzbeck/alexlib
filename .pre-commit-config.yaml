@@ -49,11 +49,11 @@ repos:
       - id: sqlfluff-fix
         name: SQLFluff Fix
         types: [sql]
-        entry: sqlfluff fix --force --config ./pyproject.toml
+        entry: sqlfluff fix --force --config pyproject.toml
       - id: sqlfluff-lint
         name: SQLFluff Lint
         types: [sql]
-        entry: sqlfluff lint --config ./pyproject.toml
+        entry: sqlfluff lint --config pyproject.toml
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.0
