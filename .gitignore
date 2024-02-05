@@ -1,15 +1,24 @@
-!.gitignore
-
-# envs
-.env.*
-*.env
+!.gitignore 
 !*.json
+!*.txt
+
+*.key
+*.lock
+*.code-workspace
+*.log
+*.log.*
+*test_cases.md
+/secrets
+secrets.*
+*.[eE][nN][vV]*
+
+.vs
+.vscode
+.idea
 
 recipe/*.pdf
-debug.env
 *.code-workspace
 .vscode/
-.vscode
 
 # Logs
 tests/fixtures/cached_*_text.txt
@@ -24,8 +33,6 @@ lightning_logs/
 .python-version
 serialization_dir
 /research
-*.[eE][nN][vV]*
-.vs
 !*.txt
 logs/
 cache*

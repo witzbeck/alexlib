@@ -1,20 +1,27 @@
 """Test core functions."""
+from datetime import timezone
+from json import JSONDecodeError
 from os import environ
 from pathlib import Path
 from random import choice
-from unittest import main
-from unittest import TestCase
+from unittest import main, TestCase
+from unittest.mock import patch
 
-from alexlib.core import asdict
-from alexlib.core import aslist
-from alexlib.core import chkenv
-from alexlib.core import chktext
-from alexlib.core import chktype
-from alexlib.core import envcast
-from alexlib.core import isdunder
-from alexlib.core import ishidden
-from alexlib.core import isnone
-from alexlib.core import istrue
+from alexlib.core import (
+    asdict,
+    aslist,
+    chkenv,
+    chktext,
+    chktype,
+    concat_lists,
+    envcast,
+    get_local_tz,
+    isdunder,
+    ishidden,
+    isnone,
+    istrue,
+    read_json,
+)
 
 
 class TestCore(TestCase):
@@ -95,6 +102,10 @@ class TestCore(TestCase):
 
     def test_isnone(self) -> None:
         """Test isnone function."""
+        self.assertFalse(isnone(True))
+        self.assertFalse(isnone("test"))
+        self.assertFalse(isnone(1))
+        self.assertFalse(isnone(0.0))
         self.assertTrue(isnone("None"))
         self.assertTrue(isnone("none"))
         self.assertTrue(isnone(""))
@@ -110,7 +121,26 @@ class TestCore(TestCase):
         self.assertEqual(lst, ["a", "b", "c"])
 
     def test_chktext(self) -> None:
-        """Test chktext function."""
+        """Test with texts that meet and do not meet the prefix, value, and suffix conditions."""
+        self.assertTrue(
+            chktext("hello world", prefix="hello"),
+            "Failed to recognize correct prefix.",
+        )
+        self.assertTrue(
+            chktext("hello world", value="world"), "Failed to recognize correct value."
+        )
+        self.assertTrue(
+            chktext("hello world", suffix="world"),
+            "Failed to recognize correct suffix.",
+        )
+        self.assertFalse(
+            chktext("hello world", prefix="world"),
+            "Incorrectly identified incorrect prefix.",
+        )
+        self.assertFalse(
+            chktext("hello world", suffix="hello"),
+            "Incorrectly identified incorrect suffix.",
+        )
         with self.assertRaises(ValueError):
             chktext("ab")
         self.assertTrue(chktext("abc", prefix="a"))
@@ -124,7 +154,22 @@ class TestCore(TestCase):
         self.assertFalse(chktext("abc", value="d"))
 
     def test_chktype(self) -> None:
-        """Test chktype function."""
+        """Test with objects of correct and incorrect types. Also, test path existence if the object is a Path."""
+        self.assertEqual(
+            chktype("text", str), "text", "Failed to recognize correct type."
+        )
+        with self.assertRaises(TypeError):
+            chktype(123, str)
+        temp_file = Path("temp_file_for_testing.txt")
+        temp_file.touch()  # Create the file for testing
+        try:
+            self.assertEqual(
+                chktype(temp_file, Path, mustexist=True),
+                temp_file,
+                "Failed to recognize path existence.",
+            )
+        finally:
+            temp_file.unlink()  # Clean up by removing the file
         with self.assertRaises(TypeError):
             chktype("a", int)
         with self.assertRaises(TypeError):
@@ -133,6 +178,14 @@ class TestCore(TestCase):
         self.assertEqual(chktype(1, int), 1)
         self.assertEqual(chktype([], list), [])
         self.assertEqual(chktype({}, dict), {})
+
+    def test_concat_lists(self):
+        """Test with various lists of lists."""
+        self.assertEqual(
+            concat_lists([[1, 2], [3, 4]]),
+            [1, 2, 3, 4],
+            "Failed to correctly concatenate lists.",
+        )
 
     def test_envcast(self) -> None:
         """Test envcast function."""
@@ -170,11 +223,13 @@ class TestCore(TestCase):
         self.assertTrue(isdunder("__dunder__"))
         self.assertFalse(isdunder("dunder__"))
         self.assertFalse(isdunder("__dunder"))
+        self.assertFalse(isdunder("test"))
 
     def test_ishidden(self) -> None:
         """Test ishidden function."""
         self.assertTrue(ishidden("_hidden"))
         self.assertFalse(ishidden("hidden_"))
+        self.assertFalse(ishidden("test"))
         self.assertTrue(ishidden("_hidden_"))
 
     def test_asdict(self) -> None:
@@ -215,6 +270,8 @@ class TestCore(TestCase):
     def test_default_for_empty_variable(self) -> None:
         """Test chkenv function with empty variable."""
         self.assertEqual(chkenv("EMPTY_VAR", need=False, ifnull="default"), "default")
+        with self.assertRaises(ValueError):
+            chkenv("EMPTY_VAR", need=True)
 
     def test_type_conversion(self) -> None:
         """Test chkenv function with type conversion."""
@@ -227,6 +284,36 @@ class TestCore(TestCase):
     def test_boolean_false_value(self) -> None:
         """Test chkenv function with boolean false value."""
         self.assertFalse(chkenv("FALSE_VAR", astype=bool))
+
+    def test_get_local_tz(self):
+        """Ensure it returns the correct local timezone."""
+        self.assertIsInstance(
+            get_local_tz(), timezone, "The returned value is not a timezone instance."
+        )
+
+
+class TestReadJson(TestCase):
+    def test_read_json(self):
+        """Test with valid and invalid JSON files."""
+        valid_json_content = '{"key": "value"}'
+        invalid_json_content = '{"key": "value"'
+
+        # Create a mock Path object for valid JSON content
+        with patch("pathlib.Path") as MockPath:
+            mock_path_instance = MockPath.return_value
+            mock_path_instance.read_text.return_value = valid_json_content
+            self.assertEqual(
+                read_json(mock_path_instance),
+                {"key": "value"},
+                "Failed to read valid JSON.",
+            )
+
+        # Create a mock Path object for invalid JSON content
+        with patch("pathlib.Path") as MockPath:
+            mock_path_instance = MockPath.return_value
+            mock_path_instance.read_text.return_value = invalid_json_content
+            with self.assertRaises(JSONDecodeError):
+                read_json(mock_path_instance)
 
 
 if __name__ == "__main__":
