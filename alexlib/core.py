@@ -232,7 +232,7 @@ def flatten_dict(
     parent_key: str = None,
     sep: str = ":",
 ) -> dict[str:str]:
-    """concattenates keys to flatter dict"""
+    """concatenates keys to create dict having only one level of key value pairs"""
     return {
         f"{parent_key}{sep}{k}" if parent_key else k: v
         for k, v in d.items()
@@ -246,13 +246,12 @@ def get_attrs(
     obj: object,
     include_hidden: bool = False,
     include_dunder: bool = False,
+    include_methods: bool = False,
 ) -> dict[str:Any]:
     """returns all attributes of object"""
-    attrs = {
-        attr: getattr(obj, attr)
-        for attr in dir(obj)
-        if not callable(getattr(obj, attr))
-    }
+    attrs = {attr: getattr(obj, attr) for attr in dir(obj)}
+    if not include_methods:
+        attrs = {k: v for k, v in attrs.items() if not callable(v)}
     if not include_hidden:
         attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
     if not include_dunder:
@@ -357,11 +356,9 @@ def mk_dictvals_distinct(dict_: dict[Hashable:Any]) -> dict[Hashable:Any]:
     return {key: list(set(dict_[key])) for key in keys}
 
 
-def invert_dict(_dict: dict) -> dict[Hashable:Hashable]:
+def invert_dict(dict_: dict) -> dict[Hashable:Hashable]:
     """flips the keys and values of a dictionary"""
-    rng = range(len(_dict))
-    vals = list(_dict.values())
-    return {vals[i]: _dict[vals[i]] for i in rng}
+    return {v: k for k, v in dict_.items()}
 
 
 def sha256sum(
