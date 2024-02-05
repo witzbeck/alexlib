@@ -43,7 +43,7 @@ addopts = [
 testpaths = ["tests"]
 
 [tool.sqlfluff.core]
-verbose = 2
+verbose = 0
 dialect = "postgres"
 sql_file_exts = ".sql"
 max_line_length = 120
