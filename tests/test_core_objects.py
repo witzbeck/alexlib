@@ -20,7 +20,7 @@ from alexlib.core import (
 )
 
 
-class TestClass:
+class _TestClass:
     """Test class for `get_attrs` function."""
 
     def __init__(
@@ -47,7 +47,7 @@ class TestGetAttrs(TestCase):
     """Test the `get_attrs` function."""
 
     def setUp(self):
-        self.test_obj = TestClass()
+        self.test_obj = _TestClass()
 
     def test_get_all_attrs(self):
         d = get_attrs(

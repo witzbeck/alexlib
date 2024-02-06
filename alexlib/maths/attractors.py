@@ -72,9 +72,10 @@ def coords(
     x0: float,
     y0: float,
     func: Callable,
+    *args,
     **kwargs,
 ) -> tuple[array, array]:
-    shape = (n, n)
+    # shape = (n, n)
     combs = get_comb_gen((n - 1, n - 1))
     grid = zeros((n, n))
     x, y = x0, y0
@@ -94,8 +95,8 @@ def frame(
     mu: float = 0.2,
     n: int = 100000,
 ) -> Generator:
-
     gen = coords(func, n, x0=x0, y0=y0, a=a, b=b, c=c, d=d, mu=mu)
+    return gen
 
 
 @dataclass
