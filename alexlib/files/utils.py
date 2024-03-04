@@ -88,11 +88,3 @@ def path_search(
             search_path = search_path.parent
             n_ascends += 1
     raise FileNotFoundError(f"no {pattern} found in {start_path}")
-
-
-def copy_csv_str(table_name: str, csv_path: Path) -> str:
-    """generates a copy statement for a csv file"""
-    return f"""COPY {table_name} FROM '{csv_path}'
-    DELIMITER ','
-    CSV HEADER
-    """
