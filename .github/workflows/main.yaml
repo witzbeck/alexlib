@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, alexlib]
+    runs-on: [ubuntu-latest]
     strategy:
       matrix:
         python-version: ['3.12', '3.11']
