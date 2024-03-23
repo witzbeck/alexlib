@@ -18,22 +18,28 @@ The module relies on standard Python libraries such as `dataclasses`, `datetime`
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
 from dataclasses import dataclass
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
+from functions import partial
 from hashlib import sha256
 from itertools import chain
-from json import dumps
-from json import JSONDecodeError
-from json import loads
+from json import dumps, JSONDecodeError, loads
 from logging import debug
 from os import environ, getenv
 from pathlib import Path
-from socket import AF_INET
-from socket import SOCK_STREAM
-from socket import socket
+from platform import system
+from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, Popen
-from typing import Any
-from typing import Hashable
+from typing import Any, Hashable
+
+
+def issystem(system_name: str) -> bool:
+    """returns bool if text matches system indicator"""
+    return system() == system_name
+
+
+iswindows = partial(issystem, "Windows")
+ismacos = partial(issystem, "Darwin")
+islinux = partial(issystem, "Linux")
 
 
 def get_local_tz() -> timezone:
@@ -276,26 +282,41 @@ def show_environ() -> None:
     show_dict(dict(environ))
 
 
-def to_clipboard(text: str) -> bool:
-    """Copies text to the clipboard. Returns True if successful, False otherwise."""
-    command = "/usr/bin/pbcopy"
-    # Check if the command exists on the system
-    if not Path(command).exists():
-        print(f"Command {command} not found")
-        return False
+def to_clipboard(text: str) -> None:
+    """
+    Securely copies text to the system clipboard across Windows, macOS, and Linux.
+    Raises an exception if the input is not a string or if any error occurs during the copy process.
+
+    Args:
+        text (str): The text to be copied to the clipboard.
+
+    Raises:
+        TypeError: If the input is not a string.
+        OSError: For errors related to the subprocess command execution.
+    """
+    chktype(text, str)
+
     try:
-        with Popen([command], stdin=PIPE, shell=False) as p:
-            p.stdin.write(text.encode("utf-8"))  # Specify encoding if necessary
-            p.stdin.close()
-            retcode = p.wait()
-        return retcode == 0
-    except OSError as e:
-        print(f"Error during execution: {e}")
-        return False
+        if iswindows():
+            topipe = ['clip']
+        elif ismacos():
+            topipe = ['pbcopy']
+        elif islinux():
+            topipe = ['xclip', '-selection', 'clipboard']
+        else:
+            raise OSError("Unsupported operating system for clipboard operation.")
+        with Popen(topipe, stdin=PIPE, close_fds=True) as process:
+            process.communicate(input=text.encode('utf-8'))
+            print("Text copied to clipboard successfully.")
+    except subprocess.SubprocessError as e:
+        raise OSError(f"Error copying text to clipboard: {e}") from e
+    except Exception as e:
+        raise RuntimeError("An unexpected error occurred.") from e
 
 
 def copy_file_to_clipboard(path: Path) -> bool:
     """Copies file to the clipboard. Returns True if successful, False otherwise."""
+    chktype(path, Path)
     if not path.exists():
         raise FileNotFoundError(f"File {path} not found")
     if not path.is_file():
