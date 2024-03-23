@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "alexlib"
-version = "0.4.1"
+version = "1.0.0"
 description = "A toolset for data science, machine learning, and data engineering."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
