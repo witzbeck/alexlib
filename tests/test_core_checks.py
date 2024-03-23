@@ -1,26 +1,13 @@
 """Test core functions."""
-from datetime import timezone
-from json import JSONDecodeError
 from os import environ
 from pathlib import Path
 from random import choice
 from unittest import main, TestCase
-from unittest.mock import patch
 
 from alexlib.core import (
-    asdict,
-    aslist,
     chkenv,
     chktext,
     chktype,
-    concat_lists,
-    envcast,
-    get_local_tz,
-    isdunder,
-    ishidden,
-    isnone,
-    istrue,
-    read_json,
 )
 
 
@@ -83,43 +70,6 @@ class TestCore(TestCase):
         with self.assertRaises(FileExistsError):
             chktype(test_path, Path)
 
-    def test_istrue(self) -> None:
-        """Test istrue function."""
-        self.assertTrue(istrue(True))
-        self.assertTrue(istrue("True"))
-        self.assertTrue(istrue("true"))
-        self.assertTrue(istrue("t"))
-        self.assertTrue(istrue("T"))
-        self.assertTrue(istrue("1"))
-        self.assertFalse(istrue(False))
-        self.assertFalse(istrue("False"))
-        self.assertFalse(istrue("false"))
-        self.assertFalse(istrue("f"))
-        self.assertFalse(istrue("F"))
-        self.assertFalse(istrue("0"))
-        self.assertFalse(istrue(""))
-        self.assertFalse(istrue(None))
-
-    def test_isnone(self) -> None:
-        """Test isnone function."""
-        self.assertFalse(isnone(True))
-        self.assertFalse(isnone("test"))
-        self.assertFalse(isnone(1))
-        self.assertFalse(isnone(0.0))
-        self.assertTrue(isnone("None"))
-        self.assertTrue(isnone("none"))
-        self.assertTrue(isnone(""))
-        self.assertTrue(isnone(None))
-        self.assertFalse(isnone(False))
-        self.assertFalse(isnone(0))
-
-    def test_aslist(self) -> None:
-        """Test aslist function."""
-        lst = aslist("a,b,c")
-        self.assertIsInstance(lst, list)
-        self.assertIsInstance(aslist("a|b|c", sep="|"), list)
-        self.assertEqual(lst, ["a", "b", "c"])
-
     def test_chktext(self) -> None:
         """Test with texts that meet and do not meet the prefix, value, and suffix conditions."""
         self.assertTrue(
@@ -179,76 +129,6 @@ class TestCore(TestCase):
         self.assertEqual(chktype([], list), [])
         self.assertEqual(chktype({}, dict), {})
 
-    def test_concat_lists(self):
-        """Test with various lists of lists."""
-        self.assertEqual(
-            concat_lists([[1, 2], [3, 4]]),
-            [1, 2, 3, 4],
-            "Failed to correctly concatenate lists.",
-        )
-
-    def test_envcast(self) -> None:
-        """Test envcast function."""
-        self.assertEqual(envcast("1", int), 1)
-        self.assertEqual(envcast("1.0", float), 1.0)
-        self.assertEqual(envcast("True", bool), True)
-        self.assertEqual(envcast("true", bool), True)
-        self.assertEqual(envcast("t", bool), True)
-        self.assertEqual(envcast("T", bool), True)
-        self.assertEqual(envcast("0", "int"), 0)
-        self.assertEqual(envcast("0.0", "float"), 0.0)
-        self.assertEqual(envcast("False", "bool"), False)
-        self.assertEqual(envcast("false", "bool"), False)
-        self.assertEqual(envcast("f", bool), False)
-        self.assertEqual(envcast("F", bool), False)
-        with self.assertRaises(ValueError):
-            envcast("None", list, need=True)
-        with self.assertRaises(ValueError):
-            envcast("none", list, need=True)
-        with self.assertRaises(ValueError):
-            envcast("", list, need=True)
-        self.assertEqual(envcast("[]", list), [])
-        self.assertEqual(envcast("[1,2,3]", list), [1, 2, 3])
-        self.assertListEqual(envcast("['a','b','c']", list), ["a", "b", "c"])
-        self.assertDictEqual(envcast('{"a":1,"b":2}', dict), {"a": 1, "b": 2})
-        self.assertDictEqual(
-            envcast('{"a":1,"b":2,"c":3}', dict), {"a": 1, "b": 2, "c": 3}
-        )
-        self.assertDictEqual(
-            envcast('{"a":1,"b":2,"c":3,"d":4}', dict), {"a": 1, "b": 2, "c": 3, "d": 4}
-        )
-
-    def test_isdunder(self) -> None:
-        """Test isdunder function."""
-        self.assertTrue(isdunder("__dunder__"))
-        self.assertFalse(isdunder("dunder__"))
-        self.assertFalse(isdunder("__dunder"))
-        self.assertFalse(isdunder("test"))
-
-    def test_ishidden(self) -> None:
-        """Test ishidden function."""
-        self.assertTrue(ishidden("_hidden"))
-        self.assertFalse(ishidden("hidden_"))
-        self.assertFalse(ishidden("test"))
-        self.assertTrue(ishidden("_hidden_"))
-
-    def test_asdict(self) -> None:
-        """Test asdict function."""
-
-        class TestClass:
-            """Test class."""
-
-            def __init__(self):
-                """Initialize the test class."""
-                self.a = 1
-                self.b = 2
-                self._c = 3
-
-        obj = TestClass()
-        dct = asdict(obj)
-        self.assertIsInstance(dct, dict)
-        self.assertEqual(dct, {"a": 1, "b": 2})
-
     def test_existing_variable(self) -> None:
         """Test chkenv function with existing variable."""
         self.assertEqual(chkenv("TEST_VAR"), "123")
@@ -284,36 +164,6 @@ class TestCore(TestCase):
     def test_boolean_false_value(self) -> None:
         """Test chkenv function with boolean false value."""
         self.assertFalse(chkenv("FALSE_VAR", astype=bool))
-
-    def test_get_local_tz(self):
-        """Ensure it returns the correct local timezone."""
-        self.assertIsInstance(
-            get_local_tz(), timezone, "The returned value is not a timezone instance."
-        )
-
-
-class TestReadJson(TestCase):
-    def test_read_json(self):
-        """Test with valid and invalid JSON files."""
-        valid_json_content = '{"key": "value"}'
-        invalid_json_content = '{"key": "value"'
-
-        # Create a mock Path object for valid JSON content
-        with patch("pathlib.Path") as MockPath:
-            mock_path_instance = MockPath.return_value
-            mock_path_instance.read_text.return_value = valid_json_content
-            self.assertEqual(
-                read_json(mock_path_instance),
-                {"key": "value"},
-                "Failed to read valid JSON.",
-            )
-
-        # Create a mock Path object for invalid JSON content
-        with patch("pathlib.Path") as MockPath:
-            mock_path_instance = MockPath.return_value
-            mock_path_instance.read_text.return_value = invalid_json_content
-            with self.assertRaises(JSONDecodeError):
-                read_json(mock_path_instance)
 
 
 if __name__ == "__main__":

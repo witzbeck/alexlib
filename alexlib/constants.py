@@ -4,7 +4,14 @@ from pathlib import Path
 from string import ascii_letters, digits
 
 
+CLIPBOARD_CMDS = {
+    "windows": ["clip"],
+    "macos": ["pbcopy"],
+    "linux": [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]],
+}
+
 ENVIRONMENTS = ["dev", "test", "prod"]
+
 SQL_CHARS = f"{ascii_letters} _{digits}"
 COL_SUBS = {
     " ": "_",
