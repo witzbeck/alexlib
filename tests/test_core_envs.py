@@ -5,8 +5,9 @@ from os import environ
 from pathlib import Path
 from random import choice
 from unittest import main, TestCase
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
+from tomllib import TOMLDecodeError
 from alexlib.core import (
     asdict,
     aslist,
@@ -21,6 +22,7 @@ from alexlib.core import (
     isnone,
     istrue,
     read_json,
+    read_toml,
 )
 
 
@@ -292,28 +294,49 @@ class TestCore(TestCase):
         )
 
 
-class TestReadJson(TestCase):
-    def test_read_json(self):
-        """Test with valid and invalid JSON files."""
-        valid_json_content = '{"key": "value"}'
-        invalid_json_content = '{"key": "value"'
+class TestReadFiles(TestCase):
+    def test_read_toml_invalid(self):
+        """
+        Test with invalid TOML content
+        """
+        with patch("pathlib.Path.open", mock_open(read_data='key = "value')):
+            mock_path_instance = Path("/fake/path/to/file")
+            with self.assertRaises(TOMLDecodeError):
+                read_toml(mock_path_instance, mustexist=False)
 
-        # Create a mock Path object for valid JSON content
-        with patch("pathlib.Path") as MockPath:
-            mock_path_instance = MockPath.return_value
-            mock_path_instance.read_text.return_value = valid_json_content
+    def test_read_toml_valid(self):
+        """
+        Test with valid content for TOML files.
+        """
+        with patch("pathlib.Path.open", mock_open(read_data='key = "value"')):
+            mock_path_instance = Path("/fake/path/to/file")
             self.assertEqual(
-                read_json(mock_path_instance),
+                read_toml(mock_path_instance, mustexist=False),
+                {"key": "value"},
+                "Failed to read valid TOML.",
+            )
+
+    def test_read_json_invalid(self):
+        """
+        Test with invalid content for JSON files.
+        This method uses subTests to iterate over different file types and content scenarios.
+        """
+        with patch("pathlib.Path.open", mock_open(read_data='{"key": "value"')):
+            mock_path_instance = Path("/fake/path/to/file")
+            with self.assertRaises(JSONDecodeError):
+                read_json(mock_path_instance, mustexist=False)
+
+    def test_read_json_valid(self) -> None:
+        """
+        Test with valid  content for JSON files.
+        """
+        with patch("pathlib.Path.open", mock_open(read_data='{"key": "value"}')):
+            mock_path_instance = Path("/fake/path/to/file")
+            self.assertEqual(
+                read_json(mock_path_instance, mustexist=False),
                 {"key": "value"},
                 "Failed to read valid JSON.",
             )
-
-        # Create a mock Path object for invalid JSON content
-        with patch("pathlib.Path") as MockPath:
-            mock_path_instance = MockPath.return_value
-            mock_path_instance.read_text.return_value = invalid_json_content
-            with self.assertRaises(JSONDecodeError):
-                read_json(mock_path_instance)
 
 
 if __name__ == "__main__":

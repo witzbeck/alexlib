@@ -26,7 +26,7 @@ from random import choice, randint
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
 from alexlib.constants import CREDS
-from alexlib.core import chkenv, read_json
+from alexlib.core import chkenv, read_json, to_json
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randlets, randdigit, randdigits
 from alexlib.files.objects import File
@@ -709,14 +709,9 @@ class AuthGenerator:
             d.update(AUTH_TEMPLATE)
         return product_dict
 
-    @staticmethod
-    def to_json(dict_: dict[str:str], path: Path) -> None:
-        """writes dict to path"""
-        path.write_text(dumps(dict_, indent=4))
-
     def write_template_file(self) -> None:
         """writes template file to path"""
-        AuthGenerator.to_json(self.mk_all_templates(), self.path)
+        to_json(self.mk_all_templates(), self.path)
 
     @property
     def towrite(self) -> bool:
@@ -739,13 +734,18 @@ class AuthGenerator:
 
     @staticmethod
     def generate(
-        template_path: Path = Path("_auth_template.json"),
+        template_path: Path | dict = Path("_auth_template.json"),
     ) -> list[Auth]:
         """generates auth objects from template file"""
-        auths = read_json(template_path)
+        if isinstance(template_path, Path):
+            auths = read_json(template_path)
+        elif isinstance(template_path, dict):
+            auths = template_path
+        else:
+            raise TypeError("template_path must be Path or dict")
         for k, v in auths.items():
             store_path = CREDS / f"{k}.store"
-            AuthGenerator.to_json(v, store_path)
+            to_json(v, store_path)
             store = SecretStore.from_dict(v, path=store_path)
             handler = Auth(
                 name=k,

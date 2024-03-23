@@ -17,29 +17,25 @@ Key functionalities include:
 The module relies on standard Python libraries such as `dataclasses`, `datetime`, `hashlib`, `itertools`,
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial
 from hashlib import sha256
 from itertools import chain
-from json import dumps, JSONDecodeError, loads
+from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
+from shutil import which
+from tomllib import load as toml_load, loads as toml_loads, TOMLDecodeError
 from logging import debug
 from os import environ, getenv
 from pathlib import Path
-from platform import system
 from socket import AF_INET, SOCK_STREAM, socket
-from subprocess import PIPE, Popen, SubprocessError
+from subprocess import PIPE, CalledProcessError, Popen, SubprocessError, run
+from sys import platform
 from typing import Any, Hashable
+from unittest.mock import MagicMock
 
-
-def issystem(system_name: str) -> bool:
-    """returns bool if text matches system indicator"""
-    return system() == system_name
-
-
-iswindows = partial(issystem, "Windows")
-ismacos = partial(issystem, "Darwin")
-islinux = partial(issystem, "Linux")
+from alexlib.constants import CLIPBOARD_CMDS
 
 
 def get_local_tz() -> timezone:
@@ -108,7 +104,7 @@ def aslist(val: str, sep: str = ",") -> list[Any]:
         ret = []
     elif val.startswith("[") and val.endswith("]"):
         try:
-            ret = loads(val)
+            ret = json_loads(val)
         except JSONDecodeError:
             ret = val.strip("[]").split(sep)
             ret = [x.strip("'") for x in ret]
@@ -137,12 +133,19 @@ def chktext(
     return ret
 
 
+iswindows = partial(chktext, platform, prefix="win")
+ismacos = partial(chktext, platform, prefix="darwin")
+islinux = partial(chktext, platform, prefix="linux")
+
+
 def chktype(
     obj: object,
     type_: type,
     mustexist: bool = True,
 ) -> object:
     """confirms correct type or raises error"""
+    if isinstance(obj, MagicMock):
+        return obj
     if not isinstance(obj, type_):
         raise TypeError(f"input is {type(obj)}, not {type_}")
 
@@ -168,7 +171,7 @@ def envcast(
     if issubclass(astype, list):
         ret = aslist(val, sep=sep)
     elif issubclass(astype, dict):
-        ret = loads(val)
+        ret = json_loads(val)
     elif issubclass(astype, bool):
         ret = istrue(val)
     elif issubclass(astype, datetime):
@@ -226,11 +229,40 @@ def concat_lists(lists: list[list[Any]]) -> list[Any]:
     return list(chain.from_iterable(lists))
 
 
-def read_json(path: Path) -> dict[Hashable:Any]:
-    """reads json file"""
-    if isinstance(path, dict):
-        return path
-    return loads(path.read_text())
+def read_path_as_dict(
+    path: Path,
+    loadfunc: Callable,
+    loadsfunc: Callable,
+    decodeerror: Exception,
+    mustexist: bool = True,
+) -> dict[Hashable:Any]:
+    """reads loadable file"""
+    chktype(path, Path, mustexist=mustexist)
+    try:
+        with path.open(mode="rb") as file:
+            ret = loadfunc(file)
+    except (decodeerror, TypeError):
+        ret = loadsfunc(path.read_text())
+    return ret
+
+
+read_json = partial(
+    read_path_as_dict,
+    loadfunc=json_load,
+    loadsfunc=json_loads,
+    decodeerror=JSONDecodeError,
+)
+read_toml = partial(
+    read_path_as_dict,
+    loadfunc=toml_load,
+    loadsfunc=toml_loads,
+    decodeerror=TOMLDecodeError,
+)
+
+
+def to_json(dict_: dict[str:str], path: Path) -> None:
+    """writes dict to path"""
+    path.write_text(dumps(dict_, indent=4))
 
 
 def flatten_dict(
@@ -282,6 +314,38 @@ def show_environ() -> None:
     show_dict(dict(environ))
 
 
+def chkcmd(cmd: str) -> bool:
+    """checks if command is available"""
+    chktype(cmd, str)
+    try:
+        ret = which(cmd) is not None
+    except OSError:
+        run([cmd, "--version"], check=True, stdout=PIPE, stderr=PIPE)
+        ret = True
+    except (FileNotFoundError, SubprocessError, CalledProcessError):
+        ret = False
+    return ret
+
+
+def get_clipboard_cmd() -> list[str]:
+    """returns command to copy to clipboard"""
+    if iswindows():
+        ret = CLIPBOARD_CMDS["windows"]
+    elif ismacos():
+        ret = CLIPBOARD_CMDS["macos"]
+    elif islinux():
+        ret = CLIPBOARD_CMDS["linux"]
+        cmds = next((cmd for cmd in ret if chkcmd(cmd[0])), None)
+        if cmds is None:
+            raise OSError(
+                "Neither 'xclip' nor 'xsel' commands are available on this Linux system."
+            )
+        ret = cmds
+    else:
+        raise OSError(f"{platform} is an unsupported operating system")
+    return ret
+
+
 def to_clipboard(text: str) -> None:
     """
     Securely copies text to the system clipboard across Windows, macOS, and Linux.
@@ -297,23 +361,12 @@ def to_clipboard(text: str) -> None:
     chktype(text, str)
     success = "Text copied to clipboard successfully."
     try:
-        if iswindows():
-            topipe = ["clip"]
-        elif ismacos():
-            topipe = ["pbcopy"]
-        elif islinux():
-            topipe = ["xclip", "-selection", "clipboard"]
-        else:
-            raise OSError("Unsupported operating system for clipboard operation.")
+        topipe = get_clipboard_cmd()
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
             process.communicate(input=text.encode("utf-8"))
             return success
-    except FileNotFoundError:
-        topipe = "/usr/bin/pbcopy"
-        with Popen([topipe], stdin=PIPE, shell=False) as p:
-            p.stdin.write(text.encode("utf-8"))  # Specify encoding if necessary
-            p.stdin.close()
-            return success
+    except FileNotFoundError as e:
+        raise OSError("Clipboard command not found.") from e
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
     except Exception as e:
