@@ -19,7 +19,7 @@ The module relies on standard Python libraries such as `dataclasses`, `datetime`
 """
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from functions import partial
+from functools import partial
 from hashlib import sha256
 from itertools import chain
 from json import dumps, JSONDecodeError, loads
