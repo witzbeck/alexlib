@@ -295,7 +295,7 @@ def to_clipboard(text: str) -> None:
         OSError: For errors related to the subprocess command execution.
     """
     chktype(text, str)
-
+    success = "Text copied to clipboard successfully."
     try:
         if iswindows():
             topipe = ["clip"]
@@ -307,7 +307,13 @@ def to_clipboard(text: str) -> None:
             raise OSError("Unsupported operating system for clipboard operation.")
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
             process.communicate(input=text.encode("utf-8"))
-            return "Text copied to clipboard successfully."
+            return success
+    except FileNotFoundError:
+        topipe = "/usr/bin/pbcopy"
+        with Popen([topipe], stdin=PIPE, shell=False) as p:
+            p.stdin.write(text.encode("utf-8"))  # Specify encoding if necessary
+            p.stdin.close()
+            return success
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
     except Exception as e:
