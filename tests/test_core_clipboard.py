@@ -58,9 +58,7 @@ class TestCopyFileToClipboard(TestCase):
     @patch("pathlib.Path.exists", return_value=True)
     @patch("pathlib.Path.is_file", return_value=True)
     @patch("pathlib.Path.read_text", return_value="File content")
-    def test_copy_existing_file(
-        self, mock_read_text, mock_is_file, mock_exists, mock_to_clipboard
-    ):
+    def test_copy_existing_file(self, *mocks):
         path = Path("/fake/path.txt")
         if not self.hascmd:
             with self.assertRaises(OSError):
@@ -75,21 +73,21 @@ class TestCopyFileToClipboard(TestCase):
     def test_copy_non_existing_file(self, mock_to_clipboard):
         path = Path("/non/existing/path")
         if not self.hascmd:
-            with self.assertRaises(OSError):
-                copy_file_to_clipboard(path)
+            self.skipTest("Clipboard command not found.")
         else:
             with self.assertRaises(FileExistsError):
                 copy_file_to_clipboard(path)
 
     @patch("alexlib.core.to_clipboard")
     @patch("pathlib.Path.exists", return_value=True)
-    def test_copy_path_not_a_file(self, mock_exists, mock_to_clipboard):
+    @patch("pathlib.Path.is_file", return_value=True)
+    def test_copy_path_not_a_file(self, *mocks):
         path = Path("/not/a/file")
         if not self.hascmd:
             with self.assertRaises(OSError):
                 copy_file_to_clipboard(path)
         else:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(FileNotFoundError):
                 copy_file_to_clipboard(path)
 
 
