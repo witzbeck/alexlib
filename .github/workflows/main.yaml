@@ -74,14 +74,3 @@ jobs:
     - name: Run tests
       run: |
         poetry run pytest --cov=alexlib --cov-report=xml -n auto
-
-    - name: Increment patch version
-      run: poetry version patch
-
-    - name: Commit and push the new version
-      run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add pyproject.toml
-        git commit -m "Bump version"
-        git push
