@@ -7,7 +7,7 @@ from alexlib.core import (
 )
 
 
-class TestClass:
+class _TestClass:
     """Test class for `get_attrs` function."""
 
     def __init__(
@@ -34,7 +34,7 @@ class TestGetAttrs(TestCase):
     """Test the `get_attrs` function."""
 
     def setUp(self):
-        self.test_obj = TestClass()
+        self.test_obj = _TestClass()
 
     def test_get_all_attrs(self):
         d = get_attrs(
@@ -95,11 +95,11 @@ class TestGetObjectsByAttr(TestCase):
     def test_with_specific_attribute(self) -> None:
         """Test with specific attribute."""
 
-        class TestObj:
+        class _TestObj:
             def __init__(self, name):
                 self.name = name
 
-        objects = [TestObj("test1"), TestObj("test2")]
+        objects = [_TestObj("test1"), _TestObj("test2")]
         result = get_objects_by_attr(objects, "name", "test1")
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "test1")

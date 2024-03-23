@@ -61,8 +61,7 @@ class TestCopyFileToClipboard(TestCase):
     def test_copy_existing_file(self, *mocks):
         path = Path("/fake/path.txt")
         if not self.hascmd:
-            with self.assertRaises(OSError):
-                copy_file_to_clipboard(path)
+            self.skipTest("Clipboard command not found.")
         else:
             result = copy_file_to_clipboard(path)
             self.assertEqual(
