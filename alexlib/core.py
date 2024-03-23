@@ -376,7 +376,7 @@ def copy_file_to_clipboard(path: Path) -> bool:
     chktype(path, Path)
     if not path.exists():
         raise FileNotFoundError(f"File {path} not found")
-    if not path.is_file():
+    elif not path.is_file():
         raise ValueError(f"{path} is not a file")
     to_clipboard(path.read_text())
     return f"File content from {path} copied to clipboard."
