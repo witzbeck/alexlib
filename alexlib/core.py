@@ -369,8 +369,6 @@ def to_clipboard(text: str) -> None:
         raise OSError("Clipboard command not found.") from e
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
-    except Exception as e:
-        raise RuntimeError("An unexpected error occurred.") from e
 
 
 def copy_file_to_clipboard(path: Path) -> bool:
