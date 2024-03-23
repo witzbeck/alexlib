@@ -298,16 +298,16 @@ def to_clipboard(text: str) -> None:
 
     try:
         if iswindows():
-            topipe = ['clip']
+            topipe = ["clip"]
         elif ismacos():
-            topipe = ['pbcopy']
+            topipe = ["pbcopy"]
         elif islinux():
-            topipe = ['xclip', '-selection', 'clipboard']
+            topipe = ["xclip", "-selection", "clipboard"]
         else:
             raise OSError("Unsupported operating system for clipboard operation.")
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
-            process.communicate(input=text.encode('utf-8'))
-            print("Text copied to clipboard successfully.")
+            process.communicate(input=text.encode("utf-8"))
+            return "Text copied to clipboard successfully."
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
     except Exception as e:
@@ -321,7 +321,8 @@ def copy_file_to_clipboard(path: Path) -> bool:
         raise FileNotFoundError(f"File {path} not found")
     if not path.is_file():
         raise ValueError(f"{path} is not a file")
-    return to_clipboard(path.read_text())
+    to_clipboard(path.read_text())
+    return f"File content from {path} copied to clipboard."
 
 
 def get_objects_by_attr(

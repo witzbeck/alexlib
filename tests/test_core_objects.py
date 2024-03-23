@@ -1,10 +1,9 @@
 """"""
 
 from pathlib import Path
-from random import choice
 from tempfile import TemporaryFile
 from unittest import TestCase, main
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 from hashlib import sha256
 from socket import socket, AF_INET, SOCK_STREAM
 
@@ -123,34 +122,52 @@ class TestToClipboard(TestCase):
     @patch("subprocess.Popen")
     def test_to_clipboard_success(self, mock_popen):
         mock_process = mock_popen.return_value
-        mock_process.wait.return_value = 0
-        result = to_clipboard("Test string")
-        self.assertTrue(result)
+        mock_process.communicate.return_value = (b"", b"")
+        mock_process.returncode = 0
 
-    @patch("subprocess.Popen")
-    def test_to_clipboard_failure(self, mock_popen):
-        mock_process = mock_popen.return_value
-        mock_process.wait.return_value = 1
-        self.assertTrue(to_clipboard("Test string"))
+        result = to_clipboard("Test string")
+        self.assertEqual(result, "Text copied to clipboard successfully.")
+
+    def test_to_clipboard_typeerror(self):
+        with self.assertRaises(TypeError):
+            to_clipboard(123)
+        with self.assertRaises(TypeError):
+            to_clipboard(1.123)
+        with self.assertRaises(TypeError):
+            to_clipboard(None)
+        with self.assertRaises(TypeError):
+            to_clipboard(False)
 
 
 class TestCopyFileToClipboard(TestCase):
-    """Test the `copy_file_to_clipboard` function."""
+    @patch(
+        "alexlib.core.to_clipboard",
+        return_value="File content from /fake/path.txt copied to clipboard.",
+    )
+    @patch("pathlib.Path.exists", return_value=True)
+    @patch("pathlib.Path.is_file", return_value=True)
+    @patch("pathlib.Path.read_text", return_value="File content")
+    def test_copy_existing_file(
+        self, mock_read_text, mock_is_file, mock_exists, mock_to_clipboard
+    ):
+        path = Path("/fake/path.txt")
+        result = copy_file_to_clipboard(path)
+        self.assertEqual(
+            result, "File content from /fake/path.txt copied to clipboard."
+        )
 
-    @patch("alexlib.core.to_clipboard", return_value=True)
-    @patch("builtins.open", new_callable=mock_open, read_data="data")
-    def test_copy_existing_file(self, mock_file, mock_to_clipboard):
-        """Test with existing file."""
-        parent = Path(__file__).parent
-        randfile = choice([x for x in parent.iterdir() if x.is_file()])
-        result = copy_file_to_clipboard(randfile)
-        self.assertTrue(result)
+    @patch("alexlib.core.to_clipboard")
+    def test_copy_non_existing_file(self, mock_to_clipboard):
+        path = Path("/non/existing/path")
+        with self.assertRaises(FileExistsError):
+            copy_file_to_clipboard(path)
 
-    @patch("alexlib.core.to_clipboard", return_value=False)
-    def test_copy_non_existing_file(self, mock_to_clipboard) -> None:
-        """Test with non-existing file."""
-        with self.assertRaises(FileNotFoundError):
-            copy_file_to_clipboard(Path("/non/existing/path"))
+    @patch("alexlib.core.to_clipboard")
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_copy_path_not_a_file(self, mock_exists, mock_to_clipboard):
+        path = Path("/not/a/file")
+        with self.assertRaises(ValueError):
+            copy_file_to_clipboard(path)
 
 
 class TestGetObjectsByAttr(TestCase):
