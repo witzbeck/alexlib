@@ -74,3 +74,6 @@ jobs:
     - name: Run tests
       run: |
         poetry run pytest --cov=alexlib --cov-report=xml -n auto
+
+    - name: Increment patch version
+      run: poetry version patch
