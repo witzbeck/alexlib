@@ -28,7 +28,7 @@ from os import environ, getenv
 from pathlib import Path
 from platform import system
 from socket import AF_INET, SOCK_STREAM, socket
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, SubprocessError
 from typing import Any, Hashable
 
 
@@ -308,7 +308,7 @@ def to_clipboard(text: str) -> None:
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
             process.communicate(input=text.encode('utf-8'))
             print("Text copied to clipboard successfully.")
-    except subprocess.SubprocessError as e:
+    except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
     except Exception as e:
         raise RuntimeError("An unexpected error occurred.") from e
