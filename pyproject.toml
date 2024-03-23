@@ -24,7 +24,7 @@ requests = "^2.31"
 statsmodels = "^0.14.1"
 
 [tool.poetry.group.test.dependencies]
-sqlfluff = "^2.3"
+sqlfluff = "^3.0"
 pytest = "^8.0"
 pytest-cov = "^4.1"
 pytest-mock = "^3.12"
