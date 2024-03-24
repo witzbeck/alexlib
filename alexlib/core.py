@@ -485,21 +485,23 @@ class Version:
         return str(self) == str(other)
 
     @classmethod
-    def from_str(cls, version: str) -> "Version":
+    def from_str(cls, version: str, **kwargs) -> "Version":
         parts = version.split(".")
-        return cls(*parts)
+        return cls(*parts, **kwargs)
 
     @classmethod
-    def from_pyproject(cls, path: str = None) -> "Version":
-        if path is None:
-            path = PROJECT_PATH / "pyproject.toml"
+    def from_pyproject(cls, path: Path = None) -> "Version":
+        path = (
+            PROJECT_PATH / "pyproject.toml"
+            if path is None
+            else chktype(path, Path, mustexist=True)
+        )
         dict_ = read_toml(path)
         try:
             ret = dict_["project"]["version"]
         except KeyError:
             ret = dict_["tool"]["poetry"]["version"]
-        return cls.from_str(ret)
-
+        return cls.from_str(ret, project_name=path.parent.name)
 
     def __iter__(self):
         """returns version as iterable"""
@@ -517,7 +519,7 @@ class Version:
 
     def __repr__(self) -> str:
         """displays project name and version as string"""
-        return f"{self.project_name} v{repr(self)}"
+        return f"{self.project_name} v{str(self)}"
 
 
 def ping(host: str, port: int, astext: bool = False) -> bool | str:

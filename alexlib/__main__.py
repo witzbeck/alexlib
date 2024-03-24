@@ -1,32 +1,33 @@
 from argparse import ArgumentParser
 
-from __init__ import proj
 from alexlib.constants import PROJECT_PATH
-from alexlib.core import show_environ, show_dict, Version
+from alexlib.core import show_environ, Version
 from alexlib.files.objects import Directory
 
 
 def main():
     parser = ArgumentParser(description="CLI for the alexlib package")
     parser.add_argument(
-        'command',
-        choices=['show_environ', 'show_project', '--version'],
-        help="The command to run"
+        "--version",
+        help="Return the package version",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--show",
+        help="Displays the project tree or environment variables",
+        choices=["environ", "project", "tree"],
     )
 
-
     args = parser.parse_args()
-    if args.command == 'show_environ':
+    if args.show == "environ":
         show_environ()
-    elif args.command == 'show_project':
-        d = Directory.from_path(PROJECT_PATH)
-        show_dict(d.tree)
-    elif args.command == '--version':
-        v = Version.from_pyproject()
-        print(v)
+    elif args.show in ["project", "tree"]:
+        Directory.from_path(PROJECT_PATH).show_tree()
+    elif args.version:
+        print(repr(Version.from_pyproject()))
+    else:
+        print(f"Invalid command = {args.command}")
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
