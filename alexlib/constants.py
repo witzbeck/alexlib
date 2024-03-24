@@ -59,6 +59,8 @@ DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
 EPOCH = datetime(1000, 1, 1)
 EPOCH_SECONDS = EPOCH.timestamp()
 
+MODULE_PATH = Path(__file__).parent
+PROJECT_PATH = MODULE_PATH.parent
 HOME = Path.home()
 (CREDS := HOME / ".creds").mkdir(exist_ok=True)
 (VENVS := HOME / ".venvs").mkdir(exist_ok=True)

@@ -35,7 +35,7 @@ from sys import platform
 from typing import Any, Hashable
 from unittest.mock import MagicMock
 
-from alexlib.constants import CLIPBOARD_CMDS
+from alexlib.constants import CLIPBOARD_CMDS, PROJECT_PATH
 
 
 def get_local_tz() -> timezone:
@@ -472,13 +472,34 @@ def get_curent_version(tag: str) -> str:
     return tag
 
 
-@dataclass
+@dataclass(slots=True)
 class Version:
     """data class for semantic versioning"""
 
     major: int
     minor: int
     patch: int
+    project_name: str = PROJECT_PATH.name
+
+    def __eq__(self, other: "Version") -> bool:
+        return str(self) == str(other)
+
+    @classmethod
+    def from_str(cls, version: str) -> "Version":
+        parts = version.split(".")
+        return cls(*parts)
+
+    @classmethod
+    def from_pyproject(cls, path: str = None) -> "Version":
+        if path is None:
+            path = PROJECT_PATH / "pyproject.toml"
+        dict_ = read_toml(path)
+        try:
+            ret = dict_["project"]["version"]
+        except KeyError:
+            ret = dict_["tool"]["poetry"]["version"]
+        return cls.from_str(ret)
+
 
     def __iter__(self):
         """returns version as iterable"""
@@ -495,8 +516,8 @@ class Version:
         return ".".join(list(self))
 
     def __repr__(self) -> str:
-        """returns version as string"""
-        return str(self)
+        """displays project name and version as string"""
+        return f"{self.project_name} v{repr(self)}"
 
 
 def ping(host: str, port: int, astext: bool = False) -> bool | str:
