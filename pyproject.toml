@@ -6,11 +6,12 @@ authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 pandas = "^2.0"
 matplotlib = "^3.7"
 cryptography = "^42.0"
 requests = "^2.31"
+sqlalchemy = "^2.0.29"
 
 [tool.poetry.group.db.dependencies]
 sqlalchemy = "^2.0"

@@ -25,7 +25,6 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
 from shutil import which
-from tomllib import load as toml_load, loads as toml_loads, TOMLDecodeError
 from logging import debug
 from os import environ, getenv
 from pathlib import Path
@@ -252,12 +251,18 @@ read_json = partial(
     loadsfunc=json_loads,
     decodeerror=JSONDecodeError,
 )
-read_toml = partial(
-    read_path_as_dict,
-    loadfunc=toml_load,
-    loadsfunc=toml_loads,
-    decodeerror=TOMLDecodeError,
-)
+try:
+    from tomllib import load as toml_load, loads as toml_loads, TOMLDecodeError
+
+    read_toml = partial(
+        read_path_as_dict,
+        loadfunc=toml_load,
+        loadsfunc=toml_loads,
+        decodeerror=TOMLDecodeError,
+    )
+except ImportError as e:
+    read_toml = None
+    debug(f"toml support only available ^3.11: {e}")
 
 
 def to_json(dict_: dict[str:str], path: Path) -> None:
