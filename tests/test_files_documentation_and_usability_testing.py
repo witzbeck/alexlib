@@ -1,6 +1,6 @@
 from unittest import TestCase, main
 from alexlib.files.objects import Directory, File
-from alexlib.files.utils import figsave, path_search, eval_parents, copy_csv_str
+from alexlib.files.utils import figsave, path_search, eval_parents
 
 
 class TestUtilityFunctions(TestCase):
@@ -26,12 +26,6 @@ class TestUtilityFunctions(TestCase):
         # Test: Use path_search to find files
         # Verify: Correct file is returned or exception is raised appropriately
         path_search  # Implementation of the test case
-
-    def test_copy_csv_str(self):
-        """Test the copy_csv_str function generates the correct PostgreSQL COPY statement."""
-        # Test: Call copy_csv_str with a table name and CSV path
-        # Verify: The returned string matches the expected COPY statement
-        copy_csv_str  # Implementation of the test case
 
 
 class TestSystemObject(TestCase):

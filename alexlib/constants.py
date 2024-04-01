@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from string import ascii_letters, digits
 
+from alexlib.__init__ import MODULE_PATH
 
 CLIPBOARD_CMDS = {
     "windows": ["clip"],
@@ -58,7 +59,7 @@ TIME_FORMAT = "%H:%M:%S"
 DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
 EPOCH = datetime(1000, 1, 1)
 EPOCH_SECONDS = EPOCH.timestamp()
-
+PROJECT_PATH = MODULE_PATH.parent
 HOME = Path.home()
 (CREDS := HOME / ".creds").mkdir(exist_ok=True)
 (VENVS := HOME / ".venvs").mkdir(exist_ok=True)

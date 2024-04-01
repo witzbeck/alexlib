@@ -2,11 +2,10 @@ from os import environ
 from pathlib import Path
 from sys import path
 
-lib = Path(__file__).parent
-proj = lib.parent
-dotenv = proj / ".env"
+MODULE_PATH = Path(__file__).parent
+dotenv = MODULE_PATH.parent / ".env"
 
-path.append(str(lib))
+path.append(str(MODULE_PATH))
 if dotenv.exists():
     environ.update(
         {
