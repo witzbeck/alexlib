@@ -98,7 +98,7 @@ class EnvironmentVariable:
 class ConfigFile(File):
     """A class to handle configuration files"""
 
-    envdict: dict = field(default_factory=dict)
+    envdict: dict = field(default_factory=dict, repr=False)
     logdirname: str = field(default="logs")
     loglevel: int = field(default=INFO)
     eventlevel: int = field(default=INFO)
@@ -171,7 +171,11 @@ class ConfigFile(File):
 
     def read_dotenv(self) -> dict[str:Any]:
         """Reads a dotenv file"""
-        lst = [EnvironmentVariable.from_line(line) for line in self.lines]
+        lst = [
+            EnvironmentVariable.from_line(line.strip())
+            for line in self.lines
+            if "=" in line
+        ]
         return {x.key: x.value for x in lst}
 
     def get_envdict(self) -> dict[str:str]:
@@ -236,6 +240,11 @@ class ConfigFile(File):
         """Creates a ConfigFile from a list of dotenv names"""
         names = [f".env.{name}" for name in names]
         return cls.from_name_list(names, **kwargs)
+
+    @classmethod
+    def from_start(cls, start: Path, **kwargs) -> "ConfigFile":
+        """Creates a ConfigFile from a starting path"""
+        return cls.from_parent(cls.name, start, **kwargs)
 
     def mkdir(self, name: str, exist_ok: bool = True) -> Path:
         """Creates a directory"""

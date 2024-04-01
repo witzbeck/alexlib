@@ -36,7 +36,15 @@ from pandas import DataFrame
 from sqlalchemy import Engine
 
 from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
-from alexlib.core import chkenv, sha256sum, to_clipboard
+from alexlib.core import (
+    chkenv,
+    flatten_dict,
+    sha256sum,
+    show_dict,
+    to_clipboard,
+    read_json,
+    read_toml,
+)
 from alexlib.files.utils import path_search
 from alexlib.iters import link
 
@@ -314,6 +322,40 @@ class SystemObject:
         """creates system object from name"""
         return cls(name=name, **kwargs)
 
+    @classmethod
+    def from_parent(
+        cls,
+        filename: str,
+        start_path: Path,
+        parent_name: str = None,
+        notexistok: bool = False,
+    ) -> "SystemObject":
+        """returns file in parent directory"""
+        if not isinstance(start_path, Path):
+            start_path = Path(start_path)
+        if not start_path.exists():
+            raise FileNotFoundError(f"{start_path} does not exist")
+        ret, start_parents = None, list(start_path.parents)
+        if parent_name:
+            parent = max(x for x in start_parents if x.name == parent_name)
+            ret = parent / filename
+        else:
+            while ret is None and start_parents:
+                candidate = start_parents.pop(-1) / filename
+                ret = candidate if notexistok or candidate.exists() else None
+        return cls.from_path(ret)
+
+    @classmethod
+    def from_start(cls, start: Path, name: str = None, **kwargs) -> "SystemObject":
+        """creates system object from starting path"""
+        if name is not None:
+            name = name
+        elif hasattr(cls, "name") and cls.name is not None:
+            name = cls.name
+        else:
+            raise ValueError("need name (or use child class with default name)")
+        return cls.from_parent(name, start, **kwargs)
+
     def eval_method(
         self,
         method: str,
@@ -392,6 +434,16 @@ class File(SystemObject):
     def isjson(self) -> bool:
         """checks if file is json"""
         return self.istype(".json")
+
+    @property
+    def isyaml(self) -> bool:
+        """checks if file is yaml"""
+        return self.istype(".yaml") or self.istype(".yml")
+
+    @property
+    def istoml(self) -> bool:
+        """checks if file is or might be toml"""
+        return self.istype(".toml") or self.name.startswith(".")
 
     @property
     def istxt(self) -> bool:
@@ -672,7 +724,30 @@ class File(SystemObject):
         return cls(path=path)
 
 
-# pylint: disable=too-many-public-methods
+@dataclass
+class JsonFile(File):
+    """class for json files"""
+
+    read: Callable = field(default=read_json, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.isjson:
+            raise TypeError(f"{self.path} is not json")
+        return super().__post_init__()
+
+
+@dataclass
+class TomlFile(File):
+    """class for json files"""
+
+    read: Callable = field(default=read_toml, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.istoml:
+            raise TypeError(f"{self.path} is not toml")
+        return super().__post_init__()
+
+
 @dataclass
 class Directory(SystemObject):
     """class for directories"""
@@ -702,15 +777,43 @@ class Directory(SystemObject):
         """gets object list"""
         return self.dirlist + self.filelist
 
+    @property
+    def _reprlist(self) -> list[SystemObject]:
+        """returns list of contents for representation"""
+        reprfiles = [repr(x) for x in self.filelist + self.dirswithoutfiles]
+        dirswithfiles = [{repr(x): x._reprlist} for x in self.dirswithfiles]
+        return reprfiles + dirswithfiles
+
     @staticmethod
-    def tree_item(obj: SystemObject) -> dict[str:SystemObject]:
-        """gets tree item"""
+    def _tree_item(obj: SystemObject) -> dict[str:SystemObject]:
+        """returns item conditioned on system object type"""
         return obj if obj.path.is_file() else obj.tree
+
+    @staticmethod
+    def _show_tree_item(obj: SystemObject) -> dict[str:SystemObject]:
+        """returns represention of item for console display"""
+        return repr(obj) if obj.path.is_file() else obj._reprlist
+
+    @staticmethod
+    def _show_tree(top_repr: str, objlist: list[SystemObject]) -> None:
+        """returns dict for pretty print representation of tree"""
+        return {
+            top_repr: {repr(obj): Directory._show_tree_item(obj) for obj in objlist}
+        }
 
     @property
     def tree(self) -> dict[str:SystemObject]:
-        """gets tree"""
-        return {self.name: {obj.name: Directory.tree_item(obj) for obj in self.objlist}}
+        """dictionary representation of directory"""
+        return {
+            self.name: {obj.name: Directory._tree_item(obj) for obj in self.objlist}
+        }
+
+    def show_tree(self, flat: bool = False) -> None:
+        """pretty prints representation of tree"""
+        d = Directory._show_tree(repr(self), self.objlist)
+        if flat:
+            d = flatten_dict(d)
+        return show_dict(d)
 
     def __repr__(self) -> str:
         """gets directory representation"""
@@ -762,6 +865,12 @@ class Directory(SystemObject):
     def hasnodirs(self) -> bool:
         """checks if directory has no directories"""
         return self.ndirs == 0
+
+    @property
+    def dirswithoutfiles(self) -> list[SystemObject]:
+        """gets directories with files"""
+        d = self.dirlist
+        return [x for x in d if x.hasnofiles]
 
     @property
     def dirswithfiles(self) -> list[SystemObject]:
