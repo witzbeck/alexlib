@@ -25,7 +25,6 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
 from shutil import which
-from tomllib import load as toml_load, loads as toml_loads, TOMLDecodeError
 from logging import debug
 from os import environ, getenv
 from pathlib import Path
@@ -35,7 +34,7 @@ from sys import platform
 from typing import Any, Hashable
 from unittest.mock import MagicMock
 
-from alexlib.constants import CLIPBOARD_CMDS
+from alexlib.constants import CLIPBOARD_CMDS, PROJECT_PATH
 
 
 def get_local_tz() -> timezone:
@@ -252,12 +251,18 @@ read_json = partial(
     loadsfunc=json_loads,
     decodeerror=JSONDecodeError,
 )
-read_toml = partial(
-    read_path_as_dict,
-    loadfunc=toml_load,
-    loadsfunc=toml_loads,
-    decodeerror=TOMLDecodeError,
-)
+try:
+    from tomllib import load as toml_load, loads as toml_loads, TOMLDecodeError
+
+    read_toml = partial(
+        read_path_as_dict,
+        loadfunc=toml_load,
+        loadsfunc=toml_loads,
+        decodeerror=TOMLDecodeError,
+    )
+except ImportError as e:
+    read_toml = None
+    debug(f"toml support only available ^3.11: {e}")
 
 
 def to_json(dict_: dict[str:str], path: Path) -> None:
@@ -472,13 +477,36 @@ def get_curent_version(tag: str) -> str:
     return tag
 
 
-@dataclass
+@dataclass(slots=True)
 class Version:
     """data class for semantic versioning"""
 
     major: int
     minor: int
     patch: int
+    project_name: str = PROJECT_PATH.name
+
+    def __eq__(self, other: "Version") -> bool:
+        return str(self) == str(other)
+
+    @classmethod
+    def from_str(cls, version: str, **kwargs) -> "Version":
+        parts = version.split(".")
+        return cls(*parts, **kwargs)
+
+    @classmethod
+    def from_pyproject(cls, path: Path = None) -> "Version":
+        path = (
+            PROJECT_PATH / "pyproject.toml"
+            if path is None
+            else chktype(path, Path, mustexist=True)
+        )
+        dict_ = read_toml(path)
+        try:
+            ret = dict_["project"]["version"]
+        except KeyError:
+            ret = dict_["tool"]["poetry"]["version"]
+        return cls.from_str(ret, project_name=path.parent.name)
 
     def __iter__(self):
         """returns version as iterable"""
@@ -495,8 +523,8 @@ class Version:
         return ".".join(list(self))
 
     def __repr__(self) -> str:
-        """returns version as string"""
-        return str(self)
+        """displays project name and version as string"""
+        return f"{self.project_name} v{str(self)}"
 
 
 def ping(host: str, port: int, astext: bool = False) -> bool | str:
