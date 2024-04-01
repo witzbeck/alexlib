@@ -14,7 +14,7 @@ from alexlib.fake import (
     randintstr,
     randrange,
 )
-from alexlib.maths import randbool
+from alexlib.maths.maths import randbool
 
 TEST_LOOP_RANGE = range(10)
 RANDINTSTR_KWARGS = {"min_int": -100_000, "max_int": 100_000}

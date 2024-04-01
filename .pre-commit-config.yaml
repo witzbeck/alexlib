@@ -3,12 +3,10 @@ repos:
     hooks:
       - id: poetry-lock
         name: poetry-lock
-        entry: poetry lock
+        entry: poetry lock --no-update
         language: system
-        types: [python]
         pass_filenames: false
         always_run: true
-        files: \.py$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
