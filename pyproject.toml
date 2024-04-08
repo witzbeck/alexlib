@@ -34,7 +34,7 @@ pytest-xdist = "^3.5"
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29"
 pre-commit = "^3.0"
-ruff = "^0.1.14"
+ruff = "^0.3.5"
 
 [tool.pytest.ini_options]
 addopts = [
