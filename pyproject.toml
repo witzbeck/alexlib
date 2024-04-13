@@ -22,7 +22,7 @@ reportlab = "^4.0"
 
 [tool.poetry.group.ml.dependencies]
 openai = "^1.14"
-scipy = "^1.12"
+scipy = "^1.13"
 
 [tool.poetry.group.test.dependencies]
 sqlfluff = "^3.0"
