@@ -16,7 +16,7 @@ declare -A packages=(
 
 # Directory for virtual environments
 venv_dir="$HOME/.venvs"
-cd $venv_dir
+cd "$venv_dir"
 
 # Ensure the directory exists
 mkdir -p "$venv_dir"
@@ -32,7 +32,7 @@ for version in "${versions[@]}"; do
         # Define environment name
         env_name="${version}_${key}"
         # Create virtual environment
-        pyenv virtualenv $version "$env_name"
+        pyenv $version venv "$env_name"
         # Activate virtual environment
         pyenv activate "$env_name"
         # Check if the package path is local and adjust pip install command
