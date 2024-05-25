@@ -1,4 +1,5 @@
 """Tests for the `core` module's class functions."""
+
 from unittest import TestCase, main
 
 from alexlib.core import (
@@ -39,9 +40,9 @@ class TestGetAttrs(TestCase):
     def test_get_all_attrs(self):
         d = get_attrs(
             self.test_obj,
-            include_hidden=True,
-            include_dunder=True,
-            include_methods=True,
+            hidden=True,
+            dunder=True,
+            methods=True,
         )
         self.assertIn("public_attr", d.keys())
         self.assertIn("_hidden_attr", d.keys())
@@ -59,13 +60,13 @@ class TestGetAttrs(TestCase):
         )
 
     def test_get_public_methods(self):
-        d = get_attrs(self.test_obj, include_methods=True)
+        d = get_attrs(self.test_obj, methods=True)
         self.assertIn("public_method", d)
         self.assertNotIn("_hidden_method", d)
 
     def test_get_hidden_attrs(self):
         self.assertDictEqual(
-            get_attrs(self.test_obj, include_hidden=True),
+            get_attrs(self.test_obj, hidden=True),
             {
                 "public_attr": "public",
                 "_hidden_attr": "hidden",
@@ -73,18 +74,18 @@ class TestGetAttrs(TestCase):
         )
 
     def test_get_hidden_methods(self):
-        d = get_attrs(self.test_obj, include_methods=True, include_hidden=True)
+        d = get_attrs(self.test_obj, methods=True, hidden=True)
         self.assertIn("_hidden_method", d)
         self.assertIn("public_method", d)
         self.assertNotIn("__dunder_method__", d)
 
     def test_get_dunder_attrs(self):
-        d = get_attrs(self.test_obj, include_dunder=True)
+        d = get_attrs(self.test_obj, dunder=True)
         self.assertIn("__dunder_attr__", d)
         self.assertIn("public_attr", d)
 
     def test_get_dunder_methods(self):
-        d = get_attrs(self.test_obj, include_methods=True, include_dunder=True)
+        d = get_attrs(self.test_obj, methods=True, dunder=True)
         self.assertIn("__dunder_method__", d)
         self.assertIn("public_method", d)
 
