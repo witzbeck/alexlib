@@ -12,19 +12,27 @@ repos:
     rev: v4.5.0
     hooks:
       - id: end-of-file-fixer
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
       - id: check-json
       - id: check-xml
       - id: check-toml
       - id: check-yaml
       - id: fix-byte-order-marker
       - id: check-docstring-first
+      - id: check-added-large-files
+      - id: debug-statements
+      - id: detect-private-key
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.4.4
     hooks:
       - id: ruff
-        args: [ --fix ]
+        types_or: [python, pyi, jupyter]
+        args: [--fix, --config, pyproject.toml]
       - id: ruff-format
+        types_or: [python, pyi, jupyter]
+        args: [--config, pyproject.toml]
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
@@ -33,7 +41,13 @@ repos:
 
   -   repo: local
       hooks:
-      -   id: pytest-check
+        - id: rm-old-covertura
+          name: Remove old covertura reports
+          entry: rm -rf .coverage .coverage.xml htmlcov
+          language: system
+          types: [python]
+          pass_filenames: false
+        - id: pytest-check
           name: pytest with coverage
           entry: poetry run pytest --cov=alexlib -n auto
           language: system

@@ -47,8 +47,7 @@ RUN git clone https://github.com/witzbeck/alexlib /alexlib
 WORKDIR /alexlib
 
 # Install project dependencies using Poetry.
-# Note: The project's pyproject.toml must be valid for this step to work.
-RUN poetry install --with dev
+RUN poetry install
 
 # Expose a port
 EXPOSE 8000

@@ -17,6 +17,7 @@ Key functionalities include:
 The module relies on standard Python libraries such as `dataclasses`, `datetime`, `hashlib`, `itertools`,
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -287,17 +288,17 @@ def flatten_dict(
 
 def get_attrs(
     obj: object,
-    include_hidden: bool = False,
-    include_dunder: bool = False,
-    include_methods: bool = False,
+    hidden: bool = False,
+    dunder: bool = False,
+    methods: bool = False,
 ) -> dict[str:Any]:
     """returns all attributes of object"""
     attrs = {attr: getattr(obj, attr) for attr in dir(obj)}
-    if not include_methods:
+    if not methods:
         attrs = {k: v for k, v in attrs.items() if not callable(v)}
-    if not include_hidden:
+    if not hidden:
         attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
-    if not include_dunder:
+    if not dunder:
         attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
     return attrs
 
@@ -445,15 +446,13 @@ def invert_dict(dict_: dict) -> dict[Hashable:Hashable]:
     return {v: k for k, v in dict_.items()}
 
 
-def sha256sum(
-    path: Path,
-    bytearr: bytearray = bytearray(128 * 1024),
-) -> str:
+def sha256sum(path: Path) -> str:
     """inputs:
-        filename = path + name of file to hash
+        path: path to file
     returns:
         hash of file
     """
+    bytearr = bytearray(128 * 1024)
     if not isinstance(path, Path):
         raise TypeError("func only computes sum on path")
     h, mv = sha256(), memoryview(bytearr)
