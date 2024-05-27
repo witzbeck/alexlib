@@ -8,10 +8,11 @@ from alexlib.core import (
     mk_dictvals_distinct,
     show_dict,
     show_environ,
+    get_attrs,
 )
 
 
-class TestClass:
+class _TestClass:
     """Test class for `get_attrs` function."""
 
     def __init__(
@@ -32,6 +33,80 @@ class TestClass:
 
     def __dunder_method__(self):
         return self.__dunder_attr__
+
+
+class TestGetAttrs(TestCase):
+    """Test the `get_attrs` function."""
+
+    def setUp(self) -> None:
+        self.obj = _TestClass()
+        return super().setUp()
+
+    def test_with_public_attrs(self) -> None:
+        """Test with public attributes."""
+        result = get_attrs(self.obj)
+        self.assertIn("public_attr", result)
+        self.assertNotIn("_hidden_attr", result)
+        self.assertNotIn("__dunder_attr__", result)
+
+    def test_with_hidden_attrs(self) -> None:
+        """Test with hidden attributes."""
+        result = get_attrs(self.obj, hidden=True)
+        self.assertIn("public_attr", result)
+        self.assertIn("_hidden_attr", result)
+        self.assertNotIn("__dunder_attr__", result)
+
+    def test_with_dunder_attrs(self) -> None:
+        """Test with dunder attributes."""
+        result = get_attrs(self.obj, dunder=True)
+        self.assertIn("public_attr", result)
+        self.assertNotIn("_hidden_attr", result)
+        self.assertIn("__dunder_attr__", result)
+
+    def test_with_all_attrs(self) -> None:
+        """Test with all attributes."""
+        result = get_attrs(self.obj, hidden=True, dunder=True)
+        self.assertIn("public_attr", result)
+        self.assertIn("_hidden_attr", result)
+        self.assertIn("__dunder_attr__", result)
+
+    def test_with_public_methods(self) -> None:
+        """Test with public methods."""
+        result = get_attrs(self.obj, methods=True)
+        self.assertIn("public_method", result)
+        self.assertNotIn("_hidden_method", result)
+        self.assertNotIn("__dunder_method__", result)
+
+    def test_with_hidden_methods(self) -> None:
+        """Test with hidden methods."""
+        result = get_attrs(self.obj, methods=True, hidden=True)
+        self.assertIn("public_method", result)
+        self.assertIn("_hidden_method", result)
+        self.assertNotIn("__dunder_method__", result)
+
+    def test_with_dunder_methods(self) -> None:
+        """Test with dunder methods."""
+        result = get_attrs(self.obj, methods=True, dunder=True)
+        self.assertIn("public_method", result)
+        self.assertNotIn("_hidden_method", result)
+        self.assertIn("__dunder_method__", result)
+
+    def test_with_all_methods(self) -> None:
+        """Test with all methods."""
+        result = get_attrs(self.obj, methods=True, hidden=True, dunder=True)
+        self.assertIn("public_method", result)
+        self.assertIn("_hidden_method", result)
+        self.assertIn("__dunder_method__", result)
+
+    def test_with_all_attrs_and_methods(self) -> None:
+        """Test with all attributes and methods."""
+        result = get_attrs(self.obj, hidden=True, dunder=True, methods=True)
+        self.assertIn("public_attr", result)
+        self.assertIn("_hidden_attr", result)
+        self.assertIn("__dunder_attr__", result)
+        self.assertIn("public_method", result)
+        self.assertIn("_hidden_method", result)
+        self.assertIn("__dunder_method__", result)
 
 
 class TestShowDict(TestCase):

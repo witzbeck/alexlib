@@ -17,7 +17,8 @@ Key functionalities include:
 The module relies on standard Python libraries such as `dataclasses`, `datetime`, `hashlib`, `itertools`,
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
-from collections.abc import Callable
+
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial
@@ -25,7 +26,7 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
 from shutil import which
-from logging import debug
+from logging import debug, info
 from os import environ, getenv
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
@@ -287,17 +288,17 @@ def flatten_dict(
 
 def get_attrs(
     obj: object,
-    include_hidden: bool = False,
-    include_dunder: bool = False,
-    include_methods: bool = False,
+    hidden: bool = False,
+    dunder: bool = False,
+    methods: bool = False,
 ) -> dict[str:Any]:
     """returns all attributes of object"""
     attrs = {attr: getattr(obj, attr) for attr in dir(obj)}
-    if not include_methods:
+    if not methods:
         attrs = {k: v for k, v in attrs.items() if not callable(v)}
-    if not include_hidden:
+    if not hidden:
         attrs = {k: v for k, v in attrs.items() if not ishidden(k)}
-    if not include_dunder:
+    if not dunder:
         attrs = {k: v for k, v in attrs.items() if not isdunder(k)}
     return attrs
 
@@ -317,6 +318,22 @@ def show_dict(d: dict, indent: int = 4) -> None:
 def show_environ() -> None:
     """prints environment variables"""
     show_dict(dict(environ))
+
+
+def dump_dotenv(
+    path: Path | None = None, pairs: Mapping | None = None, force: bool = False
+) -> Path:
+    if path is None:
+        path = Path.cwd() / ".env"
+        info(f"Path not provided, using {path}")
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists, use force=True to overwrite")
+    if pairs is None:
+        pairs = environ
+        info("Pairs not provided, using environ")
+    path.write_text("\n".join([f"{key}={value}" for key, value in pairs.items()]))
+    info(f"Dumped {len(pairs)} key-value pairs to {path}")
+    return path
 
 
 def chkcmd(cmd: str) -> bool:
@@ -445,15 +462,13 @@ def invert_dict(dict_: dict) -> dict[Hashable:Hashable]:
     return {v: k for k, v in dict_.items()}
 
 
-def sha256sum(
-    path: Path,
-    bytearr: bytearray = bytearray(128 * 1024),
-) -> str:
+def sha256sum(path: Path) -> str:
     """inputs:
-        filename = path + name of file to hash
+        path: path to file
     returns:
         hash of file
     """
+    bytearr = bytearray(128 * 1024)
     if not isinstance(path, Path):
         raise TypeError("func only computes sum on path")
     h, mv = sha256(), memoryview(bytearr)
