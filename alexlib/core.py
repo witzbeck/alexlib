@@ -322,15 +322,15 @@ def show_environ() -> None:
 
 def is_dotenv(path: Path) -> bool:
     """checks if file is a dotenv file"""
-    chktype(path, (Path, str))
+    chktype(path, (Path, str), mustexist=False)
     if isinstance(path, str):
         path = Path(path)
-    return ".env" in path.name
+    return path.name.lower().startswith(".env")
 
 
 def is_json(path: Path) -> bool:
     """checks if file is a JSON file"""
-    chktype(path, (Path, str))
+    chktype(path, (Path, str), mustexist=False)
     if isinstance(path, str):
         path = Path(path)
     return path.suffix.lower() == ".json"
