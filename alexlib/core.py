@@ -18,7 +18,7 @@ The module relies on standard Python libraries such as `dataclasses`, `datetime`
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial
@@ -26,7 +26,7 @@ from hashlib import sha256
 from itertools import chain
 from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
 from shutil import which
-from logging import debug
+from logging import debug, info
 from os import environ, getenv
 from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
@@ -318,6 +318,56 @@ def show_dict(d: dict, indent: int = 4) -> None:
 def show_environ() -> None:
     """prints environment variables"""
     show_dict(dict(environ))
+
+
+def is_dotenv(path: Path) -> bool:
+    """checks if file is a dotenv file"""
+    chktype(path, (Path, str))
+    if isinstance(path, str):
+        path = Path(path)
+    return ".env" in path.name
+
+
+def is_json(path: Path) -> bool:
+    """checks if file is a JSON file"""
+    chktype(path, (Path, str))
+    if isinstance(path, str):
+        path = Path(path)
+    return path.suffix.lower() == ".json"
+
+
+def dump_dotenv(path: Path, pairs: Mapping) -> Path:
+    path.write_text("\n".join([f"{key}={value}" for key, value in pairs.items()]))
+    return path
+
+
+def dump_envs_json(path: Path, pairs: Mapping) -> Path:
+    to_json(pairs, path)
+    info(f"Dumped {len(pairs)} key-value pairs to {path}")
+    return path
+
+
+def dump_envs(
+    path: Path | None = None, pairs: Mapping | None = None, force: bool = False
+) -> Path:
+    if path is None:
+        path = Path.cwd() / ".env"
+        info(f"Path not provided, using {path}")
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists, use force=True to overwrite")
+    if pairs is None:
+        pairs = environ
+        info("Pairs not provided, using environ")
+    if is_dotenv(path):
+        path = dump_dotenv(path, pairs)
+    elif is_json(path):
+        path = dump_envs_json(path, pairs)
+    else:
+        raise ValueError(
+            f"Only dotenv and JSON files are supported, but got {path.suffix}"
+        )
+    info(f"Dumped {len(pairs)} key-value pairs to {path}")
+    return path
 
 
 def chkcmd(cmd: str) -> bool:
