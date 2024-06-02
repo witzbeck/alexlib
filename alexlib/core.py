@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from functools import partial
 from hashlib import sha256
 from itertools import chain
-from json import dumps, JSONDecodeError, loads as json_loads, load as json_load
+from json import dumps, dump, JSONDecodeError, loads as json_loads, load as json_load
 from shutil import which
 from logging import debug, info
 from os import environ, getenv
@@ -32,8 +32,7 @@ from pathlib import Path
 from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, CalledProcessError, Popen, SubprocessError, run
 from sys import platform
-from typing import Any, Hashable
-from unittest.mock import MagicMock
+from typing import Any, Hashable, Union
 
 from alexlib.constants import CLIPBOARD_CMDS, PROJECT_PATH
 
@@ -144,8 +143,6 @@ def chktype(
     mustexist: bool = True,
 ) -> object:
     """confirms correct type or raises error"""
-    if isinstance(obj, MagicMock):
-        return obj
     if not isinstance(obj, type_):
         raise TypeError(f"input is {type(obj)}, not {type_}")
 
@@ -320,54 +317,55 @@ def show_environ() -> None:
     show_dict(dict(environ))
 
 
-def is_dotenv(path: Path) -> bool:
-    """checks if file is a dotenv file"""
-    chktype(path, (Path, str), mustexist=False)
-    if isinstance(path, str):
-        path = Path(path)
-    return path.name.lower().startswith(".env")
+def normalize_path(path: Union[Path, str]) -> Path:
+    """Ensure the path is a Path object."""
+    return Path(path) if isinstance(path, str) else path
 
 
-def is_json(path: Path) -> bool:
-    """checks if file is a JSON file"""
-    chktype(path, (Path, str), mustexist=False)
-    if isinstance(path, str):
-        path = Path(path)
+def is_dotenv(path: Union[Path, str]) -> bool:
+    """Check if the file is a dotenv file."""
+    path = normalize_path(path)
+    name = path.name.lower()
+    return name.startswith(".env") or path.suffix == ".env"
+
+
+def is_json(path: Union[Path, str]) -> bool:
+    """Check if the file is a JSON file."""
+    path = normalize_path(path)
     return path.suffix.lower() == ".json"
 
 
-def dump_dotenv(path: Path, pairs: Mapping) -> Path:
-    path.write_text("\n".join([f"{key}={value}" for key, value in pairs.items()]))
-    return path
-
-
-def dump_envs_json(path: Path, pairs: Mapping) -> Path:
-    to_json(pairs, path)
+def dump_dotenv(path: Path, pairs: Mapping[str, str]) -> None:
+    """Write key-value pairs to a dotenv file."""
+    content = "\n".join(f"{key}={value}" for key, value in pairs.items())
+    path.write_text(content)
     info(f"Dumped {len(pairs)} key-value pairs to {path}")
-    return path
+
+
+def dump_envs_json(path: Path, pairs: Mapping[str, str]) -> None:
+    """Write key-value pairs to a JSON file."""
+    with open(path, "w") as f:
+        dump(pairs, f)
+    info(f"Dumped {len(pairs)} key-value pairs to {path}")
 
 
 def dump_envs(
-    path: Path | None = None, pairs: Mapping | None = None, force: bool = False
-) -> Path:
-    if path is None:
-        path = Path.cwd() / ".env"
-        info(f"Path not provided, using {path}")
+    path: Union[Path, str, None] = None,
+    pairs: Mapping[str, str] = None,
+    force: bool = False,
+) -> None:
+    """Dump key-value pairs to a file. Supported file types are dotenv and JSON."""
+    path = normalize_path(path) if path else Path.cwd() / ".env"
     if path.exists() and not force:
-        raise FileExistsError(f"{path} already exists, use force=True to overwrite")
-    if pairs is None:
-        pairs = environ
-        info("Pairs not provided, using environ")
+        raise FileExistsError(f"{path} already exists. Use force=True to overwrite.")
+    pairs = pairs if pairs is not None else environ
     if is_dotenv(path):
-        path = dump_dotenv(path, pairs)
+        dump_dotenv(path, pairs)
     elif is_json(path):
-        path = dump_envs_json(path, pairs)
+        dump_envs_json(path, pairs)
     else:
-        raise ValueError(
-            f"Only dotenv and JSON files are supported, but got {path.suffix}"
-        )
-    info(f"Dumped {len(pairs)} key-value pairs to {path}")
-    return path
+        raise ValueError(f"Unsupported file type: {path.suffix}")
+    info(f"Dumped environment to {path}")
 
 
 def chkcmd(cmd: str) -> bool:
