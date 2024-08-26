@@ -21,7 +21,7 @@ pyarrow = "^16.1"
 reportlab = "^4.0"
 
 [tool.poetry.group.ml.dependencies]
-openai = "^1.25"
+openai = "^1.42"
 scipy = "^1.13"
 
 [tool.poetry.group.test.dependencies]
