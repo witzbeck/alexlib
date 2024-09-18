@@ -42,8 +42,15 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-fail-under=60",
     "--cov-branch",
+    "-n",
+    "auto",
 ]
 testpaths = ["tests"]
+markers = [
+    "slow: mark test as slow to run",
+    "skip: mark test as skipped",
+    "fast: mark test as fast to run",
+]
 
 [tool.sqlfluff.core]
 verbose = 0
