@@ -10,7 +10,7 @@ python = "^3.10"
 pandas = "^2.2"
 matplotlib = "^3.8"
 cryptography = "^42.0"
-requests = "^2.31"
+requests = "^2.32"
 
 [tool.poetry.group.db.dependencies]
 sqlalchemy = "^2.0"
