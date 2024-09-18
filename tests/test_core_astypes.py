@@ -1,5 +1,6 @@
 """Test core functions."""
-from unittest import main, TestCase
+
+from pytest import fixture, mark
 
 from alexlib.core import (
     asdict,
@@ -8,41 +9,46 @@ from alexlib.core import (
 )
 
 
-class TestCore(TestCase):
-    """Test core functions."""
-
-    def test_aslist(self) -> None:
-        """Test aslist function."""
-        lst = aslist("a,b,c")
-        self.assertIsInstance(lst, list)
-        self.assertIsInstance(aslist("a|b|c", sep="|"), list)
-        self.assertEqual(lst, ["a", "b", "c"])
-
-    def test_concat_lists(self):
-        """Test with various lists of lists."""
-        self.assertEqual(
-            concat_lists([[1, 2], [3, 4]]),
-            [1, 2, 3, 4],
-            "Failed to correctly concatenate lists.",
-        )
-
-    def test_asdict(self) -> None:
-        """Test asdict function."""
-
-        class TestClass:
-            """Test class."""
-
-            def __init__(self):
-                """Initialize the test class."""
-                self.a = 1
-                self.b = 2
-                self._c = 3
-
-        obj = TestClass()
-        dct = asdict(obj)
-        self.assertIsInstance(dct, dict)
-        self.assertEqual(dct, {"a": 1, "b": 2})
+@mark.parametrize(
+    "nested, expected",
+    [
+        ([[1, 2], [3, 4]], [1, 2, 3, 4]),
+        ([[1, 2], [3, [4, 5]]], [1, 2, 3, 4, 5]),
+    ],
+)
+def test_concat_lists(nested, expected):
+    """Test with various lists of lists."""
+    (
+        concat_lists(nested) == expected,
+        "Failed to correctly concatenate lists.",
+    )
 
 
-if __name__ == "__main__":
-    main()
+@mark.parametrize(
+    "string, sep, expected",
+    [
+        ("a,b,c", ",", ["a", "b", "c"]),
+        ("a|b|c", "|", ["a", "b", "c"]),
+    ],
+)
+def test_aslist(string: str, sep: str, expected: list[str]) -> None:
+    lst = aslist(string, sep=sep)
+    assert isinstance(lst, list)
+    assert lst == expected
+
+
+@fixture
+def _testclass():
+    class TestClass:
+        def __init__(self):
+            self.a = 1
+            self.b = 2
+            self._c = 3
+
+    return TestClass()
+
+
+def test_asdict(_testclass):
+    dct = asdict(_testclass)
+    assert isinstance(dct, dict)
+    assert dct == {"a": 1, "b": 2}
