@@ -50,7 +50,7 @@ repos:
           pass_filenames: false
         - id: pytest-check
           name: pytest with coverage
-          entry: poetry run pytest --cov=alexlib -n auto
+          entry: poetry run pytest --cov=alexlib -n auto -m "not slow"
           language: system
           types: [python]
           pass_filenames: false
