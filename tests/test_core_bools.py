@@ -1,5 +1,8 @@
 """Test core functions."""
-from unittest import main, TestCase
+
+from typing import Any
+
+from pytest import mark
 
 from alexlib.core import (
     isdunder,
@@ -8,54 +11,96 @@ from alexlib.core import (
     istrue,
 )
 
-
-class TestCore(TestCase):
-    """Test core functions."""
-
-    def test_istrue(self) -> None:
-        """Test istrue function."""
-        self.assertTrue(istrue(True))
-        self.assertTrue(istrue("True"))
-        self.assertTrue(istrue("true"))
-        self.assertTrue(istrue("t"))
-        self.assertTrue(istrue("T"))
-        self.assertTrue(istrue("1"))
-        self.assertFalse(istrue(False))
-        self.assertFalse(istrue("False"))
-        self.assertFalse(istrue("false"))
-        self.assertFalse(istrue("f"))
-        self.assertFalse(istrue("F"))
-        self.assertFalse(istrue("0"))
-        self.assertFalse(istrue(""))
-        self.assertFalse(istrue(None))
-
-    def test_isnone(self) -> None:
-        """Test isnone function."""
-        self.assertFalse(isnone(True))
-        self.assertFalse(isnone("test"))
-        self.assertFalse(isnone(1))
-        self.assertFalse(isnone(0.0))
-        self.assertTrue(isnone("None"))
-        self.assertTrue(isnone("none"))
-        self.assertTrue(isnone(""))
-        self.assertTrue(isnone(None))
-        self.assertFalse(isnone(False))
-        self.assertFalse(isnone(0))
-
-    def test_isdunder(self) -> None:
-        """Test isdunder function."""
-        self.assertTrue(isdunder("__dunder__"))
-        self.assertFalse(isdunder("dunder__"))
-        self.assertFalse(isdunder("__dunder"))
-        self.assertFalse(isdunder("test"))
-
-    def test_ishidden(self) -> None:
-        """Test ishidden function."""
-        self.assertTrue(ishidden("_hidden"))
-        self.assertFalse(ishidden("hidden_"))
-        self.assertFalse(ishidden("test"))
-        self.assertTrue(ishidden("_hidden_"))
+ISTRUE_TRUE = (
+    True,
+    "True",
+    "true",
+    "t",
+    "T",
+    "1",
+)
+ISTRUE_FALSE = (
+    False,
+    "False",
+    "false",
+    "f",
+    "F",
+    "0",
+    "",
+    None,
+)
+ISNONE_TRUE = (
+    "None",
+    "none",
+    "",
+    None,
+)
+ISNONE_FALSE = (
+    True,
+    "test",
+    1,
+    0.0,
+)
+ISDUNDER_TRUE = ("__dunder__",)
+ISDUNDER_FALSE = (
+    "dunder__",
+    "__dunder",
+    "test",
+)
+ISHIDDEN_TRUE = (
+    "_hidden",
+    "_hidden_",
+)
+ISHIDDEN_FALSE = (
+    "hidden_",
+    "test",
+)
 
 
-if __name__ == "__main__":
-    main()
+@mark.fast
+@mark.parametrize("value", ISTRUE_TRUE)
+def test_istrue_true(value: Any) -> None:
+    """Test istrue function."""
+    assert istrue(value) is True
+
+
+@mark.fast
+@mark.parametrize("value", ISTRUE_FALSE)
+def test_istrue_false(value: Any) -> None:
+    """Test istrue function."""
+    assert istrue(value) is False
+
+
+@mark.fast
+@mark.parametrize("value", ISNONE_TRUE)
+def test_isnone_true(value: Any) -> None:
+    """Test isnone function."""
+    assert isnone(value) is True
+
+
+@mark.fast
+@mark.parametrize("value", ISNONE_FALSE)
+def test_isnone_false(value: Any) -> None:
+    """Test isnone function."""
+    assert isnone(value) is False
+
+
+@mark.fast
+@mark.parametrize("value", ISDUNDER_TRUE)
+def test_isdunder_true(value: Any) -> None:
+    """Test isdunder function."""
+    assert isdunder(value) is True
+
+
+@mark.fast
+@mark.parametrize("value", ISDUNDER_FALSE)
+def test_isdunder_false(value: Any) -> None:
+    """Test isdunder function."""
+    assert isdunder(value) is False
+
+
+@mark.fast
+@mark.parametrize("value", ISHIDDEN_TRUE)
+def test_ishidden_true(value: Any) -> None:
+    """Test ishidden function."""
+    assert ishidden(value) is True
