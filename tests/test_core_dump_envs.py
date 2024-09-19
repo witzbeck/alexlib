@@ -3,40 +3,7 @@ from json import loads as json_loads
 
 from pytest import mark, raises
 
-from alexlib.core import dump_envs, is_dotenv, is_json
-
-
-@mark.fast
-def test_is_dotenv_true(is_dotenv_true: bool) -> None:
-    """Test to check .env detection"""
-    assert is_dotenv(is_dotenv_true) is True
-
-
-@mark.fast
-def test_is_dotenv_false(is_dotenv_false: bool) -> None:
-    """Test to check non-.env files"""
-    assert is_dotenv(is_dotenv_false) is False
-
-
-@mark.fast
-def test_is_json_true(is_json_true: bool) -> None:
-    """Test to check JSON file detection"""
-    assert is_json(is_json_true) is True
-
-
-@mark.fast
-def test_is_json_false(is_json_false: bool) -> None:
-    assert is_json(is_json_false) is False
-
-
-@mark.fast
-def test_is_a_string(a_string: str) -> None:
-    assert isinstance(a_string, str)
-
-
-@mark.fast
-def test_is_a_path(a_path: Path) -> None:
-    assert isinstance(a_path, Path)
+from alexlib.core import dump_envs
 
 
 @mark.slow

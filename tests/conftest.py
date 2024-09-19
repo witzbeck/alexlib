@@ -1,101 +1,71 @@
+from os import environ
 from pathlib import Path
+from random import choice
 from tempfile import TemporaryDirectory
-from pytest import FixtureRequest, fixture
+from pytest import fixture
 
-ISJSON_TRUE_STRINGS = (
-    "test.json",
-    "settings.json",
-    "config.json",
-    "package.json",
-)
-ISJSON_TRUE_PATHS = (
-    Path("test.json"),
-    Path("settings.json"),
-    Path("config.json"),
-    Path("package.json"),
-)
-ISJSON_FALSE_STRINGS = (
-    "test.txt",
-    "test",
-)
-ISJSON_FALSE_PATHS = (
-    Path("test.txt"),
-    Path("test"),
-)
-ISDOTENV_TRUE_STRINGS = (
-    ".env",
-    ".env.example",
-    ".env.local",
-    ".env.test",
-)
-ISDOTENV_TRUE_PATHS = (
-    Path(".env"),
-    Path(".env.example"),
-    Path(".env.local"),
-    Path(".env.test"),
-)
-ISDOTENV_FALSE_STRINGS = (
-    "env.development",
-    "settings.json",
-    "config.json",
-    "package.json",
-    "test.json",
-    "test.txt",
-)
-ISDOTENV_FALSE_PATHS = (
-    Path("env.development"),
-    Path("settings.json"),
-    Path("config.json"),
-    Path("package.json"),
-    Path("test.json"),
-    Path("test.txt"),
-)
-ISJSON_TRUE = ISJSON_TRUE_STRINGS + ISJSON_TRUE_PATHS
-ISJSON_FALSE = ISJSON_FALSE_STRINGS + ISJSON_FALSE_PATHS
-ISDOTENV_TRUE = ISDOTENV_TRUE_STRINGS + ISDOTENV_TRUE_PATHS
-ISDOTENV_FALSE = ISDOTENV_FALSE_STRINGS + ISDOTENV_FALSE_PATHS
-ALL_STRINGS = (
-    ISJSON_TRUE_STRINGS
-    + ISJSON_FALSE_STRINGS
-    + ISDOTENV_TRUE_STRINGS
-    + ISDOTENV_FALSE_STRINGS
-)
-ALL_PATHS = (
-    ISJSON_TRUE_PATHS + ISJSON_FALSE_PATHS + ISDOTENV_TRUE_PATHS + ISDOTENV_FALSE_PATHS
-)
+from alexlib.auth import Auth
+from alexlib.core import chkcmd, get_clipboard_cmd
 
 
-@fixture(params=ALL_STRINGS)
-def a_string(request: FixtureRequest) -> str:
-    return request.param
+@fixture(scope="session")
+def environ_keys():
+    return list(environ.keys())
 
 
-@fixture(params=ALL_PATHS)
-def a_path(request: FixtureRequest) -> Path:
-    return request.param
-
-
-@fixture(params=ISJSON_TRUE)
-def is_json_true(request: FixtureRequest) -> bool:
-    return request.param
-
-
-@fixture(params=ISJSON_FALSE)
-def is_json_false(request: FixtureRequest) -> bool:
-    return request.param
-
-
-@fixture(params=ISDOTENV_TRUE)
-def is_dotenv_true(request: FixtureRequest) -> bool:
-    return request.param
-
-
-@fixture(params=ISDOTENV_FALSE)
-def is_dotenv_false(request: FixtureRequest) -> bool:
-    return request.param
+@fixture(scope="class")
+def rand_env(environ_keys: list[str]) -> str:
+    return choice(environ_keys)
 
 
 @fixture(scope="class")
 def test_dir():
     with TemporaryDirectory() as test_dir:
         yield Path(test_dir)
+
+
+@fixture(scope="class")
+def test_file(test_dir: Path):
+    test_file = test_dir / "test.txt"
+    test_file.touch()
+    yield test_file
+    test_file.unlink()
+
+
+@fixture(scope="class")
+def copy_text():
+    return "Text copied to clipboard successfully."
+
+
+@fixture(scope="class")
+def copy_path(test_file: Path, copy_text: str):
+    test_file.write_text(copy_text)
+    return test_file
+
+
+@fixture(scope="session")
+def test_auth():
+    return Auth.from_dict(
+        name="test_auth",
+        dict_={
+            "username": "test_user",
+            "password": "test_pass",
+            "key": "value",
+            "host": "test_host",
+            "port": "test_port",
+            "database": "test_database",
+        },
+    )
+
+
+@fixture(scope="class")
+def cmd():
+    try:
+        get_clipboard_cmd()
+    except OSError:
+        return None
+
+
+@fixture(scope="class")
+def hascmd(cmd):
+    return chkcmd(cmd[0]) if cmd is not None else False

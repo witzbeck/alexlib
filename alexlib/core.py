@@ -150,7 +150,7 @@ def chktype(
     exists = obj.exists() if ispath else True
 
     if ispath and mustexist and not exists:
-        raise FileExistsError(f"{obj} must exist but doesn't")
+        raise FileNotFoundError(f"{obj} must exist but doesn't")
     return obj
 
 

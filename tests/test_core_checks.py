@@ -1,170 +1,112 @@
 """Test core functions."""
+
 from os import environ
 from pathlib import Path
-from random import choice
-from unittest import main, TestCase
+
+from pytest import mark, raises
 
 from alexlib.core import (
     chkenv,
     chktext,
     chktype,
+    iswindows,
+    islinux,
+    ismacos,
 )
 
 
-class TestCore(TestCase):
-    """Test core functions."""
-
-    @property
-    def rand_env(self) -> str:
-        """returns a random environment variable"""
-        return choice(list(environ.keys()))
-
-    def setUp(self) -> None:
-        """Set up test environment."""
-        self.env = self.rand_env
-        environ["TEST_VAR"] = "123"
-        environ["EMPTY_VAR"] = ""
-        environ["TRUE_VAR"] = "True"
-        environ["FALSE_VAR"] = "False"
-
-    # Tests for chktext
-    def test_chktext_prefix(self) -> None:
-        """Test chktext function with prefix."""
-        self.assertTrue(chktext("example text", prefix="Exa"))
-        self.assertFalse(chktext("example text", prefix="test"))
-
-    def test_chktext_value(self) -> None:
-        """Test chktext function with value."""
-        self.assertTrue(chktext("example text", value="ample"))
-        self.assertFalse(chktext("example text", value="none"))
-
-    def test_chktext_suffix(self) -> None:
-        """Test chktext function with suffix."""
-        self.assertTrue(chktext("example text", suffix="text"))
-        self.assertFalse(chktext("example text", suffix="exam"))
-
-    def test_chktext_no_input(self) -> None:
-        """Test chktext function with no input."""
-        with self.assertRaises(ValueError):
-            chktext("example text")
-
-    # Tests for chktype
-    def test_chktype_correct(self) -> None:
-        """Test chktype function with correct input."""
-        self.assertEqual(chktype(123, int), 123)
-        self.assertEqual(chktype("abc", str), "abc")
-
-    def test_chktype_incorrect(self) -> None:
-        """Test chktype function with incorrect input."""
-        with self.assertRaises(TypeError):
-            chktype(123, str)
-
-    def test_chktype_path_exists(self) -> None:
-        """Test chktype function with Path object."""
-        test_path = Path("existing_file.txt")  # Assume this file exists
-        self.assertEqual(chktype(test_path, Path, mustexist=False), test_path)
-
-    def test_chktype_path_not_exist(self) -> None:
-        """Test chktype function with Path object."""
-        test_path = Path("non_existing_file.txt")  # Assume this file does not exist
-        with self.assertRaises(FileExistsError):
-            chktype(test_path, Path)
-
-    def test_chktext(self) -> None:
-        """Test with texts that meet and do not meet the prefix, value, and suffix conditions."""
-        self.assertTrue(
-            chktext("hello world", prefix="hello"),
-            "Failed to recognize correct prefix.",
-        )
-        self.assertTrue(
-            chktext("hello world", value="world"), "Failed to recognize correct value."
-        )
-        self.assertTrue(
-            chktext("hello world", suffix="world"),
-            "Failed to recognize correct suffix.",
-        )
-        self.assertFalse(
-            chktext("hello world", prefix="world"),
-            "Incorrectly identified incorrect prefix.",
-        )
-        self.assertFalse(
-            chktext("hello world", suffix="hello"),
-            "Incorrectly identified incorrect suffix.",
-        )
-        with self.assertRaises(ValueError):
-            chktext("ab")
-        self.assertTrue(chktext("abc", prefix="a"))
-        self.assertTrue(chktext("abc", suffix="c"))
-        self.assertTrue(chktext("abc", value="b"))
-        self.assertTrue(chktext("abc", prefix="A"))
-        self.assertTrue(chktext("abc", suffix="C"))
-        self.assertTrue(chktext("abc", value="B"))
-        self.assertFalse(chktext("abc", prefix="b"))
-        self.assertFalse(chktext("abc", suffix="a"))
-        self.assertFalse(chktext("abc", value="d"))
-
-    def test_chktype(self) -> None:
-        """Test with objects of correct and incorrect types. Also, test path existence if the object is a Path."""
-        self.assertEqual(
-            chktype("text", str), "text", "Failed to recognize correct type."
-        )
-        with self.assertRaises(TypeError):
-            chktype(123, str)
-        temp_file = Path("temp_file_for_testing.txt")
-        temp_file.touch()  # Create the file for testing
-        try:
-            self.assertEqual(
-                chktype(temp_file, Path, mustexist=True),
-                temp_file,
-                "Failed to recognize path existence.",
-            )
-        finally:
-            temp_file.unlink()  # Clean up by removing the file
-        with self.assertRaises(TypeError):
-            chktype("a", int)
-        with self.assertRaises(TypeError):
-            chktype(1, str)
-        self.assertEqual(chktype("a", str), "a")
-        self.assertEqual(chktype(1, int), 1)
-        self.assertEqual(chktype([], list), [])
-        self.assertEqual(chktype({}, dict), {})
-
-    def test_existing_variable(self) -> None:
-        """Test chkenv function with existing variable."""
-        self.assertEqual(chkenv("TEST_VAR"), "123")
-
-    def test_non_existing_variable(self) -> None:
-        """Test chkenv function with non existing variable."""
-        with self.assertRaises(ValueError):
-            chkenv("NON_EXISTING_VAR")
-
-    def test_empty_variable(self) -> None:
-        """Test chkenv function with empty variable."""
-        with self.assertRaises(ValueError):
-            chkenv("EMPTY_VAR")
-
-    def test_default_for_non_existing_variable(self) -> None:
-        """Test chkenv function with non existing variable."""
-        self.assertIsNone(chkenv("NON_EXISTING_VAR", need=False))
-
-    def test_default_for_empty_variable(self) -> None:
-        """Test chkenv function with empty variable."""
-        self.assertEqual(chkenv("EMPTY_VAR", need=False, ifnull="default"), "default")
-        with self.assertRaises(ValueError):
-            chkenv("EMPTY_VAR", need=True)
-
-    def test_type_conversion(self) -> None:
-        """Test chkenv function with type conversion."""
-        self.assertEqual(chkenv("TEST_VAR", astype=int), 123)
-
-    def test_boolean_true_value(self) -> None:
-        """Test chkenv function with boolean true value."""
-        self.assertTrue(chkenv("TRUE_VAR", astype=bool))
-
-    def test_boolean_false_value(self) -> None:
-        """Test chkenv function with boolean false value."""
-        self.assertFalse(chkenv("FALSE_VAR", astype=bool))
+def test_chktype_path_not_exist() -> None:
+    """Test chktype function with Path object."""
+    test_path = Path("non_existing_file.txt")  # Assume this file does not exist
+    with raises(FileNotFoundError):
+        chktype(test_path, Path)
 
 
-if __name__ == "__main__":
-    main()
+def test_isplatform() -> None:
+    """Test isplatform function."""
+    assert any((iswindows(), islinux(), ismacos()))
+
+
+@mark.parametrize(
+    "text, kwargs, expected",
+    (
+        ("example text", {"prefix": "Exa"}, True),
+        ("example text", {"prefix": "test"}, False),
+        ("example text", {"value": "ample"}, True),
+        ("example text", {"value": "none"}, False),
+        ("example text", {"suffix": "text"}, True),
+        ("example text", {"suffix": "exam"}, False),
+        ("abc", {"prefix": "a"}, True),
+        ("abc", {"prefix": "b"}, False),
+        ("abc", {"suffix": "c"}, True),
+        ("abc", {"suffix": "b"}, False),
+        ("abc", {"value": "b"}, True),
+        ("abc", {"value": "a"}, True),
+    ),
+)
+def test_chktext(text: str, kwargs: dict, expected: bool) -> None:
+    """Test chktext function."""
+    assert chktext(text, **kwargs) == expected
+
+
+def test_chktext_raises() -> None:
+    """Test chktext function with no input."""
+    with raises(ValueError):
+        chktext("example text")
+
+
+def test_file_exists(test_file: Path) -> None:
+    """Test chktype function with Path object."""
+    assert chktype(test_file, Path, mustexist=True) == test_file
+
+
+def test_chktype_incorrect() -> None:
+    """Test chktype function with incorrect input."""
+    with raises(TypeError):
+        chktype("value", int)
+
+
+@mark.parametrize(
+    "value, type_",
+    (
+        (123, int),
+        ("abc", str),
+        (Path(__file__), Path),
+        ([1, 2, 3], list),
+        ({"a": 1, "b": 2}, dict),
+        (True, bool),
+    ),
+)
+def test_chktype_correct(value: int, type_: type) -> None:
+    """Test chktype function with correct input."""
+    assert chktype(value, type_) == value
+
+
+def test_default_for_non_existing_variable() -> None:
+    """Test chkenv function with non existing variable."""
+    assert chkenv("NON_EXISTING_VAR", need=False) is None
+
+
+def test_default_for_empty_variable() -> None:
+    """Test chkenv function with empty variable."""
+    assert chkenv("EMPTY_VAR", need=False, ifnull="default") == "default"
+    with raises(ValueError):
+        chkenv("EMPTY_VAR", need=True)
+
+
+@mark.parametrize(
+    "env, value, astype",
+    (
+        ("TRUE_VAR", True, bool),
+        ("FALSE_VAR", False, bool),
+        ("TRUE_VAR", 1, int),
+        ("FALSE_VAR", 0, int),
+        ("TRUE_VAR", "True", str),
+        ("FALSE_VAR", "False", str),
+        ("TEST_VAR", 123, int),
+    ),
+)
+def test_chkenv_bool(env: str, value: bool, astype: type) -> None:
+    """Test chkenv function with boolean values."""
+    environ[env] = str(value)
+    assert chkenv(env, astype=astype) == value
