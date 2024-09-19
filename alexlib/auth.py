@@ -52,8 +52,7 @@ class AuthPart:
         """returns the name of the AuthPart object"""
         return self.name
 
-    @property
-    def length(self) -> int:
+    def __len__(self) -> int:
         """returns the length of the AuthPart object"""
         return len(self.name)
 
@@ -95,9 +94,11 @@ class Username(AuthPart):
     length: int = field(default=6)
 
     @classmethod
-    def rand(cls, minlen: int = 6, maxlen: int = 12) -> "Username":
+    def rand(cls, minlen: int = 6, maxlen: int = 12, **kwargs) -> "Username":
         """returns a random Username object"""
-        return super().rand(minlen=minlen, maxlen=maxlen, letter=True)
+        if "letter" not in kwargs:
+            kwargs["letter"] = True
+        return super().rand(minlen=minlen, maxlen=maxlen, **kwargs)
 
 
 @dataclass
@@ -107,9 +108,9 @@ class Password(AuthPart):
     length: int = field(default=12)
 
     @classmethod
-    def rand(cls, minlen: int = 12, maxlen: int = 24) -> "Password":
+    def rand(cls, minlen: int = 12, maxlen: int = 24, **kwargs) -> "Password":
         """returns a random Password object"""
-        return super().rand(minlen=minlen, maxlen=maxlen, printable_=True)
+        return super().rand(minlen=minlen, maxlen=maxlen, printable_=True, **kwargs)
 
 
 @dataclass
