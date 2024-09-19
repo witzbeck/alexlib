@@ -18,7 +18,7 @@ def rand_env(environ_keys: list[str]) -> str:
     return choice(environ_keys)
 
 
-@fixture(scope="class")
+@fixture(scope="session")
 def test_dir():
     with TemporaryDirectory() as test_dir:
         yield Path(test_dir)
@@ -44,7 +44,7 @@ def copy_path(test_file: Path, copy_text: str):
 
 
 @fixture(scope="session")
-def test_auth():
+def auth():
     return Auth.from_dict(
         name="test_auth",
         dict_={

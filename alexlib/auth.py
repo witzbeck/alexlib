@@ -15,6 +15,7 @@ The module uses `dataclasses` for structured data management, `functools` and `i
 Usage:
 This module is intended for developers who need to manage authentication and secrets in a secure and organized manner. It's particularly useful in scenarios where credentials need to be stored, retrieved, and used dynamically in a secure way.
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property, partial
@@ -700,7 +701,10 @@ class AuthGenerator:
     def mk_product_dict(**kwargs) -> dict[str:list]:
         """returns a dict of all possible auth templates"""
         keys, vals = kwargs.keys(), kwargs.values()
-        return {".".join(inst): dict(zip(keys, inst)) for inst in product(*vals)}
+        return {
+            ".".join(inst): dict(zip(keys, inst, strict=True))
+            for inst in product(*vals)
+        }
 
     def mk_all_templates(self) -> dict[str:dict]:
         """returns a dict of all possible auth templates"""

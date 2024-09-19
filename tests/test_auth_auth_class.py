@@ -13,75 +13,73 @@ from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 from alexlib.auth import Curl, Auth
 
 
-def test_auth_init(test_auth: Auth):
+def test_auth_init(auth: Auth):
     """
     Test the initialization of an Auth object.
     """
-    assert isinstance(test_auth, Auth)
+    assert isinstance(auth, Auth)
 
 
-def test_auth_name(test_auth: Auth):
+def test_auth_name(auth: Auth):
     """
     Test the `name` attribute of an Auth object.
     """
-    assert test_auth.name == "test_auth"
-    assert isinstance(test_auth.name, str)
+    assert auth.name == "test_auth"
+    assert isinstance(auth.name, str)
 
 
-def test_auth_keypath(test_auth: Auth):
+def test_auth_keypath(auth: Auth):
     """
     Test the `keypath` attribute of an Auth object.
     """
-    assert test_auth.keypath.exists()
-    assert isinstance(test_auth.keypath, Path)
+    assert auth.keypath.exists()
+    assert isinstance(auth.keypath, Path)
 
 
-def test_auth_storepath(test_auth: Auth):
+def test_auth_storepath(auth: Auth):
     """
     Test the `storepath` attribute of an Auth object.
     """
-    assert test_auth.storepath.exists()
-    assert isinstance(test_auth.storepath, Path)
+    assert auth.storepath.exists()
+    assert isinstance(auth.storepath, Path)
 
 
-def test_update_value(test_auth: Auth):
+def test_update_value(auth: Auth):
     """
     Test the `update_value` method of an Auth object.
     """
-    test_auth.update_value("new_key", "new_value")
-    assert str(test_auth.store.get_cred("new_key")) == "new_value"
+    auth.update_value("new_key", "new_value")
+    assert str(auth.store.get_cred("new_key")) == "new_value"
 
 
-def test_update_values(test_auth: Auth):
+def test_update_values(auth: Auth):
     """
     Test the `update_values` method of an Auth object.
     """
     updates = {"key1": "value1", "key2": "value2"}
-    test_auth.update_values(updates)
-    assert all(
-        str(test_auth.store.get_cred(key)) == value for key, value in updates.items()
-    )
+    auth.update_values(updates)
+    assert all(str(auth.store.get_cred(key)) == value for key, value in updates.items())
 
 
-def test_auth_curl(test_auth: Auth):
+def test_auth_curl(auth: Auth):
     """
     Test the `curl` attribute of an Auth object.
     """
-    assert isinstance(test_auth.curl, Curl)
+    assert isinstance(auth.curl, Curl)
 
 
-def test_auth_basic(test_auth: Auth):
+def test_auth_basic(auth: Auth):
     """
     Test the `basic` attribute of an Auth object.
     """
-    assert isinstance(test_auth.basic, HTTPBasicAuth)
+    assert isinstance(auth.basic, HTTPBasicAuth)
 
 
-def test_auth_digest(test_auth: Auth):
+def test_auth_digest(auth: Auth):
     """
     Test the `digest` attribute of an Auth object.
     """
-    assert isinstance(test_auth.digest, HTTPDigestAuth)
+    assert isinstance(auth.digest, HTTPDigestAuth)
 
 
 def test_auth_from_nonexistent_path():
