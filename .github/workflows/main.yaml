@@ -56,6 +56,12 @@ jobs:
           ${{ runner.os }}-poetry-
     
     #----------------------------------------------
+    # Check the poetry lock file
+    #----------------------------------------------
+    - name: Install dependencies
+      run: poetry check
+    
+      #----------------------------------------------
     # install dependencies if cache does not exist
     #----------------------------------------------
     - name: Install dependencies
