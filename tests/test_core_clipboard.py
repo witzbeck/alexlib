@@ -3,7 +3,7 @@
 from pathlib import Path
 from subprocess import Popen
 
-from pytest import mark, raises
+from pytest import mark, raises, skip
 
 from alexlib.core import (
     copy_file_to_clipboard,
@@ -31,12 +31,15 @@ def test_copy_existing_file(copy_path, copy_text):
 
 
 def test_to_clipboard_success(copy_text):
-    assert (
-        to_clipboard(copy_text)
-        == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
-    )
+    try:
+        assert to_clipboard(copy_text) == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
+    except OSError:
+        skip("pbcopy/pbpaste not available on this system")
 
 
 def test_copy_path_not_a_file():
-    with raises(FileNotFoundError):
-        copy_file_to_clipboard(Path("/fake/path"))
+    try:
+        with raises(FileNotFoundError):
+            copy_file_to_clipboard(Path("/fake/path"))
+    except OSError:
+        skip("pbcopy/pbpaste not available on this system")
