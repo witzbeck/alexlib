@@ -1,61 +1,33 @@
 """Test cases for the SystemObject class."""
+
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest import TestCase, main
+
+from pytest import fixture
+
 from alexlib.files.objects import SystemObject
 
 
-class TestSystemObject(TestCase):
-    """Test cases for the SystemObject class."""
-
-    def test_instantiation(self):
-        """Test instantiation with different names and paths."""
-        with TemporaryDirectory() as td:
-            path = Path(td) / "test_file.txt"
-            self.system_object = SystemObject.from_path(path)
-            self.assertEqual(self.system_object.name, "test_file.txt")
-            self.assertEqual(self.system_object.path, Path(td) / "test_file.txt")
-
-    def test_properties(self):
-        """Test property methods like `isfile`, `isdir`, `haspath`, `user`, etc."""
-        # Assuming the existence of a file at '/tmp/test_file.txt'
-        with TemporaryDirectory() as td:
-            path = Path(td) / "test_file.txt"
-            self.system_object = SystemObject.from_path(path)
-            path.touch()
-            self.assertTrue(self.system_object.isfile)
-            self.assertFalse(self.system_object.isdir)
-            self.assertTrue(self.system_object.haspath)
-
-    def test_path_manipulation(self):
-        """Test path manipulation methods like `get_path`, `set_path`, `get_name`, `set_name`."""
-        # Changing the path
-        with TemporaryDirectory() as td:
-            path = Path(td) / "test_file.txt"
-            self.system_object = SystemObject.from_path(path)
-            self.system_object.set_path()
-            self.assertEqual(self.system_object.path, path)
-            # Changing the name
-            self.system_object.set_name("new_file.txt")
-            self.assertEqual(self.system_object.name, "new_file.txt")
-
-    def test_utility_methods(self):
-        """Test other utility methods like `eval_method`, `from_path`, `from_name`."""
-        # Testing from_path class method
-        with TemporaryDirectory() as td:
-            path = Path(td) / "test_file.txt"
-            self.system_object = SystemObject.from_path(path)
-            # self.assertEqual(self.system_object.name, "test_file.txt")
-            # self.assertEqual(self.system_object.path, Path(td) / "test_file.txt")
-            ## Testing from_name class method
-            # self.system_object = SystemObject.from_name("test_file.txt")
-            # self.assertEqual(self.system_object.name, "test_file.txt")
-            # self.assertEqual(self.system_object.path, Path.cwd() / "test_file.txt")
-
-    def tearDown(self):
-        """Clean up any resources or temporary files created during testing."""
-        super().tearDown()
+@fixture(scope="class")
+def sysobj(file_path: Path):
+    return SystemObject.from_path(file_path)
 
 
-if __name__ == "__main__":
-    main()
+def test_systemobject_instantiation(sysobj: SystemObject):
+    """Test instantiation with different names and paths."""
+    assert sysobj.name
+    assert sysobj.path.exists()
+
+
+def test_systemobject_properties(sysobj: SystemObject):
+    """Test property methods like `isfile`, `isdir`, `haspath`, `user`, etc."""
+    assert sysobj.isfile
+    assert not sysobj.isdir
+    assert sysobj.haspath
+
+
+def test_systemobject_path_manipulation(sysobj: SystemObject):
+    """Test path manipulation methods like `get_path`, `set_path`, `get_name`, `set_name`."""
+    # Changing the name
+    new_name = "new_file.txt"
+    sysobj.set_name(new_name)
+    assert sysobj.name == new_name

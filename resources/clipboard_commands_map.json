@@ -1,0 +1,20 @@
+{
+    "windows": [
+        "clip"
+    ],
+    "macos": [
+        "pbcopy"
+    ],
+    "linux": [
+        [
+            "xclip",
+            "-selection",
+            "clipboard"
+        ],
+        [
+            "xsel",
+            "--clipboard",
+            "--input"
+        ]
+    ]
+}

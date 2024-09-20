@@ -1,22 +1,6 @@
 """Tests for the AuthPart class and its subclasses."""
 
-from pytest import FixtureRequest, fixture
 from alexlib.auth import AuthPart, Login, Password, Server, Username
-
-
-@fixture(scope="class", params=(Username, AuthPart, Password))
-def auth_part(request: FixtureRequest) -> AuthPart:
-    return request.param.rand(letter=True)
-
-
-@fixture(scope="class")
-def login() -> Login:
-    return Login.rand()
-
-
-@fixture(scope="class")
-def server() -> Server:
-    return Server.rand()
 
 
 def test_auth_part(auth_part: AuthPart):

@@ -6,9 +6,9 @@ This test module provides a comprehensive suite of tests for ensuring the correc
 
 from pathlib import Path
 
-from pytest import fixture, mark, FixtureRequest
-from alexlib.auth import AuthGenerator, Auth
+from pytest import FixtureRequest, fixture, mark
 
+from alexlib.auth import Auth, AuthGenerator
 from alexlib.crypto import SecretValue
 
 
@@ -30,8 +30,8 @@ def auth_key(request: FixtureRequest) -> str:
 
 
 @fixture(scope="session")
-def auth_template_path(test_dir: Path):
-    test_path = test_dir / "test_template.json"
+def auth_template_path(dir_path: Path):
+    test_path = dir_path / "test_template.json"
     return test_path
 
 

@@ -1,15 +1,15 @@
-from pathlib import Path
 from json import loads as json_loads
+from pathlib import Path
 
 from pytest import mark, raises
 
-from alexlib.core import dump_envs
+from alexlib.files.utils import dump_envs
 
 
 @mark.slow
-def test_dump_dotenv(test_dir: Path):
+def test_dump_dotenv(dir_path: Path):
     """Test dumping to dotenv format"""
-    test_path = test_dir / "output.env"
+    test_path = dir_path / "output.env"
     pairs = {"KEY": "VALUE"}
     dump_envs(test_path, pairs)
     assert test_path.exists()
@@ -17,9 +17,9 @@ def test_dump_dotenv(test_dir: Path):
 
 
 @mark.slow
-def test_dump_json(test_dir: Path):
+def test_dump_json(dir_path: Path):
     """Test dumping to JSON format"""
-    test_path = test_dir / "output.json"
+    test_path = dir_path / "output.json"
     pairs = {"KEY": "VALUE"}
     dump_envs(test_path, pairs)
     assert test_path.exists()
@@ -27,9 +27,9 @@ def test_dump_json(test_dir: Path):
 
 
 @mark.slow
-def test_dump_envs_force(test_dir: Path):
+def test_dump_envs_force(dir_path: Path):
     """Test force overwrite"""
-    test_path = test_dir / "output.json"
+    test_path = dir_path / "output.json"
     test_path.touch()
     pairs = {"KEY": "NEW_VALUE"}
     dump_envs(test_path, pairs, force=True)
@@ -38,9 +38,9 @@ def test_dump_envs_force(test_dir: Path):
 
 
 @mark.slow
-def test_dump_envs_unsupported_type(test_dir: Path):
+def test_dump_envs_unsupported_type(dir_path: Path):
     """Test unsupported file types"""
-    test_path = test_dir / "output.unsupported"
+    test_path = dir_path / "output.unsupported"
     pairs = {"KEY": "VALUE"}
     with raises(ValueError):
         dump_envs(test_path, pairs)

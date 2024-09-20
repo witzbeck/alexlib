@@ -1,27 +1,21 @@
 """Test core functions."""
 
+from datetime import timezone
+
 from pytest import fixture, mark
 
 from alexlib.core import (
     asdict,
     aslist,
-    concat_lists,
+    get_local_tz,
 )
 
 
-@mark.parametrize(
-    "nested, expected",
-    [
-        ([[1, 2], [3, 4]], [1, 2, 3, 4]),
-        ([[1, 2], [3, [4, 5]]], [1, 2, 3, 4, 5]),
-    ],
-)
-def test_concat_lists(nested, expected):
-    """Test with various lists of lists."""
-    (
-        concat_lists(nested) == expected,
-        "Failed to correctly concatenate lists.",
-    )
+def test_get_local_tz():
+    """Ensure it returns the correct local timezone."""
+    assert isinstance(
+        get_local_tz(), timezone
+    ), "The returned value is not a timezone instance."
 
 
 @mark.parametrize(

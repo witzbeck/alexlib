@@ -6,12 +6,14 @@ from typing import Any
 from pytest import mark
 
 from alexlib.core import (
-    is_dotenv,
-    is_json,
     isdunder,
     ishidden,
     isnone,
     istrue,
+)
+from alexlib.files.utils import (
+    is_dotenv,
+    is_json,
 )
 
 ISJSON_TRUE_STRINGS = (

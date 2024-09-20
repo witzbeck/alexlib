@@ -2,10 +2,12 @@
 This module contains unittests for testing the functionalities provided by the alexlib.files module,
 including file and directory operations, manipulation, searching, and database interactions.
 """
+
+from pathlib import Path
 from shutil import rmtree
 from tempfile import mkdtemp
 from unittest import TestCase, main
-from pathlib import Path
+
 from alexlib.files.objects import Directory, File
 from alexlib.files.utils import eval_parents
 

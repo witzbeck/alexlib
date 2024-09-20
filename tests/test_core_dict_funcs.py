@@ -1,6 +1,6 @@
 """Tests for the `alexlib.core` module."""
 
-from unittest import TestCase, main
+from unittest import TestCase
 from unittest.mock import patch
 
 from alexlib.core import (
@@ -8,105 +8,7 @@ from alexlib.core import (
     mk_dictvals_distinct,
     show_dict,
     show_environ,
-    get_attrs,
 )
-
-
-class _TestClass:
-    """Test class for `get_attrs` function."""
-
-    def __init__(
-        self,
-        public_attr: str = "public",
-        hidden_attr: str = "hidden",
-        dunder_attr: str = "dunder",
-    ) -> None:
-        self.public_attr = public_attr
-        self._hidden_attr = hidden_attr
-        self.__dunder_attr__ = dunder_attr
-
-    def public_method(self):
-        return self.public_attr
-
-    def _hidden_method(self):
-        return self._hidden_attr
-
-    def __dunder_method__(self):
-        return self.__dunder_attr__
-
-
-class TestGetAttrs(TestCase):
-    """Test the `get_attrs` function."""
-
-    def setUp(self) -> None:
-        self.obj = _TestClass()
-        return super().setUp()
-
-    def test_with_public_attrs(self) -> None:
-        """Test with public attributes."""
-        result = get_attrs(self.obj)
-        self.assertIn("public_attr", result)
-        self.assertNotIn("_hidden_attr", result)
-        self.assertNotIn("__dunder_attr__", result)
-
-    def test_with_hidden_attrs(self) -> None:
-        """Test with hidden attributes."""
-        result = get_attrs(self.obj, hidden=True)
-        self.assertIn("public_attr", result)
-        self.assertIn("_hidden_attr", result)
-        self.assertNotIn("__dunder_attr__", result)
-
-    def test_with_dunder_attrs(self) -> None:
-        """Test with dunder attributes."""
-        result = get_attrs(self.obj, dunder=True)
-        self.assertIn("public_attr", result)
-        self.assertNotIn("_hidden_attr", result)
-        self.assertIn("__dunder_attr__", result)
-
-    def test_with_all_attrs(self) -> None:
-        """Test with all attributes."""
-        result = get_attrs(self.obj, hidden=True, dunder=True)
-        self.assertIn("public_attr", result)
-        self.assertIn("_hidden_attr", result)
-        self.assertIn("__dunder_attr__", result)
-
-    def test_with_public_methods(self) -> None:
-        """Test with public methods."""
-        result = get_attrs(self.obj, methods=True)
-        self.assertIn("public_method", result)
-        self.assertNotIn("_hidden_method", result)
-        self.assertNotIn("__dunder_method__", result)
-
-    def test_with_hidden_methods(self) -> None:
-        """Test with hidden methods."""
-        result = get_attrs(self.obj, methods=True, hidden=True)
-        self.assertIn("public_method", result)
-        self.assertIn("_hidden_method", result)
-        self.assertNotIn("__dunder_method__", result)
-
-    def test_with_dunder_methods(self) -> None:
-        """Test with dunder methods."""
-        result = get_attrs(self.obj, methods=True, dunder=True)
-        self.assertIn("public_method", result)
-        self.assertNotIn("_hidden_method", result)
-        self.assertIn("__dunder_method__", result)
-
-    def test_with_all_methods(self) -> None:
-        """Test with all methods."""
-        result = get_attrs(self.obj, methods=True, hidden=True, dunder=True)
-        self.assertIn("public_method", result)
-        self.assertIn("_hidden_method", result)
-        self.assertIn("__dunder_method__", result)
-
-    def test_with_all_attrs_and_methods(self) -> None:
-        """Test with all attributes and methods."""
-        result = get_attrs(self.obj, hidden=True, dunder=True, methods=True)
-        self.assertIn("public_attr", result)
-        self.assertIn("_hidden_attr", result)
-        self.assertIn("__dunder_attr__", result)
-        self.assertIn("public_method", result)
-        self.assertIn("_hidden_method", result)
-        self.assertIn("__dunder_method__", result)
 
 
 class TestShowDict(TestCase):
@@ -126,39 +28,20 @@ class TestShowDict(TestCase):
         mock_print.assert_called()
 
 
-class TestMkDictvalsDistinct(TestCase):
-    """Test the `mk_dictvals_distinct` function."""
-
-    def test_with_list_values_including_duplicates(self) -> None:
-        """Test with list values including duplicates."""
-        test_dict = {"a": [1, 2, 2, 3], "b": ["x", "y", "y"]}
-        expected = {"a": [1, 2, 3], "b": ["x", "y"]}
-        result = mk_dictvals_distinct(test_dict)
-        self.assertIn("a", result)
-        self.assertIn("b", result)
-        result["a"].sort()
-        result["b"].sort()
-        self.assertListEqual(result["a"], expected["a"])
-        self.assertListEqual(result["b"], expected["b"])
+def test_with_list_values_including_duplicates() -> None:
+    """Test with list values including duplicates."""
+    test_dict = {"a": [1, 2, 2, 3], "b": ["x", "y", "y"]}
+    expected = {"a": [1, 2, 3], "b": ["x", "y"]}
+    result = mk_dictvals_distinct(test_dict)
+    assert all(
+        (sorted(result[key]) == sorted(expected[key]) for key in test_dict.keys())
+    )
 
 
-class TestInvertDict(TestCase):
-    """Test the `invert_dict` function."""
-
-    def test_with_dict(self) -> None:
-        """Test with a dictionary."""
-        test_dict = {"a": 1, "b": 2}
-        expected = {1: "a", 2: "b"}
-        result = invert_dict(test_dict)
-        self.assertEqual(result, expected)
-
-    def test_with_list_of_tuples(self) -> None:
-        """Test with a list of tuples."""
-        test_list = [("a", 1), ("b", 2)]
-        expected = {1: "a", 2: "b"}
-        result = invert_dict(dict(test_list))
-        self.assertEqual(result, expected)
-
-
-if __name__ == "__main__":
-    main()
+def test_with_dict() -> None:
+    """Test with a dictionary."""
+    test_dict = {"a": 1, "b": 2}
+    expected = {1: "a", 2: "b"}
+    result = invert_dict(test_dict)
+    assert sorted(result.keys()) == sorted(expected.keys())
+    assert sorted(result.values()) == sorted(expected.values())

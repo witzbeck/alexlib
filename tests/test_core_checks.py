@@ -9,9 +9,9 @@ from alexlib.core import (
     chkenv,
     chktext,
     chktype,
-    iswindows,
     islinux,
     ismacos,
+    iswindows,
 )
 
 
@@ -55,9 +55,9 @@ def test_chktext_raises() -> None:
         chktext("example text")
 
 
-def test_file_exists(test_file: Path) -> None:
+def test_file_exists(file_path: Path) -> None:
     """Test chktype function with Path object."""
-    assert chktype(test_file, Path, mustexist=True) == test_file
+    assert chktype(file_path, Path, mustexist=True) == file_path
 
 
 def test_chktype_incorrect() -> None:

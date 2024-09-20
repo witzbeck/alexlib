@@ -1,11 +1,12 @@
 """Test core functions."""
+
 from json import JSONDecodeError
 from pathlib import Path
-from unittest import main, TestCase
+from tomllib import TOMLDecodeError
+from unittest import TestCase
 from unittest.mock import mock_open, patch
 
-from tomllib import TOMLDecodeError
-from alexlib.core import (
+from alexlib.files.utils import (
     read_json,
     read_toml,
 )
@@ -54,7 +55,3 @@ class TestReadFiles(TestCase):
                 {"key": "value"},
                 "Failed to read valid JSON.",
             )
-
-
-if __name__ == "__main__":
-    main()
