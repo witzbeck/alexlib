@@ -1,6 +1,0 @@
-{
-  "databases": ["learning", "headlines", "finance"],
-  "locales": ["local", "remote"],
-  "systems": ["postgres"],
-  "envs": ["dev", "test", "prod"]
-}

@@ -6,7 +6,8 @@ This module contains unit tests for the Username and Password classes in the ale
 """
 
 from unittest import TestCase, main
-from alexlib.auth import AuthPart, Username, Password
+
+from alexlib.auth import AuthPart, Password, Username
 
 
 class TestUsernameAndPasswordClasses(TestCase):

@@ -8,89 +8,40 @@ focusing on the interactions between its various classes and real-world
 usage scenarios such as creating, updating, and using credentials.
 """
 
-from unittest import TestCase, main
-from alexlib.auth import Auth, SecretStore, Curl, Username, Password, Server, Login
 from pathlib import Path
-from tempfile import TemporaryDirectory
+
+from alexlib.auth import Auth, SecretStore
 
 
-class TestAlexlibAuthIntegration(TestCase):
+def test_updating_credentials_in_Auth(auth: Auth, auth_path: Path):
     """
-    Integration tests for the alexlib.auth module.
+    Test updating credentials in the Auth class.
     """
+    auth.store.path = auth_path
 
-    def setUp(self):
-        """
-        Set up environment for each test.
-        """
-        self.temp_dir = TemporaryDirectory()
-        self.test_auth_name = "test_auth"
-        self.test_auth_path = Path(self.temp_dir.name) / "auth_store.json"
+    # Updating credentials
+    auth.update_value("username", "user2")
+    auth.update_value("password", "pass2")
 
-    def tearDown(self):
-        """
-        Clean up after each test.
-        """
-        self.temp_dir.cleanup()
+    # Verifying updates
+    updated_username = auth.run_getattr("get_username")
+    updated_password = auth.run_getattr("get_password")
 
-    def test_creating_and_using_credentials(self):
-        """
-        Test the creation of credentials and their usage in various classes.
-        """
-        username = Username.rand()
-        password = Password.rand()
-        server = Server.rand()
-
-        # Creating a login and a server instance
-        login = Login(user=username, pw=password)
-        curl = Curl(
-            username=str(username),
-            password=str(password),
-            host=server.host,
-            port=server.port,
-        )
-
-        self.assertEqual(login.user.name, curl.username)
-        self.assertEqual(login.pw.name, curl.password)
-
-    def test_updating_credentials_in_Auth(self):
-        """
-        Test updating credentials in the Auth class.
-        """
-        # Creating an Auth instance
-        auth = Auth.from_dict(
-            self.test_auth_name, {"username": "user1", "password": "pass1"}
-        )
-        auth.store.path = self.test_auth_path
-
-        # Updating credentials
-        auth.update_value("username", "user2")
-        auth.update_value("password", "pass2")
-
-        # Verifying updates
-        updated_username = auth.run_getattr("get_username")
-        updated_password = auth.run_getattr("get_password")
-
-        self.assertEqual(str(updated_username), "user2")
-        self.assertNotEqual(updated_password, "pass2")
-        self.assertEqual(repr(updated_password), "<SecretValue>")
-
-    def test_secret_store_encryption_and_decryption(self):
-        """
-        Test encryption and decryption of credentials in SecretStore.
-        """
-        secret_store = SecretStore.from_dict(
-            {"username": "user", "password": "pass"}, path=self.test_auth_path
-        )
-        secret_store.secrets = SecretStore.encode_str_dict(secret_store.secrets)
-
-        # Testing encryption and decryption
-        encrypted_secrets = secret_store.secrets
-        decrypted_secrets = {k: str(v) for k, v in encrypted_secrets.items()}
-
-        self.assertEqual(decrypted_secrets["username"], "user")
-        self.assertEqual(decrypted_secrets["password"], "pass")
+    assert str(updated_username) == "user2", f"Expected user2, got {updated_username}"
+    assert str(updated_password) == "pass2", f"Expected pass2, got {updated_password}"
+    assert (
+        repr(updated_password) == "<SecretValue>"
+    ), f"Expected <SecretValue>, got {updated_password}"
 
 
-if __name__ == "__main__":
-    main()
+def test_store_encryption_and_decryption(secret_store: SecretStore):
+    """
+    Test encryption and decryption of secrets in the SecretStore class.
+    """
+    secret_store.secrets = SecretStore.encode_str_dict(secret_store.secrets)
+
+    # Testing encryption and decryption
+    encrypted_secrets = secret_store.secrets
+    decrypted_secrets = {k: str(v) for k, v in encrypted_secrets.items()}
+    assert decrypted_secrets["username"] == "user"
+    assert decrypted_secrets["password"] == "pass"

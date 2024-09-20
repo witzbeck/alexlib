@@ -1,12 +1,12 @@
 """"""
 
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryFile
 from unittest import TestCase, main
-from hashlib import sha256
 
-from alexlib.core import sha256sum
 from alexlib.files.objects import Directory
+from alexlib.files.utils import sha256sum
 
 
 class TestSha256(TestCase):

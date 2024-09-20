@@ -2,23 +2,24 @@
 !*.json
 !*.txt
 
+# ASV
+asv.conf.json
+.asv/
+
+
+# Environments & Secrets
 *.key
-*.lock
-*.code-workspace
-*.log
-*.log.*
-*test_cases.md
 /secrets
 secrets.*
 *.[eE][nN][vV]*
 
+# User-specific files
 .vs
 .vscode
-.idea
-
-recipe/*.pdf
-*.code-workspace
 .vscode/
+.idea
+recipe/*.pdf
+
 
 # Logs
 tests/fixtures/cached_*_text.txt
@@ -30,6 +31,8 @@ lightning_logs/
 .python-version
 serialization_dir
 /research
+*.log
+*.log.*
 logs/
 cache*
 /target
