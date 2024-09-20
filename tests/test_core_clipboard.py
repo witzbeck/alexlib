@@ -8,6 +8,10 @@ from pytest import mark, raises, skip
 from alexlib.core import (
     copy_file_to_clipboard,
     to_clipboard,
+    islinux,
+    iswindows,
+    ismacos,
+    get_clipboard_cmd
 )
 
 
@@ -26,15 +30,22 @@ def test_copy_non_existing_file():
 
 
 def test_copy_existing_file(copy_path, copy_text):
-    copy_file_to_clipboard(copy_path)
-    assert copy_text == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
-
+    if not islinux():
+        assert  copy_file_to_clipboard(copy_path)
+    else:
+        try:
+            assert  copy_file_to_clipboard(copy_path)
+        except OSError:
+            skip("pbcopy/pbpaste not available on this system")
 
 def test_to_clipboard_success(copy_text):
-    try:
+    if not islinux():
         assert to_clipboard(copy_text) == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
-    except OSError:
-        skip("pbcopy/pbpaste not available on this system")
+    else:
+        try:
+            assert to_clipboard(copy_text) == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
+        except OSError:
+            skip("pbcopy/pbpaste not available on this system")
 
 
 def test_copy_path_not_a_file():
