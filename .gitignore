@@ -2,10 +2,7 @@
 !*.json
 !*.txt
 
-# ASV
-asv.conf.json
-.asv/
-
+data/
 
 # Environments & Secrets
 *.key
