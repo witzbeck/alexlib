@@ -7,9 +7,58 @@ from faker import Faker
 from pytest import FixtureRequest, fixture
 
 from alexlib.auth import Auth, AuthPart, Login, Password, SecretStore, Server, Username
+from alexlib.constants import (
+    CLIPBOARD_COMMANDS_PATH,
+    COLUMN_SUB_PATH,
+    CREDS,
+    DATA_PATH,
+    DATE_FORMAT,
+    DATETIME_FORMAT,
+    HOME,
+    MODULE_PATH,
+    PROJECT_PATH,
+    PYPROJECT_PATH,
+    RESOURCES_PATH,
+    SA_DIALECT_MAP_PATH,
+    SOURCE_PATH,
+    SQL_CHARS,
+    TIME_FORMAT,
+    VENVS,
+)
 from alexlib.core import chkcmd, get_clipboard_cmd
 from alexlib.crypto import Cryptographer
 from alexlib.files.objects import Directory, File
+
+CORE_PATHS = (
+    MODULE_PATH,
+    SOURCE_PATH,
+    PROJECT_PATH,
+    RESOURCES_PATH,
+    DATA_PATH,
+    PYPROJECT_PATH,
+    HOME,
+    CREDS,
+    VENVS,
+    CLIPBOARD_COMMANDS_PATH,
+    COLUMN_SUB_PATH,
+    SA_DIALECT_MAP_PATH,
+)
+CORE_STRINGS = (
+    DATE_FORMAT,
+    TIME_FORMAT,
+    DATETIME_FORMAT,
+    SQL_CHARS,
+)
+
+
+@fixture(scope="session", params=CORE_PATHS)
+def core_path(request: FixtureRequest) -> Path:
+    return request.param
+
+
+@fixture(scope="session", params=CORE_STRINGS)
+def core_string(request: FixtureRequest) -> str:
+    return request.param
 
 
 @fixture(scope="class")

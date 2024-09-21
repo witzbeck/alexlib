@@ -1,13 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
-from sys import path
+from sys import path, version_info
 
-from alexlib.constants import DOTENV_PATH, MODULE_PATH, PROJECT_PATH, PYPROJECT_PATH
-from alexlib.files.utils import load_dotenv, read_toml
+from alexlib.constants import MODULE_PATH, PYPROJECT_PATH
+from alexlib.files.utils import read_toml
 
 path.append(str(MODULE_PATH))
-if DOTENV_PATH.exists():
-    load_dotenv(DOTENV_PATH)
 
 
 @dataclass(slots=True)
@@ -17,7 +15,7 @@ class Version:
     major: int
     minor: int
     patch: int
-    project_name: str = PROJECT_PATH.name
+    project_name: str = None
 
     def __eq__(self, other: "Version") -> bool:
         return str(self) == str(other)
@@ -36,6 +34,10 @@ class Version:
             ret = dict_["tool"]["poetry"]["version"]
         return cls.from_str(ret, project_name=path.parent.name)
 
+    @classmethod
+    def from_sys(cls) -> "Version":
+        return cls(*version_info[:3], project_name="Python")
+
     def __iter__(self):
         """returns version as iterable"""
         return iter(
@@ -48,8 +50,17 @@ class Version:
 
     def __str__(self) -> str:
         """returns version as string"""
-        return ".".join(list(self))
+        return ".".join([str(part) for part in self])
 
     def __repr__(self) -> str:
         """displays project name and version as string"""
         return f"{self.project_name} v{str(self)}"
+
+    def __post_init__(self):
+        """checks for valid version"""
+        if not isinstance(self.major, int):
+            self.major = int(self.major)
+        if not isinstance(self.minor, int):
+            self.minor = int(self.minor)
+        if not isinstance(self.patch, int):
+            self.patch = int(self.patch)

@@ -53,15 +53,3 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-
-  - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 3.2.0
-    hooks:
-      - id: sqlfluff-fix
-        name: SQLFluff Fix
-        types: [sql]
-        entry: sqlfluff fix --force --config pyproject.toml
-      - id: sqlfluff-lint
-        name: SQLFluff Lint
-        types: [sql]
-        entry: sqlfluff lint --config pyproject.toml

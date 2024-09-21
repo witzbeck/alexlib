@@ -59,23 +59,18 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.ruff]
-# Exclude a variety of commonly ignored directories.
 exclude = [
-    ".eggs",
     ".git",
     ".git-rewrite",
     ".ipynb_checkpoints",
     ".pyenv",
     ".pytest_cache",
-    ".pytype",
     ".ruff_cache",
     ".venv",
     ".vscode",
     "build",
     "dist",
-    "node_modules",
     "site-packages",
-    "venv",
 ]
 extend-include = ["*.ipynb"]
 line-length = 88
@@ -93,10 +88,10 @@ select = ["E4", "E7", "E9", "F", "B", "Q", "W", "C", "T", "I", "C901"]
 [tool.ruff.lint.isort]
 known-first-party = ["alexlib"]
 
-# Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
 [tool.ruff.lint.per-file-ignores]
-#"__init__.py" = ["E402"]
-"**/{tests,docs,tools}/*" = ["E402"]
+"**/{tests,docs,tools}/*" = [
+    "E402",
+] # Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
 
 [tool.ruff.format]
 quote-style = "double"
