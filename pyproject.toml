@@ -17,7 +17,6 @@ requests = "^2.32"
 faker = "^29.0.0"
 sqlalchemy = "^2.0"
 sqlalchemy-utils = "^0.41"
-pyarrow = "^16.1"
 
 [tool.poetry.group.docs.dependencies]
 reportlab = "^4.0"
@@ -37,8 +36,16 @@ ipykernel = "^6.29"
 pre-commit = "^3.0"
 sqlfluff = "^3.0"
 
+[tool.cov]
 [tool.pytest.ini_options]
-addopts = ["--cov=alexlib", "--cov-fail-under=10"]
+addopts = [
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov=alexlib",
+    "--cov-fail-under=10",
+    "-n",
+    "2",
+]
 testpaths = ["tests"]
 markers = [
     "slow: mark test as slow to run",
