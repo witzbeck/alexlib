@@ -41,7 +41,7 @@ sqlfluff = "^3.0"
 addopts = [
     "--cov=./src/alexlib",
     "--cov-report=term-missing",
-    "--cov-fail-under=60",
+    "--cov-fail-under=70",
     "--cov-branch",
     "-n",
     "auto",

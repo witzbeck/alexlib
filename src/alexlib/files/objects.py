@@ -30,7 +30,6 @@ from itertools import chain
 from os import stat_result
 from pathlib import Path
 from random import choice
-from typing import Any
 
 from pandas import DataFrame
 
@@ -168,7 +167,6 @@ class SystemObject:
         cls,
         filename: str,
         start_path: Path,
-        parent_name: str = None,
         notexistok: bool = False,
     ) -> "SystemObject":
         """returns file in parent directory"""
@@ -177,36 +175,15 @@ class SystemObject:
         if not start_path.exists():
             raise FileNotFoundError(f"{start_path} does not exist")
         ret, start_parents = None, list(start_path.parents)
-        if parent_name:
-            parent = max(x for x in start_parents if x.name == parent_name)
-            ret = parent / filename
-        else:
-            while ret is None and start_parents:
-                candidate = start_parents.pop(-1) / filename
-                ret = candidate if notexistok or candidate.exists() else None
+        while ret is None and start_parents:
+            candidate = start_parents.pop(-1) / filename
+            ret = candidate if notexistok or candidate.exists() else None
         return cls.from_path(ret)
-
-    def eval_method(
-        self,
-        method: str,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """evaluates a method"""
-        func = getattr(self, method)
-        return func(*args, **kwargs)
 
     @classmethod
     def find(cls, name: str, **kwargs):
         """finds system object by name"""
         return cls(path=path_search(name, **kwargs))
-
-
-def eval_method_list(
-    method: str, lst: list[SystemObject], *args, **kwargs
-) -> list[Any]:
-    """evaluates a method on a list of system objects"""
-    return [x.eval_method(method, *args, **kwargs) for x in lst]
 
 
 @dataclass
@@ -548,20 +525,6 @@ class Directory(SystemObject):
             d.rm_files()
         self.rm_files()
         self.path.rmdir()
-
-    def apply_to_files(
-        self,
-        method,
-        *args,
-        **kwargs,
-    ) -> list[File]:
-        """applies method to files"""
-        eval_method_list(
-            method,
-            self.filelist,
-            *args,
-            **kwargs,
-        )
 
     @property
     def randfile(self) -> File:

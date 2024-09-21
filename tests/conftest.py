@@ -10,7 +10,16 @@ from matplotlib.figure import Figure
 from pandas import DataFrame
 from pytest import FixtureRequest, fixture
 
-from alexlib.auth import Auth, AuthPart, Login, Password, SecretStore, Server, Username
+from alexlib.auth import (
+    Auth,
+    AuthPart,
+    Curl,
+    Login,
+    Password,
+    SecretStore,
+    Server,
+    Username,
+)
 from alexlib.constants import (
     CLIPBOARD_COMMANDS_PATH,
     COLUMN_SUB_PATH,
@@ -269,6 +278,18 @@ def auth():
 
 
 @fixture(scope="module")
+def curl():
+    return Curl(
+        username="testuser",
+        password="testpass",
+        host="localhost",
+        port=5432,
+        database="testdb",
+        dialect="postgres",
+    )
+
+
+@fixture(scope="module")
 def auth_path(dir_path: Path):
     return dir_path / "auth_store.json"
 
@@ -281,6 +302,36 @@ def username():
 @fixture(scope="function")
 def password():
     return Password.rand()
+
+
+@fixture(scope="module")
+def ip() -> str:
+    return Server.rand_ip()
+
+
+@fixture(scope="module")
+def addr() -> str:
+    return Server.rand_addr()
+
+
+@fixture(scope="module")
+def host() -> str:
+    return Server.rand_host()
+
+
+@fixture(scope="module")
+def port() -> int:
+    return Server.rand_port()
+
+
+@fixture(scope="module")
+def rand_server() -> Server:
+    return Server.rand()
+
+
+@fixture(scope="module")
+def regular_server() -> Server:
+    return Server("127.0.0.1", 8080)
 
 
 @fixture(scope="function")
@@ -298,11 +349,20 @@ def server() -> Server:
     return Server.rand()
 
 
-@fixture(scope="class")
-def secret_store(auth_path: Path):
-    return SecretStore.from_dict(
-        {"username": "user", "password": "pass"}, path=auth_path
-    )
+@fixture(
+    scope="module",
+    params=(
+        {"username": "user", "password": "pass"},
+        {"key1": "value1", "key2": "value2"},
+    ),
+)
+def secrets(request: FixtureRequest) -> dict:
+    return request.param
+
+
+@fixture(scope="module")
+def secret_store(secrets: dict) -> SecretStore:
+    return SecretStore.from_dict(secrets)
 
 
 @fixture(scope="class")

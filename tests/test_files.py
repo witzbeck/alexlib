@@ -215,6 +215,25 @@ def test_sysobj_is_new_enough(sysobj: SystemObject):
     assert sysobj.is_new_enough(timedelta(days=1))
 
 
+def test_sysobj_is_new_enough_not_timedelta(sysobj: SystemObject):
+    with raises(TypeError):
+        sysobj.is_new_enough(1e5)
+
+
+def test_sysobj_from_path(dir_obj: Directory):
+    """Test the from_path method of the SystemObject class."""
+    sysobj = SystemObject.from_path(dir_obj.path)
+    assert isinstance(sysobj, SystemObject)
+
+
+def test_sysobj_from_parent(settings_file: SettingsFile):
+    """Test the from_parent method of the SystemObject class."""
+    sysobj = SystemObject.from_parent(
+        settings_file.path.name, settings_file.path.parent, notexistok=True
+    )
+    assert isinstance(sysobj, SystemObject)
+
+
 def test_sysobj_clsname(sysobj: SystemObject):
     assert sysobj.clsname in __sysobj_names__
 
