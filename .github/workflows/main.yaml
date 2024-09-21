@@ -2,11 +2,11 @@ name: Python project workflow
 
 on:
   push:
-    branches: [ main, next/* ]
+    branches: [ main]
     paths-ignore:
       - "**/*.md"
   pull_request:
-    branches: [ main, next/* ]
+    branches: [ main]
     paths-ignore:
       - "**/*.md"
 
@@ -65,7 +65,7 @@ jobs:
     # install dependencies if cache does not exist
     #----------------------------------------------
     - name: Install dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      if: steps.Load_cached_virtualenv.outputs.cache-hit != 'true'
       run: poetry install --with test --no-interaction --no-root
     
     #----------------------------------------------
@@ -79,4 +79,4 @@ jobs:
     #----------------------------------------------
     - name: Run tests
       run: |
-        poetry run pytest --cov=alexlib --cov-report=xml -n auto
+        poetry run pytest --cov=alexlib --fail-under=75 -n auto
