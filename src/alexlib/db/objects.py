@@ -116,8 +116,8 @@ class Column:
 class Table:
     """wrapper for db table as pandas dataframe"""
 
-    name: Name = field()
-    schema_name: Name = field()
+    name: Name
+    schema_name: Name
     df: DataFrame = field(
         init=False,
         repr=False,
@@ -163,12 +163,12 @@ class Table:
     @classmethod
     def from_df(
         cls,
-        schema: str,
-        table: str,
+        schema_name: str,
+        name: str,
         df: DataFrame,
     ) -> "Table":
         """makes table from dataframe"""
-        cls_ = cls(schema, table)
+        cls_ = cls(schema_name=schema_name, name=name)
         cls_.df = df
         return cls_
 

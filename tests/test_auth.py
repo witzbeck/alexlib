@@ -321,3 +321,57 @@ def test_secret_store_sensor_input(secret_store: SecretStore, value: str):
     sensored_value = secret_store.sensor_input("input")
     assert sensored_value != value
     assert "*" in sensored_value
+
+
+def test_authpart_str_method(auth_part: AuthPart):
+    """Test the __str__ method for the AuthPart class."""
+    assert isinstance(str(auth_part), str)
+
+
+def test_login_rand_method():
+    """Test the rand method for the Login class."""
+    login = Login.rand()
+    assert isinstance(login, Login)
+    assert isinstance(login.user, Username)
+    assert isinstance(login.pw, Password)
+
+
+def test_curl_repr_method(curl: Curl):
+    """Test the __repr__ method for the Curl class."""
+    assert isinstance(repr(curl), str)
+
+
+def test_curl_clsname(curl: Curl):
+    """Test the __class__.__name__ attribute for the Curl class."""
+    assert isinstance(curl.clsname, str)
+
+
+def test_curl_without_login():
+    """Test the Curl class without a login."""
+    curl = Curl(host="localhost", port=5432, database="testdb")
+    assert isinstance(curl, Curl)
+    assert curl.login == ""
+
+
+def test_curl_without_port():
+    """Test the Curl class without a port."""
+    curl = Curl(host="localhost", database="testdb")
+    assert isinstance(curl, Curl)
+    assert curl.port is None
+    assert curl.hostport == "localhost"
+
+
+def test_curl_mssql():
+    """Test the Curl class with an MSSQL database."""
+    curl = Curl(host="localhost", port=1433, database="testdb", dialect="mssql")
+    assert isinstance(curl, Curl)
+    assert curl.dialect == "mssql"
+    assert str(curl).startswith("mssql+pyodbc")
+
+
+def test_curl_postgres():
+    """Test the Curl class with a PostgreSQL database."""
+    curl = Curl(host="localhost", port=5432, database="testdb", dialect="postgres")
+    assert isinstance(curl, Curl)
+    assert curl.dialect == "postgres"
+    assert str(curl).startswith("postgresql+psycopg")

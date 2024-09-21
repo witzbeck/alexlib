@@ -1,6 +1,6 @@
 """Test the new datetime methods."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pytest import FixtureRequest, fixture
 
@@ -9,6 +9,7 @@ from alexlib.times import (
     ONEDAY,
     CustomDatetime,
     CustomTimedelta,
+    get_local_tz,
     get_rand_datetime,
     get_rand_timedelta,
 )
@@ -32,6 +33,13 @@ def cdt(dt: datetime) -> CustomDatetime:
 @fixture(scope="class")
 def ctd(td: timedelta) -> CustomTimedelta:
     return CustomTimedelta(td)
+
+
+def test_get_local_tz():
+    """Ensure it returns the correct local timezone."""
+    assert isinstance(
+        get_local_tz(), timezone
+    ), "The returned value is not a timezone instance."
 
 
 def test_epoch_is_datetime() -> None:

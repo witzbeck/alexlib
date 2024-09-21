@@ -228,9 +228,7 @@ class Curl:
     @property
     def hostport(self) -> str:
         """returns a host:port string for connection urls"""
-        if not self.host:
-            ret = None
-        elif not self.port:
+        if self.port is None:
             ret = self.host
         else:
             ret = f"{self.host}:{self.port}"

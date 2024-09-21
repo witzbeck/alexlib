@@ -1,21 +1,11 @@
 """Test core functions."""
 
-from datetime import timezone
-
 from pytest import fixture, mark
 
 from alexlib.core import (
     asdict,
     aslist,
 )
-from alexlib.times import get_local_tz
-
-
-def test_get_local_tz():
-    """Ensure it returns the correct local timezone."""
-    assert isinstance(
-        get_local_tz(), timezone
-    ), "The returned value is not a timezone instance."
 
 
 @mark.parametrize(
@@ -31,7 +21,7 @@ def test_aslist(string: str, sep: str, expected: list[str]) -> None:
     assert lst == expected
 
 
-@fixture
+@fixture(scope="function")
 def _testclass():
     class TestClass:
         def __init__(self):

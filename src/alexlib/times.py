@@ -36,53 +36,15 @@ from typing import Any
 from pandas import Timestamp
 from pandas.tseries.holiday import Holiday, USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String
-from sqlalchemy.orm import declarative_base
 
 from alexlib.constants import EPOCH_SECONDS
 
 ONEDAY = timedelta(days=1)
 
-Base = declarative_base()
-
 
 def get_local_tz() -> timezone:
     """returns local timezone"""
     return datetime.now().astimezone().tzinfo
-
-
-class TimerLog(Base):
-    """A timer log class for storing timer logs."""
-
-    __tablename__ = "timer_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=True)
-    action = Column(String, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    duration = Column(Float, nullable=False)
-    duration_unit = Column(String, nullable=False)
-    additional_info = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    def __repr__(self) -> str:
-        """Get the timer log representation."""
-        attrs = "\n".join(
-            [
-                f"{key}: {val}"
-                for key, val in {
-                    "id": self.id,
-                    "user_id": self.user_id,
-                    "action": self.action,
-                    "start_time": self.start_time,
-                    "end_time": self.end_time,
-                    "duration": self.duration,
-                }.items()
-                if val
-            ]
-        )
-        return "\n".join([f"{self.__class__.__name__}(", attrs, ")"])
 
 
 @dataclass(frozen=True)
