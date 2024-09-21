@@ -142,6 +142,8 @@ class SystemObject:
         min_delta: timedelta,
     ) -> bool:
         """checks if path is new enough"""
+        if not isinstance(min_delta, timedelta):
+            raise TypeError(f"{min_delta} is not a timedelta")
         return self.created_delta < min_delta
 
     @cached_property

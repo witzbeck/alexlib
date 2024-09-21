@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 from pytest import mark, raises
 
 from alexlib.files import JsonFile, SettingsFile, TomlFile
-from alexlib.files.objects import Directory, File, SystemObject
+from alexlib.files.objects import Directory, File, SystemObject, __sysobj_names__
 from alexlib.files.utils import eval_parents, figsave, path_search, read_json, read_toml
 
 
@@ -209,6 +209,14 @@ def test_sysobj_created_strfdate(sysobj: SystemObject):
 
 def test_sysobj_created_delta(sysobj: SystemObject):
     assert isinstance(sysobj.created_delta, timedelta)
+
+
+def test_sysobj_is_new_enough(sysobj: SystemObject):
+    assert sysobj.is_new_enough(timedelta(days=1))
+
+
+def test_sysobj_clsname(sysobj: SystemObject):
+    assert sysobj.clsname in __sysobj_names__
 
 
 def test_dir_obj_filelist(subdir_with_files: Directory):
