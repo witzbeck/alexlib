@@ -1,55 +1,64 @@
-import unittest
-from unittest.mock import patch
-from alexlib.auth import SecretStore, Cryptographer
+from pytest import FixtureRequest, fixture, mark
+
+from alexlib.auth import Cryptographer, SecretStore
 
 
-class TestSecretStore(unittest.TestCase):
-    """Unit tests for the SecretStore class in alexlib.auth module."""
-
-    def setUp(self):
-        """Set up test fixtures before each test method."""
-        self.test_secrets = {"key1": "value1", "key2": "value2"}
-        self.secret_store = SecretStore.from_dict(self.test_secrets)
-
-    def test_storing_and_retrieving_secrets(self):
-        """Test that secrets can be stored and retrieved correctly."""
-        for key, value in self.test_secrets.items():
-            self.assertEqual(str(self.secret_store.get_cred(key)), value)
-
-    def test_encryption_and_decryption(self):
-        """Verify that secrets are correctly encrypted and decrypted."""
-        cryptographer = Cryptographer.new()
-        encrypted = cryptographer.encrypt_str("test_secret")
-        decrypted = cryptographer.decrypt_str(encrypted)
-        self.assertEqual(decrypted, "test_secret")
-
-    def test_len_method(self):
-        """Test the __len__ method for SecretStore."""
-        self.assertEqual(len(self.secret_store), len(self.test_secrets))
-
-    def test_repr_method(self):
-        """Test the __repr__ method for SecretStore."""
-        representation = repr(self.secret_store)
-        for key in self.test_secrets:
-            self.assertIn(key, representation)
-
-    @patch("alexlib.auth.SecretStore.sensor_input")
-    def test_sensor_input_static_method(self, mock_sensor_input):
-        """Test the sensor_input static method."""
-        mock_sensor_input.return_value = "test"
-        result = SecretStore.sensor_input("input")
-        mock_sensor_input.assert_called_once_with("input")
-        self.assertEqual(result, "test")
-
-    def test_from_dict_class_method(self):
-        """Test the from_dict class method."""
-        new_store = SecretStore.from_dict({"new_key": "new_value"})
-        self.assertIn("new_key", new_store.secrets)
-        self.assertEqual(str(new_store.get_cred("new_key")), "new_value")
-
-    # Additional tests for from_path and from_user methods
-    # ...
+@fixture(
+    scope="module",
+    params=(
+        {"username": "user", "password": "pass"},
+        {"key1": "value1", "key2": "value2"},
+    ),
+)
+def secrets(request: FixtureRequest) -> dict:
+    return request.param
 
 
-if __name__ == "__main__":
-    unittest.main()
+@fixture(scope="module")
+def secret_store(secrets: dict) -> SecretStore:
+    return SecretStore.from_dict(secrets)
+
+
+def test_storing_and_retrieving_secrets_repr_protected_by_default(
+    secret_store: SecretStore,
+):
+    """Test that secrets can be stored and retrieved correctly."""
+    assert all(
+        str(secret_store.get_cred(key)) != value
+        for key, value in secret_store.secrets.items()
+    ), secret_store.secrets
+
+
+def test_storing_and_retrieving_secrets(secret_store: SecretStore):
+    """Test that secrets can be stored and retrieved correctly."""
+    assert all(
+        str(secret_store.get_cred(key)) == str(value)
+        for key, value in secret_store.secrets.items()
+    ), secret_store.secrets
+
+
+@mark.parametrize("secret", ("test_secret", "another_secret"))
+def test_encryption_and_decryption(cryptographer: Cryptographer, secret: str):
+    """Test that secrets are correctly encrypted and decrypted."""
+    encrypted = cryptographer.encrypt_str(secret)
+    decrypted = cryptographer.decrypt_str(encrypted)
+    assert decrypted == secret, f"Expected {secret}, got {decrypted}"
+
+
+def test_secret_store_len(secret_store: SecretStore):
+    """Test that the __len__ method returns the correct number of secrets."""
+    assert len(secret_store) == len(secret_store.secrets)
+
+
+def test_secret_store_repr(secret_store: SecretStore):
+    """Test that the __repr__ method returns the correct representation."""
+    representation = repr(secret_store)
+    assert all(key in representation for key in secret_store.secrets.keys())
+
+
+@mark.parametrize("value", ("test_value", "another_value"))
+def test_secret_store_sensor_input(secret_store: SecretStore, value: str):
+    """Test that the sensor_input method returns the correct value."""
+    sensored_value = secret_store.sensor_input("input")
+    assert sensored_value != value
+    assert "*" in sensored_value

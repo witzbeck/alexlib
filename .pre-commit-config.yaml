@@ -5,7 +5,7 @@ repos:
         name: poetry-lock
         entry: poetry lock --no-update
         language: system
-        paths: ["pyproject.toml"]
+        types: [toml]
         pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks

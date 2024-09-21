@@ -8,7 +8,13 @@ from pytest import FixtureRequest, fixture
 
 from alexlib.auth import Auth, AuthPart, Login, Password, SecretStore, Server, Username
 from alexlib.core import chkcmd, get_clipboard_cmd
+from alexlib.crypto import Cryptographer
 from alexlib.files.objects import Directory, File
+
+
+@fixture(scope="class")
+def cryptographer() -> Cryptographer:
+    return Cryptographer.new()
 
 
 @fixture(scope="session")
