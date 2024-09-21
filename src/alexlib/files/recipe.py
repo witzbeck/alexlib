@@ -8,7 +8,6 @@ from pathlib import Path
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-from alexlib.constants import RECIPES_PATH
 from alexlib.ml.llm_response import LargeLanguageModelResponse
 
 
@@ -16,7 +15,7 @@ from alexlib.ml.llm_response import LargeLanguageModelResponse
 class RecipeBase:
     """A recipe core object"""
 
-    name: str = field()
+    name: str = field(default=None)
     notes: str | None = field(default=None)
     tags: list[str] = field(default_factory=list, repr=False)
 
@@ -43,7 +42,7 @@ class RecipeBase:
 class Equipment(RecipeBase):
     """Equipment"""
 
-    name: str = field()
+    name: str = field(default=None)
     quantity: int | float | str | None = field(default=None)
     size: str | None = field(default=None)
 
@@ -79,10 +78,10 @@ class Ingredient(RecipeBase):
 class RecipeResponse(RecipeBase, LargeLanguageModelResponse):
     """A recipe response is a text file with a title and a body of text."""
 
-    name: str = field()
-    ingredients: dict[str:str] = field()
-    equipment: list[str:str] = field()
-    steps: list[str] = field()
+    name: str = field(default=None)
+    ingredients: dict[str, str] = field(default=None)
+    equipment: list[str, str] = field(default=None)
+    steps: list[str] = field(default=None)
     total_time: int | None = field(default=None)
     prep_time: int | None = field(default=None)
     cook_time: int | None = field(default=None)
@@ -94,10 +93,11 @@ class RecipeResponse(RecipeBase, LargeLanguageModelResponse):
         pass
 
 
-@dataclass
-class Recipe(RecipeResponse):
+@dataclass(slots=True)
+class Recipe:
     """A recipe"""
 
+    name: str = field(default=None)
     equipment: list[Ingredient] = field(default_factory=list)
     ingredients: list[Ingredient] = field(default_factory=list)
     steps: list[str] = field(default_factory=list)
@@ -181,6 +181,31 @@ class Recipe(RecipeResponse):
         """Returns the ingredient paragraphs"""
         return Recipe.get_paragraph_list(self.ingredients, self.normal_style)
 
+    @classmethod
+    def from_json(cls, path: Path) -> "Recipe":
+        """Creates a Recipe from a JSON object"""
+        if isinstance(path, str):
+            path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError
+        d = loads(path.read_text(encoding="utf-8"))
+        return cls(**d)
+
+    @classmethod
+    def from_response(cls, response: RecipeResponse) -> "Recipe":
+        """Creates a Recipe from a response"""
+        return cls(
+            name=response.name,
+            ingredients=response.ingredients,
+            equipment=response.equipment,
+            steps=response.steps,
+            cook_time=response.cook_time,
+            prep_time=response.prep_time,
+            total_time=response.total_time,
+            servings=response.servings,
+            calories=response.calories,
+        )
+
     def to_pdf(self, path: Path) -> None:
         """Saves the recipe as a PDF"""
         if isinstance(path, str):
@@ -195,8 +220,3 @@ class Recipe(RecipeResponse):
         elements.append(Spacer(1, 12))
         elements += self.steps_paragraph
         doc.build(elements)
-
-
-if __name__ == "__main__":
-    cc_cookies = Recipe.from_json("chocolate_chip_cookies.json")
-    cc_cookies.to_pdf(RECIPES_PATH / "chocolate_chip_cookies.pdf")

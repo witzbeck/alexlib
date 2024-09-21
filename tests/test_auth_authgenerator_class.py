@@ -13,7 +13,7 @@ from alexlib.crypto import SecretValue
 
 
 @fixture(
-    scope="session",
+    scope="module",
     params=(
         "remote.dev.postgres",
         "remote.prod.postgres",
@@ -29,13 +29,13 @@ def auth_key(request: FixtureRequest) -> str:
     return request.param
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_template_path(dir_path: Path):
     test_path = dir_path / "test_template.json"
     return test_path
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_generator(auth_template_path: Path):
     return AuthGenerator(
         name="test_template",
@@ -46,19 +46,19 @@ def auth_generator(auth_template_path: Path):
     )
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_templates(auth_generator: AuthGenerator) -> dict[str, dict[str, str]]:
     return auth_generator.mk_all_templates()
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_objects(auth_templates: dict[str, dict[str, str]]) -> dict[str, Auth]:
     return {
         key: Auth.from_dict(key, template) for key, template in auth_templates.items()
     }
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_object(auth_objects: dict[str, Auth], auth_key: str) -> Auth:
     return auth_objects[auth_key]
 

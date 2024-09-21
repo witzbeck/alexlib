@@ -25,11 +25,10 @@ datetime module.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from functools import cached_property, partial, wraps
+from datetime import datetime, timedelta, timezone
+from functools import cached_property, wraps
 from logging import info
 from math import floor
-from os import getenv
 from random import randint
 from time import perf_counter
 from typing import Any
@@ -46,7 +45,10 @@ ONEDAY = timedelta(days=1)
 
 Base = declarative_base()
 
-get_env_user = partial(getenv, "USER")
+
+def get_local_tz() -> timezone:
+    """returns local timezone"""
+    return datetime.now().astimezone().tzinfo
 
 
 class TimerLog(Base):
@@ -339,7 +341,7 @@ class CustomTimedelta(timedelta):
         return super().__new__(cls, *args, **kwargs)
 
     @classmethod
-    def rand(cls) -> timedelta():
+    def rand(cls) -> timedelta:
         """Generate a random timedelta object."""
         return cls(seconds=get_rand_timedelta().total_seconds())
 
@@ -469,17 +471,3 @@ class CustomDatetime(datetime):
     def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
         """returns the divmod of the datetime and epoch_seconds"""
         return divmod(self.epoch_self_dif, td.total_seconds())
-
-
-class Users(Base):
-    """A user class for storing user information."""
-
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, default=get_env_user)
-
-
-if __name__ == "__main__":
-    get_rand_datetime()
-    get_rand_timedelta()

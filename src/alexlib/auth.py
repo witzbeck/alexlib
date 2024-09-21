@@ -31,7 +31,7 @@ from alexlib.core import chkenv, chktype
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randdigit, randdigits, randlets
 from alexlib.files.objects import File
-from alexlib.files.utils import read_json, to_json
+from alexlib.files.utils import read_json, write_json
 
 AUTH_TEMPLATE = {
     "username": "",
@@ -309,8 +309,6 @@ class SecretStore(File):
     def __post_init__(self) -> None:
         """creates a SecretStore object"""
         self.secrets = SecretStore.encode_str_dict(self.secrets)
-        if self.exists:
-            super().__post_init__()
 
     @staticmethod
     def sensor_input(input_: str, fill: str = "*") -> str:
@@ -355,7 +353,6 @@ class SecretStore(File):
             path=path,
         )
 
-    # pylint: disable=arguments-differ
     @classmethod
     def from_path(
         cls,
@@ -707,7 +704,7 @@ class AuthGenerator:
 
     def write_template_file(self) -> None:
         """writes template file to path"""
-        to_json(self.mk_all_templates(), self.path)
+        write_json(self.mk_all_templates(), self.path)
 
     @property
     def towrite(self) -> bool:
@@ -741,7 +738,7 @@ class AuthGenerator:
             raise TypeError("template_path must be Path or dict")
         for k, v in auths.items():
             store_path = CREDS / f"{k}.store"
-            to_json(v, store_path)
+            write_json(v, store_path)
             store = SecretStore.from_dict(v, path=store_path)
             handler = Auth(
                 name=k,

@@ -30,6 +30,7 @@ jobs:
     # Set up Python
     # ---------------------------------------------
     - name: Set up Python
+      id: setup-python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
@@ -48,6 +49,7 @@ jobs:
     # load cached poetry dependencies if available
     # ---------------------------------------------
     - name: Load cached virtualenv
+      id: load-cached-virtualenv
       uses: actions/cache@v4
       with:
         path: .venv
@@ -65,7 +67,7 @@ jobs:
     # install dependencies if cache does not exist
     #----------------------------------------------
     - name: Install dependencies
-      if: steps.Load_cached_virtualenv.outputs.cache-hit != 'true'
+      if: steps.load-cached-virtualenv.outputs.cache-hit != 'true'
       run: poetry install --with test --no-interaction --no-root
     
     #----------------------------------------------

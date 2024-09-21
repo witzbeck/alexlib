@@ -1,8 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
+from alexlib.constants import DOTENV_PATH, PROJECT_PATH
+from alexlib.core import flatten_dict
+from alexlib.files.config import ConfigFile
 from alexlib.files.objects import File
-from alexlib.files.utils import read_json, read_toml
+from alexlib.files.utils import read_dotenv, read_json, read_toml
 
 
 @dataclass
@@ -11,11 +15,6 @@ class JsonFile(File):
 
     read: Callable = field(default=read_json, repr=False)
 
-    def __post_init__(self) -> None:
-        if not self.istype("json"):
-            raise TypeError(f"{self.path} is not json")
-        return super().__post_init__()
-
 
 @dataclass
 class TomlFile(File):
@@ -23,7 +22,26 @@ class TomlFile(File):
 
     read: Callable = field(default=read_toml, repr=False)
 
-    def __post_init__(self) -> None:
-        if not self.istype("toml"):
-            raise TypeError(f"{self.path} is not toml")
-        return super().__post_init__()
+
+@dataclass
+class DotenvFile(ConfigFile):
+    """A class to handle dotenv files"""
+
+    name: str = field(default=".env")
+    path: Path = field(default=DOTENV_PATH)
+
+    def get_envdict(self) -> dict:
+        return read_dotenv(self.path)
+
+
+@dataclass
+class SettingsFile(ConfigFile, JsonFile):
+    """A class to handle settings files"""
+
+    name: str = field(default="settings.json")
+    path: Path = field(default=PROJECT_PATH / "settings.json")
+
+    def get_envdict(self) -> dict[str, str]:
+        """Returns the environment variables from the settings file"""
+        flat_dict = flatten_dict(read_json(self.path))
+        return flat_dict

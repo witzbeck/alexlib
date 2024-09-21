@@ -7,8 +7,8 @@ from pytest import fixture, mark
 from alexlib.core import (
     asdict,
     aslist,
-    get_local_tz,
 )
+from alexlib.times import get_local_tz
 
 
 def test_get_local_tz():

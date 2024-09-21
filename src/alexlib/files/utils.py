@@ -21,8 +21,7 @@ in Python scripting and data processing tasks.
 Dependencies: collections, dataclasses, datetime, functools, json, logging, os, pathlib, random, typing, matplotlib, pandas, sqlalchemy
 """
 
-from collections.abc import Callable, Hashable, Mapping
-from functools import partial
+from collections.abc import Hashable, Mapping
 from hashlib import sha256
 from json import dumps
 from json import loads as json_loads
@@ -38,43 +37,36 @@ from alexlib.core import chktype
 logger = getLogger(__name__)
 
 
-def read_path_as_dict(
-    path: Path,
-    loadsfunc: Callable,
-    mustexist: bool = True,
-) -> dict[Hashable, str]:
-    """reads loadable file"""
-    chktype(path, Path, mustexist=mustexist)
-    return loadsfunc(path.read_text())
+def read_json(path: Path) -> dict[Hashable, str]:
+    """reads json file"""
+    chktype(path, Path, mustexist=True)
+    return json_loads(path.read_text())
 
 
-read_json = partial(
-    read_path_as_dict,
-    loadsfunc=json_loads,
-)
 try:
     from tomllib import loads as toml_loads
 
-    read_toml = partial(
-        read_path_as_dict,
-        loadsfunc=toml_loads,
-    )
+    def read_toml(path: Path) -> dict[str, str]:
+        """reads toml file"""
+        chktype(path, Path, mustexist=True)
+        return toml_loads(path.read_text())
+
 except ImportError as e:
     read_toml = None
     logger.debug(f"toml support only available ^3.11: {e}")
 
 
-def to_json(dict_: dict[str:str], path: Path) -> None:
+def write_json(dict_: dict[str:str], path: Path) -> None:
     """writes dict to path"""
     path.write_text(dumps(dict_, indent=4))
 
 
-def load_dotenv(dotenv_path: Path, toenviron: bool = True) -> dict[str, str]:
-    """load a dotenv file into a dictionary"""
-    if not dotenv_path.exists():
-        raise FileNotFoundError(f"{dotenv_path} not found")
-    d = {
-        k: v.strip("'").strip('"')
+def read_dotenv(dotenv_path: Path) -> dict[str, str]:
+    """read a dotenv file into a dictionary"""
+    chktype(dotenv_path, Path, mustexist=True)
+    print(dotenv_path.read_text())
+    return {
+        k: v.strip("'").strip('"').strip()
         for k, v in [
             x.split("=")
             for x in [
@@ -84,9 +76,11 @@ def load_dotenv(dotenv_path: Path, toenviron: bool = True) -> dict[str, str]:
             ]
         ]
     }
-    if toenviron:
-        environ.update(d)
-    return d
+
+
+def load_dotenv(dotenv_path: Path) -> dict[str, str]:
+    """load a dotenv file into a dictionary"""
+    return environ.update(read_dotenv(dotenv_path))
 
 
 def figsave(
