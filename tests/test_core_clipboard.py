@@ -1,94 +1,56 @@
 """Tests for the clipboard funcs in the core module."""
+
 from pathlib import Path
-from unittest import TestCase, main
-from unittest.mock import patch
+from subprocess import Popen
+
+from pytest import mark, raises, skip
 
 from alexlib.core import (
     copy_file_to_clipboard,
-    chkcmd,
-    get_clipboard_cmd,
     to_clipboard,
+    islinux,
+    iswindows,
+    ismacos,
+    get_clipboard_cmd
 )
 
 
-class TestToClipboard(TestCase):
-    def setUp(self) -> None:
+@mark.parametrize(
+    "value",
+    (1, 0.0, None, False),
+)
+def test_to_clipboard_typeerror(value):
+    with raises(TypeError):
+        to_clipboard(value)
+
+
+def test_copy_non_existing_file():
+    with raises(FileNotFoundError):
+        copy_file_to_clipboard(Path("/fake/path"))
+
+
+def test_copy_existing_file(copy_path, copy_text):
+    if not islinux():
+        assert  copy_file_to_clipboard(copy_path)
+    else:
         try:
-            self.cmd = get_clipboard_cmd()
+            assert  copy_file_to_clipboard(copy_path)
         except OSError:
-            self.cmd = None
-        self.hascmd = chkcmd(self.cmd[0]) if self.cmd is not None else False
+            skip("pbcopy/pbpaste not available on this system")
 
-    @patch("subprocess.Popen")
-    def test_to_clipboard_success(self, mock_popen):
-        if not self.hascmd:
-            with self.assertRaises(OSError):
-                to_clipboard("Test string")
-        else:
-            mock_process = mock_popen.return_value
-            mock_process.communicate.return_value = (b"", b"")
-            mock_process.returncode = 0
-
-            result = to_clipboard("Test string")
-            self.assertEqual(result, "Text copied to clipboard successfully.")
-
-    def test_to_clipboard_typeerror(self):
-        with self.assertRaises(TypeError):
-            to_clipboard(123)
-        with self.assertRaises(TypeError):
-            to_clipboard(1.123)
-        with self.assertRaises(TypeError):
-            to_clipboard(None)
-        with self.assertRaises(TypeError):
-            to_clipboard(False)
-
-
-class TestCopyFileToClipboard(TestCase):
-    def setUp(self) -> None:
+def test_to_clipboard_success(copy_text):
+    if not islinux():
+        assert to_clipboard(copy_text) == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
+    else:
         try:
-            self.cmd = get_clipboard_cmd()
+            assert to_clipboard(copy_text) == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
         except OSError:
-            self.cmd = None
-        self.hascmd = chkcmd(self.cmd[0]) if self.cmd is not None else False
-
-    @patch(
-        "alexlib.core.to_clipboard",
-        return_value="File content from /fake/path.txt copied to clipboard.",
-    )
-    @patch("pathlib.Path.exists", return_value=True)
-    @patch("pathlib.Path.is_file", return_value=True)
-    @patch("pathlib.Path.read_text", return_value="File content")
-    def test_copy_existing_file(self, *mocks):
-        path = Path("/fake/path.txt")
-        if not self.hascmd:
-            self.skipTest("Clipboard command not found.")
-        else:
-            result = copy_file_to_clipboard(path)
-            self.assertEqual(
-                result, "File content from /fake/path.txt copied to clipboard."
-            )
-
-    @patch("alexlib.core.to_clipboard")
-    def test_copy_non_existing_file(self, mock_to_clipboard):
-        path = Path("/non/existing/path")
-        if not self.hascmd:
-            self.skipTest("Clipboard command not found.")
-        else:
-            with self.assertRaises(FileExistsError):
-                copy_file_to_clipboard(path)
-
-    @patch("alexlib.core.to_clipboard")
-    @patch("pathlib.Path.exists", return_value=True)
-    @patch("pathlib.Path.is_file", return_value=True)
-    def test_copy_path_not_a_file(self, *mocks):
-        path = Path("/not/a/file")
-        if not self.hascmd:
-            with self.assertRaises(OSError):
-                copy_file_to_clipboard(path)
-        else:
-            with self.assertRaises(FileNotFoundError):
-                copy_file_to_clipboard(path)
+            skip("pbcopy/pbpaste not available on this system")
 
 
-if __name__ == "__main__":
-    main()
+def test_copy_path_not_a_file():
+    try:
+        with raises(FileNotFoundError):
+            copy_file_to_clipboard(Path("/fake/path"))
+    except OSError:
+        skip("pbcopy/pbpaste not available on this system")

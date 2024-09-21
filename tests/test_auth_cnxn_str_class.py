@@ -6,57 +6,60 @@ which is used for constructing database connection strings and managing
 different dialects.
 """
 
-from unittest import TestCase, main
+from pytest import fixture
+
 from alexlib.auth import Curl
 
 
-class TestCurlClass(TestCase):
-    """Test cases for the Curl class."""
-
-    def setUp(self):
-        """Set up test data."""
-        self.username = "testuser"
-        self.password = "testpass"
-        self.host = "localhost"
-        self.port = 5432
-        self.database = "testdb"
-        self.dialect = "postgres"
-        self.curl = Curl(
-            username=self.username,
-            password=self.password,
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            dialect=self.dialect,
-        )
-
-    def test_instantiation(self):
-        """Test Curl instantiation and property values."""
-        self.assertEqual(self.curl.username, self.username)
-        self.assertEqual(self.curl.password, self.password)
-        self.assertEqual(self.curl.host, self.host)
-        self.assertEqual(self.curl.port, self.port)
-        self.assertEqual(self.curl.database, self.database)
-        self.assertEqual(self.curl.dialect, self.dialect)
-        self.assertEqual(self.curl.clsname, "Curl")
-
-    def test_connection_string_generation(self):
-        """Test connection string generation for different dialects."""
-        self.assertEqual(
-            self.curl.__str__(),
-            f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}",
-        )
-        self.curl.dialect = "mysql"
-        self.assertEqual(
-            self.curl.__str__(),
-            f"mysql+mysqldb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}",
-        )
-
-    def test_str_method(self):
-        """Test __str__ method for correct connection string formatting."""
-        expected_str = f"postgresql+psycopg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
-        self.assertEqual(str(self.curl), expected_str)
+@fixture(scope="module")
+def curl():
+    return Curl(
+        username="testuser",
+        password="testpass",
+        host="localhost",
+        port=5432,
+        database="testdb",
+        dialect="postgres",
+    )
 
 
-if __name__ == "__main__":
-    main()
+def test_instantiation(curl: Curl):
+    assert isinstance(curl, Curl)
+    assert isinstance(curl.username, str)
+    assert isinstance(curl.password, str)
+    assert isinstance(curl.host, str)
+    assert isinstance(curl.port, int)
+    assert isinstance(curl.database, str)
+
+
+def test_connection_string_generation(curl: Curl):
+    assert str(curl) == "postgresql+psycopg://testuser:testpass@localhost:5432/testdb"
+
+
+def test_alternate_dialect(curl: Curl):
+    curl.dialect = "mysql"
+    assert str(curl).startswith("mysql+mysqldb")
+
+
+def test_canping(curl: Curl):
+    assert isinstance(
+        curl.canping, bool
+    ), f"canping should be a boolean but is {type(curl.canping)}"
+    assert curl.host, f"host should not be empty but is {curl.host}"
+    assert curl.port, f"port should not be empty but is {curl.port}"
+    assert curl.canping is True, "canping should be True if host and port are not empty"
+
+
+def test_login(curl: Curl):
+    assert isinstance(curl.login, str)
+    assert curl.login == "testuser:testpass"
+
+
+def test_hostport(curl: Curl):
+    assert isinstance(curl.hostport, str)
+    assert curl.hostport == "localhost:5432"
+
+
+def test_db(curl: Curl):
+    assert isinstance(curl.database, str)
+    assert curl.database == "testdb"

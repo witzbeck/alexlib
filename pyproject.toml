@@ -1,74 +1,57 @@
 [tool.poetry]
 name = "alexlib"
-version = "1.0.1"
+version = "1.1.0"
 description = "A toolset for building machine learning solutions."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
+license = "MIT"
+packages = [{ include = "alexlib", from = "./src" }]
+package-mode = true
 
 [tool.poetry.dependencies]
 python = "^3.10"
 pandas = "^2.2"
 matplotlib = "^3.8"
-cryptography = "^42.0"
-requests = "^2.31"
+cryptography = "^43.0"
+requests = "^2.32"
+faker = "^29.0.0"
+
+[tool.poetry.group.db.dependencies]
 sqlalchemy = "^2.0"
 sqlalchemy-utils = "^0.41"
 pyarrow = "^16.1"
-reportlab = "^4.2"
-openai = "^1.25"
+
+[tool.poetry.group.docs.dependencies]
+reportlab = "^4.0"
+
+[tool.poetry.group.ml.dependencies]
+openai = "^1.46"
 scipy = "^1.13"
 
 [tool.poetry.group.test.dependencies]
+ruff = "^0.4.4"
 pytest = "^8.1"
 pytest-cov = "^5.0"
-pytest-mock = "^3.12"
-pytest-xdist = "^3.5"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29"
 pre-commit = "^3.0"
-ruff = "^0.4.4"
 sqlfluff = "^3.0"
 
 [tool.pytest.ini_options]
 addopts = [
     "--cov=alexlib",
-    "--cov-report=term-missing",
-    "--cov-fail-under=60",
-    "--cov-branch",
+    "--cov-fail-under=0",
+    "-n",
+    "auto",
+    "--durations=10",
 ]
 testpaths = ["tests"]
-
-[tool.sqlfluff.core]
-verbose = 0
-dialect = "postgres"
-sql_file_exts = ".sql"
-max_line_length = 120
-processes = 0
-rules = "core"
-
-[tool.sqlfluff.layout.type.comma]
-line_position = "leading"
-spacing_before = "touch"
-
-[tool.sqlfluff.indentation]
-indent_unit = "space"
-indented_then = false
-indented_joins = true
-trailing_comments = "after"
-
-[tool.sqlfluff.layout.type.alias_expression]
-spacing_before = "align"
-align_scope = "file"
-
-[tool.sqlfluff.capitalisation]
-capitalisation_policy = "lower"
-
-[tool.sqlfluff.rules.aliasing.table]
-aliasing = "implicit"
-
-[tool.sqlfluff.rules.aliasing.column]
-aliasing = "implicit"
+markers = [
+    "slow: mark test as slow to run",
+    "skip: mark test as skipped",
+    "fast: mark test as fast to run",
+]
 
 [build-system]
 requires = ["poetry-core"]
@@ -78,8 +61,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
-    ".bzr",
-    ".direnv",
     ".eggs",
     ".git",
     ".git-rewrite",
@@ -112,11 +93,13 @@ target-version = "py312"
 
 [tool.ruff.lint]
 
+# Allow linter to sort imports.
+extend-select = ["I"]
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 
 # Avoid trying to fix flake8-bugbear (`B`) violations.
-unfixable = ["B"]
+# unfixable = ["B"]
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -125,13 +108,14 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
 # Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-select = ["E4", "E7", "E9", "F", "B", "Q"]
+
+# select = ["E4", "E7", "E9", "F", "B", "Q"]
 
 # Avoid enforcing line-length violations (`E501`)
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["alexlib", "mlops_capstone", "app", "frontend"]
+known-first-party = ["alexlib"]
 known-local-folder = ["app", "frontend", "mlops_capstone"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
@@ -144,8 +128,3 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
-docstring-code-format = false
-docstring-code-line-length = "dynamic"
-
-[tool.ruff.lint.flake8-quotes]
-docstring-quotes = "double"

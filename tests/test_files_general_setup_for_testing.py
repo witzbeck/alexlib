@@ -1,10 +1,11 @@
 from os import environ
-from unittest import TestCase, main
-from unittest.mock import patch, mock_open
 from pathlib import Path
-from sys import version_info
+from unittest.mock import mock_open, patch
 
-from alexlib.files.objects import SystemObject, JsonFile, TomlFile
+from pytest import fixture, mark
+
+from alexlib.files import JsonFile, TomlFile
+from alexlib.files.objects import SystemObject
 from alexlib.files.utils import eval_parents
 
 
@@ -35,57 +36,47 @@ def create_mock_file(path, content=""):
             f.write(content)
 
 
-class TestEvalParents(TestCase):
-    """Test cases for the eval_parents function."""
-
-    def test_eval_parents_inclusion_exclusion(self):
-        # Test various combinations of include and exclude criteria
-        path = Path("/path/to/file")
-        self.assertTrue(eval_parents(path, include={"path"}, exclude={"exclude"}))
-        self.assertFalse(eval_parents(path, include={"other"}, exclude={"file"}))
-
-
-class TestSystemObject(TestCase):
-    """Test cases for the SystemObject class."""
-
-    def test_system_object_initialization(self):
-        # Test initialization and attribute setting
-        obj = SystemObject(name="test", path=Path("/test/path"))
-        self.assertTrue(obj.haspath)
-        self.assertTrue(obj.hasname)
+@mark.parametrize(
+    "path, include, exclude, expected",
+    [
+        ("/path/to/file", {"path"}, {"exclude"}, True),
+        ("/path/to/file", {"other"}, {"file"}, False),
+    ],
+)
+def test_eval_parents_inclusion_exclusion(path, include, exclude, expected):
+    """Test various combinations of include and exclude criteria"""
+    path = Path(path)
+    assert eval_parents(path, include, exclude) is expected
 
 
-class TestJsonFileInit(TestCase):
-    """Test cases for the JsonFile class initialization."""
-
-    def test_json_file_init(self):
-        # Test the initialization of the JsonFile class
-        path = Path("/path/to/file.json")
-        create_mock_file(path)
-        obj = JsonFile.from_path(path)
-        self.assertTrue(obj.haspath)
-        self.assertTrue(obj.hasname)
-        self.assertTrue(obj.isjson)
-        self.assertFalse(obj.exists)
+def test_system_object_initialization():
+    # Test initialization and attribute setting
+    obj = SystemObject(name="test", path=Path("/test/path"))
+    assert obj.haspath
+    assert obj.hasname
 
 
-class TestTomlFileInit(TestCase):
-    """Test cases for the TomlFile class initialization."""
-
-    def test_toml_file_init(self):
-        # Test the initialization of the TomlFile class
-        try:
-            path = Path("/path/to/file.toml")
-            create_mock_file(path)
-            obj = TomlFile.from_path(path)
-            self.assertTrue(obj.haspath)
-            self.assertTrue(obj.hasname)
-            self.assertTrue(obj.istoml)
-            self.assertFalse(obj.exists)
-        except AttributeError:
-            if version_info.major == 3 and version_info.minor < 11:
-                self.assertIsNone(TomlFile)
+@fixture(scope="class")
+def json_file(dir_path: Path) -> JsonFile:
+    return JsonFile.from_path(dir_path / "/path/to/file.json")
 
 
-if __name__ == "__main__":
-    main()
+@fixture(scope="class")
+def toml_file(dir_path: Path) -> TomlFile:
+    return TomlFile.from_path(dir_path / "/path/to/file.toml")
+
+
+def test_json_file_init(json_file: JsonFile):
+    """Test the initialization of the JsonFile class"""
+    assert json_file.haspath
+    assert json_file.hasname
+    assert json_file.isjson
+    assert not json_file.exists
+
+
+def test_toml_file_init(toml_file: TomlFile):
+    """Test the initialization of the TomlFile class"""
+    assert toml_file.haspath
+    assert toml_file.hasname
+    assert toml_file.istoml
+    assert not toml_file.exists

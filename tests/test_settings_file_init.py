@@ -27,126 +27,75 @@ compatible with unittest.
 from os import getenv
 from pathlib import Path
 from random import choice
-from unittest import main, TestCase
-from tempfile import NamedTemporaryFile
-from sys import version_info
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
-from alexlib.files.config import Settings, DotEnv, ConfigFile
+from pytest import fixture
 
-
-class TestConfigFile(TestCase):
-    """Test the config file."""
-
-    def setUp(self) -> None:
-        """Set up the test case."""
-        self.settings = Settings.from_path(
-            Path(__file__).parent.parent / "settings.json"
-        )
-        self.rand_key = self.settings.rand_key
-        self.rand_val = getenv(self.rand_key)
-
-    def test_settings_init(self) -> None:
-        """Test the settings init."""
-        self.assertEqual(self.settings.name, "settings.json")
-        self.assertIsInstance(self.settings, Settings)
-
-    def test_envdict_init(self) -> None:
-        """Test the envdict init."""
-        self.assertTrue(issubclass(self.settings.envdict.__class__, dict))
-        self.assertGreater(len(self.settings.envdict), 0)
-
-    def test_gets_rand_env(self) -> None:
-        """Test the gets_rand_env method."""
-        self.assertEqual(str(self.settings.envdict[self.rand_key]), self.rand_val)
+from alexlib.files.config import DotEnv, Settings
 
 
-class TestDotEnvConfig(TestCase):
-    """Test the dotenv file."""
-
-    def setUp(self):
-        # Create a temporary file to act as .env
-        self.temp_env_file = NamedTemporaryFile(prefix=".env", mode="w+t", delete=False)
-        self.path = Path(self.temp_env_file.name)
-        # Write example environment variables to the temp file
-        self.path.write_text(
+@fixture(scope="class")
+def settings():
+    with TemporaryDirectory() as temp_dir:
+        SETTINGS_PATH = Path(temp_dir) / "settings.json"
+        SETTINGS_PATH.write_text(
             """
-                             EXAMPLE_VAR=some_value
-                             ANOTHER_VAR=another_value
-                             """
+            {
+                "rand_key": "RAND_ENV",
+                "rand_val": "1234"
+            }
+            """
         )
-        self.dotenv = ConfigFile.from_dotenv(path=self.temp_env_file.name)
-
-    def tearDown(self):
-        # Remove the temporary file after tests
-        self.path.unlink()
-
-    def test_load_env_vars(self):
-        # Verify that the environment variables were set correctly
-        self.assertEqual(getenv("EXAMPLE_VAR"), "some_value")
-        self.assertEqual(getenv("ANOTHER_VAR"), "another_value")
-
-    def test_dotenv_init(self) -> None:
-        """Test the dotenv init."""
-        self.assertEqual(self.dotenv.name, ".env")
-
-    def test_envdict_init(self) -> None:
-        """Test the envdict init."""
-        self.assertTrue(issubclass(self.dotenv.envdict.__class__, dict))
-        self.assertGreater(len(self.dotenv.envdict), 0)
+        yield Settings.from_path(SETTINGS_PATH)
 
 
-class TestDotEnvFile(TestCase):
-    """Test the dotenv file."""
-
-    def setUp(self) -> None:
-        """Set up the test case."""
-        self.path = Path(__file__).parent.parent / ".env"
-        self.path.touch()
-        self.path.write_text("RAND_ENV=1234")
-
-    def test_dotenv_init(self) -> None:
-        """Test the dotenv init."""
-        de = DotEnv.from_path(self.path)
-        self.assertEqual(de.name, ".env")
-        self.assertTrue(de.isdotenv)
-        self.assertTrue(de.path.exists())
-
-    def test_envdict_init(self) -> None:
-        """Test the envdict init."""
-        de = DotEnv.from_parent(".env", __file__)
-        self.assertTrue(issubclass(de.envdict.__class__, dict))
-        self.assertGreater(len(de.envdict), 0)
-
-    def tearDown(self) -> None:
-        """Tear down the test case."""
-        self.path.unlink()
+@fixture(scope="class")
+def rand_key(settings):
+    return choice(list(settings.envdict.keys()))
 
 
-class TestJsonSettings(TestCase):
-    """Test the json settings file."""
+@fixture(scope="class")
+def rand_val(settings, rand_key):
+    return settings.envdict[rand_key]
 
-    def setUp(self) -> None:
-        """Set up the test case."""
-        self.settings = Settings.from_path(
-            Path(__file__).parent.parent / "settings.json"
+
+def test_settings_init(settings):
+    assert settings.name == "settings.json"
+    assert isinstance(settings, Settings)
+
+
+def test_settings_envdict_init(settings):
+    assert isinstance(settings.envdict, dict)
+    assert len(settings.envdict) > 0
+
+
+def test_gets_rand_env(settings, rand_key):
+    assert getenv(rand_key) == settings.envdict[rand_key]
+
+
+@fixture(scope="class")
+def dotenv():
+    with NamedTemporaryFile(prefix=".env", mode="w+t") as temp_env_file:
+        path = Path(temp_env_file.name)
+        path.write_text(
+            """
+            EXAMPLE_VAR=some_value
+            ANOTHER_VAR=another_value
+            """
         )
-
-    def test_settings_init(self) -> None:
-        """Test the settings init."""
-        self.assertEqual(self.settings.name, "settings.json")
-        self.assertIsInstance(self.settings, Settings)
-        self.assertTrue(self.settings.isjson)
-
-    def test_envdict_init(self) -> None:
-        """Test the envdict init."""
-        self.assertTrue(issubclass(self.settings.envdict.__class__, dict))
-        self.assertGreater(len(self.settings.envdict), 0)
-
-    def test_gets_rand_env(self) -> None:
-        """Test the gets_rand_env method."""
-        self.assertIsNotNone(getenv(choice(list(self.settings.envdict.keys()))))
+        yield DotEnv.from_path(path)
 
 
-if __name__ == "__main__":
-    print(version_info)
-    main()
+def test_load_env_vars(dotenv):
+    assert getenv("EXAMPLE_VAR") == "some_value"
+    assert getenv("ANOTHER_VAR") == "another_value"
+
+
+def test_dotenv_init(dotenv):
+    assert dotenv.name == ".env"
+    assert isinstance(dotenv, DotEnv)
+
+
+def test_dotenv_envdict_init(dotenv):
+    assert isinstance(dotenv.envdict, dict)
+    assert len(dotenv.envdict) > 0

@@ -14,15 +14,11 @@ Usage:
 Note:
     The tests in this module depend on the external configuration and state of the file system, particularly the presence of a .env file and authentication store files.
 """
-from pathlib import Path
-from unittest import main
-from unittest import TestCase
+
+from unittest import TestCase, main
 
 from alexlib.auth import Auth
 from alexlib.constants import CREDS
-
-proj = Path(__file__).parent.parent
-dotenv_path = proj / ".env"
 
 
 class TestAuth(TestCase):
