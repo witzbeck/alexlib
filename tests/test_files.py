@@ -1,4 +1,6 @@
+from datetime import datetime, timedelta
 from pathlib import Path
+from random import choice
 
 from matplotlib.figure import Figure
 from pytest import mark, raises
@@ -154,6 +156,59 @@ def test_systemobject_properties(sysobj: SystemObject):
     """Test property methods like `isfile`, `isdir`, `haspath`, `user`, etc."""
     assert sysobj.isfile
     assert not sysobj.isdir
+
+
+def test_sysobj_get_parent(sysobj: SystemObject):
+    """Test the get_parent method of the SystemObject class."""
+    rand_parent_name = choice([x.name for x in sysobj.path.parents if len(x.name) > 1])
+    parent = sysobj.get_parent(rand_parent_name)
+    assert isinstance(parent, Path)
+
+
+def test_sysobj_get_parent_failure(sysobj: SystemObject):
+    """Test the get_parent method of the SystemObject class."""
+    with raises(ValueError):
+        sysobj.get_parent("nonexistent")
+
+
+def test_sysobj_modified_timestamp(sysobj: SystemObject):
+    assert isinstance(sysobj.modified_timestamp, float)
+
+
+def test_sysobj_modified_datetime(sysobj: SystemObject):
+    assert isinstance(sysobj.modified_datetime, datetime)
+
+
+def test_sysobj_modified_strfdatetime(sysobj: SystemObject):
+    assert isinstance(sysobj.modified_strfdatetime, str)
+
+
+def test_sysobj_modified_strfdate(sysobj: SystemObject):
+    assert isinstance(sysobj.modified_strfdate, str)
+
+
+def test_sysobj_modified_delta(sysobj: SystemObject):
+    assert isinstance(sysobj.modified_delta, timedelta)
+
+
+def test_sysobj_created_timestamp(sysobj: SystemObject):
+    assert isinstance(sysobj.created_timestamp, float)
+
+
+def test_sysobj_created_datetime(sysobj: SystemObject):
+    assert isinstance(sysobj.created_datetime, datetime)
+
+
+def test_sysobj_created_strfdatetime(sysobj: SystemObject):
+    assert isinstance(sysobj.created_strfdatetime, str)
+
+
+def test_sysobj_created_strfdate(sysobj: SystemObject):
+    assert isinstance(sysobj.created_strfdate, str)
+
+
+def test_sysobj_created_delta(sysobj: SystemObject):
+    assert isinstance(sysobj.created_delta, timedelta)
 
 
 def test_dir_obj_filelist(subdir_with_files: Directory):

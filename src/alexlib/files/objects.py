@@ -68,8 +68,8 @@ class SystemObject:
 
     def get_parent(self, name: str) -> Path:
         """gets parent path by name"""
-        if name not in self.parts:
-            raise ValueError(f"{name} not in parents[{self.parts}]")
+        if name not in self.path.parts:
+            raise ValueError(f"{name} not in parents[{self.path.parts}]")
         return [x for x in self.path.parents if x.name == name][-1]
 
     @property
@@ -86,15 +86,6 @@ class SystemObject:
     def size(self) -> int:
         """gets path size"""
         return self.stat.st_size
-
-    @staticmethod
-    def get_path_attr(path: Path, attr: str) -> Any:
-        """gets path attribute"""
-        try:
-            ret = getattr(path.stat(), attr)
-        except AttributeError:
-            ret = getattr(path, attr)
-        return ret
 
     @property
     def modified_timestamp(self) -> float:

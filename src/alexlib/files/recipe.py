@@ -93,7 +93,7 @@ class RecipeResponse(RecipeBase, LargeLanguageModelResponse):
         pass
 
 
-@dataclass(slots=True)
+@dataclass
 class Recipe:
     """A recipe"""
 
@@ -107,6 +107,7 @@ class Recipe:
     servings: int | None = field(default=None)
     source: str | None = field(default=None)
     calories: int | None = field(default=None)
+    notes: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.set_ingredients(self.ingredients)
@@ -210,7 +211,7 @@ class Recipe:
         """Saves the recipe as a PDF"""
         if isinstance(path, str):
             path = Path(path)
-        doc = SimpleDocTemplate(path.name)
+        doc = SimpleDocTemplate(str(path))
         elements = []
         elements.append(self.title_paragraph)
         elements.append(Spacer(1, 12))

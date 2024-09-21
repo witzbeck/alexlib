@@ -8,9 +8,6 @@ from reportlab.lib.fonts import _tt2ps_map
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen.canvas import Canvas
 
-from alexlib.constants import RECIPES_PATH
-from alexlib.files.objects import File
-
 
 @dataclass
 class Font:
@@ -28,11 +25,6 @@ class Font:
         """Returns the font as a tuple"""
         yield self.ps_name
         yield self.size
-
-    @property
-    def astuple(self) -> tuple[str, int]:
-        """Returns the font as a tuple"""
-        return tuple(self)
 
     @property
     def ps_name(self) -> str:
@@ -121,7 +113,7 @@ class RecipeOutput:
         elif islistitem:
             self.canvas.setFont(self.font.bold_italic, size)
         else:
-            self.canvas.setFont(*self.font.astuple)
+            self.canvas.setFont(*tuple(self.font))
         line = line.strip("*")
         drawfunc(margin, current_height, line)
         current_height -= line_step
@@ -146,8 +138,3 @@ def export_recipe_to_pdf(
     """Exports a recipe to a PDF file"""
     recipe = RecipeOutput(recipe_text, filename)
     recipe.draw()
-
-
-if __name__ == "__main__":
-    RECIPE = File.from_path(RECIPES_PATH / "homemade_bread_recipe.txt").text
-    export_recipe_to_pdf(RECIPE, "homemade_bread_recipe.pdf")
