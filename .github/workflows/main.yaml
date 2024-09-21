@@ -79,4 +79,4 @@ jobs:
     #----------------------------------------------
     - name: Run tests
       run: |
-        poetry run pytest --cov=alexlib --fail-under=75 -n auto
+        poetry run pytest --cov=alexlib --cov-fail-under=75 -n auto
