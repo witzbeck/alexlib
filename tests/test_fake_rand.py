@@ -13,7 +13,7 @@ from alexlib.fake import (
     randprint,
     randrange,
 )
-from alexlib.maths.maths import randbool
+from alexlib.maths import randbool
 
 TEST_LOOP_RANGE = range(10)
 RANDINTSTR_KWARGS = {"min_int": -100_000, "max_int": 100_000}
@@ -191,4 +191,4 @@ def test_limgen_many_args_is_fine_no_concat():
             }
             gen = limgen(limgen_randint(), concat=False, **rand_kwargs)
             assert isinstance(gen, list)
-            assert [x for x in gen]
+            assert list(gen)

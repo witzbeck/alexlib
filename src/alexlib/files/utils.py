@@ -186,19 +186,6 @@ def is_json(path: Union[Path, str]) -> bool:
     return path.suffix.lower() == ".json"
 
 
-def dump_dotenv(path: Path, pairs: Mapping[str, str]) -> None:
-    """Write key-value pairs to a dotenv file."""
-    content = "\n".join(f"{key}={value}" for key, value in pairs.items())
-    path.write_text(content)
-    logger.info(f"Dumped {len(pairs)} key-value pairs to {path}")
-
-
-def dump_envs_json(path: Path, pairs: Mapping[str, str]) -> None:
-    """Write key-value pairs to a JSON file."""
-    path.write_text(dumps(pairs))
-    logger.info(f"Dumped {len(pairs)} key-value pairs to {path}")
-
-
 def dump_envs(
     path: Union[Path, str, None] = None,
     pairs: Mapping[str, str] = None,
@@ -210,9 +197,10 @@ def dump_envs(
         raise FileExistsError(f"{path} already exists. Use force=True to overwrite.")
     pairs = pairs if pairs is not None else environ
     if is_dotenv(path):
-        dump_dotenv(path, pairs)
+        content = "\n".join(f"{key}={value}" for key, value in pairs.items())
+        path.write_text(content)
     elif is_json(path):
-        dump_envs_json(path, pairs)
+        path.write_text(dumps(pairs, indent=4))
     else:
         raise ValueError(f"Unsupported file type: {path.suffix}")
-    logger.info(f"Dumped environment to {path}")
+    logger.info(f"Dumped {len(pairs)} environment variables to {path}")

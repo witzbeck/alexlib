@@ -12,13 +12,10 @@ Each class includes methods and properties to handle various aspects of database
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from random import choice
 from re import match
 
 from numpy import ndarray
 from pandas import DataFrame, Series
-
-from alexlib.df import series_col
 
 # Define a pattern for valid SQL object names.
 # Adjust the pattern as per your DB's naming rules.
@@ -33,13 +30,10 @@ def get_abrv(table_name: str) -> str:
 
 
 def validate_name(name: str) -> None:
-    """validates name"""
-    # This pattern allows alphanumeric characters and underscores, starting with a letter.
-    if name.isnumeric():
-        raise ValueError("name cannot be numeric")
-    # Check if the name matches the pattern
+    """Check if the name matches the pattern"""
     if not match(VALID_NAME_RULES, name):
         raise ValueError("name must be alphanumeric and start with a letter")
+    return name
 
 
 @dataclass(frozen=True, init=False)
@@ -145,20 +139,10 @@ class Table:
         return len(self.cols)
 
     @cached_property
-    def col_series(self) -> dict[str:Series]:
-        """returns dict of column names and series"""
-        return {x: series_col(self.df, x) for x in self.cols}
-
-    @cached_property
     def col_objs(self) -> dict[str:Column]:
         """returns dict of column names and column objects"""
         s, t, cs = self.schema_name, self.name, self.col_series
         return {x: Column(x, t, s, series=cs[x]) for x in self.cols}
-
-    @property
-    def rand_col(self) -> Column:
-        """returns random column"""
-        return choice(self.cols)
 
     @classmethod
     def from_df(

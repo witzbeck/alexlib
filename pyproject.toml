@@ -17,6 +17,7 @@ requests = "^2.32"
 faker = "^29.0.0"
 sqlalchemy = "^2.0"
 sqlalchemy-utils = "^0.41"
+statsmodels = "^0.14.3"
 
 [tool.poetry.group.docs.dependencies]
 reportlab = "^4.0"
