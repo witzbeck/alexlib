@@ -36,15 +36,15 @@ ipykernel = "^6.29"
 pre-commit = "^3.0"
 sqlfluff = "^3.0"
 
-[tool.cov]
+
 [tool.pytest.ini_options]
 addopts = [
+    "--cov=./src/alexlib",
     "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov=alexlib",
-    "--cov-fail-under=10",
+    "--cov-fail-under=60",
+    "--cov-branch",
     "-n",
-    "2",
+    "auto",
 ]
 testpaths = ["tests"]
 markers = [
