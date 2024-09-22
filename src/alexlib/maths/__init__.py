@@ -73,7 +73,7 @@ def discrete_exp_dist(
 
 def isintorfloat(x: int | float) -> bool:
     """returns True if x is an int or float"""
-    return isinstance(x, (int, float))
+    return not isinstance(x, bool) and isinstance(x, (int, float))
 
 
 def interpolate(
