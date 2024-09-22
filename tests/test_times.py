@@ -10,9 +10,12 @@ from alexlib.times import (
     ONEDAY,
     CustomDatetime,
     CustomTimedelta,
+    Timer,
+    TimerLabel,
     get_local_tz,
     get_rand_datetime,
     get_rand_timedelta,
+    timeit,
 )
 
 
@@ -119,3 +122,77 @@ def test_get_last_busday(cdt: CustomDatetime) -> None:
         assert last_busday == cdt.yesterday
     else:
         assert last_busday < cdt
+
+
+@fixture(scope="class")
+def timer():
+    return Timer()
+
+
+def test_timer_start(timer: Timer):
+    assert isinstance(timer.start, float)
+
+
+def test_timer_soft_last_record(timer: Timer):
+    assert isinstance(timer.soft_last_record, float)
+
+
+def test_timer_hard_last_record(timer: Timer):
+    assert isinstance(timer.hard_last_record, float)
+
+
+def test_timer_soft_elapsed_from_last(timer: Timer):
+    assert isinstance(timer.soft_elapsed_from_last, float)
+
+
+def test_timer_soft_elapsed_from_start(timer: Timer):
+    assert isinstance(timer.soft_elapsed_from_start, float)
+
+
+def test_timer_soft_start_label(timer: Timer):
+    assert isinstance(timer.soft_start_label, TimerLabel)
+
+
+def test_timer_soft_start_label_str(timer: Timer):
+    assert isinstance(str(timer.soft_start_label), str)
+
+
+def test_timer_soft_last_label(timer: Timer):
+    assert isinstance(timer.soft_last_label, TimerLabel)
+
+
+def test_timer_soft_last_label_str(timer: Timer):
+    assert isinstance(str(timer.soft_last_label), str)
+
+
+def test_timer_from_start_label(timer: Timer):
+    assert isinstance(timer.from_start_label, TimerLabel)
+
+
+def test_timer_from_start_label_str(timer: Timer):
+    assert isinstance(str(timer.from_start_label), str)
+
+
+def test_timer_from_last_label_str(timer: Timer):
+    assert isinstance(str(timer.from_last_label), str)
+
+
+def test_timer_from_last_label(timer: Timer):
+    assert isinstance(timer.from_last_label, TimerLabel)
+
+
+def test_timer_log_from_last(timer: Timer):
+    assert isinstance(timer.log_from_last(), str)
+
+
+def test_timer_log_from_start(timer: Timer):
+    assert isinstance(timer.log_from_start(), str)
+
+
+def test_timeit():
+    @timeit()
+    def to_time_func():
+        pass
+
+    to_time_func()
+    assert True

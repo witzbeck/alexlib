@@ -63,15 +63,3 @@ def rm_pattern(list_of_strs: list, pattern: str, end: bool = True) -> list:
         p_len = len(pattern)
         ret = [x for x in list_of_strs if x[:p_len] != pattern]
     return ret
-
-
-def get_idx_val(
-    idx_counter: int,
-    in_val: Any,
-    in_list: list[Any],
-    out_list: list[Any],
-) -> Any:
-    """returns the value of the out_list
-    at the index of the in_val in the in_list"""
-    idx = in_list.index(in_val, idx_counter)
-    return out_list[idx]
