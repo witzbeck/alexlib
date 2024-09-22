@@ -26,22 +26,22 @@ def comb_gen() -> Generator[tuple, None, None]:
     return get_comb_gen(list(range(10)), 3)
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def to_pop_list() -> list:
     return list(range(10))
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def pop_list_copy(to_pop_list: list):
     return to_pop_list.copy()
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def popped_item(to_pop_list: list):
     return get_pop_item(to_pop_list[randint(0, 9)], to_pop_list)
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def popped_rand_item(to_pop_list: list):
     return get_pop_rand_item(to_pop_list)
 
