@@ -37,6 +37,14 @@ from alexlib.core import chktype
 logger = getLogger(__name__)
 
 
+def get_parent(path: Path, parent_name: str) -> Path:
+    """gets parent path by name"""
+    if parent_name not in path.parts:
+        toprint_parts = ["\n"] + "\n".join([f"\t{x}" for x in path.parts]) + ["\n"]
+        raise ValueError(f"{parent_name} not in parents[{toprint_parts}]")
+    return [x for x in path.parents if x.name == parent_name][-1]
+
+
 def read_json(path: Path) -> dict[Hashable, str]:
     """reads json file"""
     chktype(path, Path, mustexist=True)

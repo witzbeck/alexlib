@@ -6,8 +6,22 @@ from matplotlib.figure import Figure
 from pytest import mark, raises
 
 from alexlib.files import JsonFile, SettingsFile, TomlFile
-from alexlib.files.objects import Directory, File, SystemObject, __sysobj_names__
-from alexlib.files.utils import eval_parents, figsave, path_search, read_json, read_toml
+from alexlib.files.objects import (
+    CreatedTimestamp,
+    Directory,
+    File,
+    ModifiedTimestamp,
+    SystemObject,
+    __sysobj_names__,
+)
+from alexlib.files.utils import (
+    eval_parents,
+    figsave,
+    get_parent,
+    path_search,
+    read_json,
+    read_toml,
+)
 
 
 def test_instantiation(text_file_obj: File):
@@ -70,8 +84,9 @@ def test_eval_parents_inclusion_exclusion(path, include, exclude, expected):
 
 def test_system_object_initialization():
     # Test initialization and attribute setting
-    obj = SystemObject(name="test", path=Path("/test/path"))
-    assert obj.name
+    obj = SystemObject(path=Path("/test/path"))
+    assert isinstance(obj, SystemObject)
+    assert isinstance(obj.path, Path)
 
 
 def test_json_file_init(json_file: JsonFile):
@@ -97,7 +112,6 @@ def test_read_json(json_file: JsonFile):
 
 
 def test_settings_init(settings_file: SettingsFile):
-    assert settings_file.name == "settings.json"
     assert isinstance(settings_file, SettingsFile)
 
 
@@ -148,7 +162,6 @@ def test_search_nonexistent_file(dir_path: Path):
 
 def test_systemobject_instantiation(sysobj: SystemObject):
     """Test instantiation with different names and paths."""
-    assert sysobj.name
     assert sysobj.path.exists()
 
 
@@ -161,63 +174,65 @@ def test_systemobject_properties(sysobj: SystemObject):
 def test_sysobj_get_parent(sysobj: SystemObject):
     """Test the get_parent method of the SystemObject class."""
     rand_parent_name = choice([x.name for x in sysobj.path.parents if len(x.name) > 1])
-    parent = sysobj.get_parent(rand_parent_name)
+    parent = get_parent(sysobj.path, rand_parent_name)
     assert isinstance(parent, Path)
 
 
 def test_sysobj_get_parent_failure(sysobj: SystemObject):
     """Test the get_parent method of the SystemObject class."""
     with raises(ValueError):
-        sysobj.get_parent("nonexistent")
+        get_parent(sysobj.path, "nonexistent")
 
 
 def test_sysobj_modified_timestamp(sysobj: SystemObject):
-    assert isinstance(sysobj.modified_timestamp, float)
+    assert isinstance(sysobj.modified_timestamp, ModifiedTimestamp)
+    assert isinstance(sysobj.modified_timestamp.timestamp, float)
 
 
 def test_sysobj_modified_datetime(sysobj: SystemObject):
-    assert isinstance(sysobj.modified_datetime, datetime)
+    assert isinstance(sysobj.modified_timestamp.datetime, datetime)
 
 
 def test_sysobj_modified_strfdatetime(sysobj: SystemObject):
-    assert isinstance(sysobj.modified_strfdatetime, str)
+    assert isinstance(sysobj.modified_timestamp.strfdatetime, str)
 
 
 def test_sysobj_modified_strfdate(sysobj: SystemObject):
-    assert isinstance(sysobj.modified_strfdate, str)
+    assert isinstance(sysobj.modified_timestamp.strfdate, str)
 
 
 def test_sysobj_modified_delta(sysobj: SystemObject):
-    assert isinstance(sysobj.modified_delta, timedelta)
+    assert isinstance(sysobj.modified_timestamp.delta, timedelta)
 
 
 def test_sysobj_created_timestamp(sysobj: SystemObject):
-    assert isinstance(sysobj.created_timestamp, float)
+    assert isinstance(sysobj.created_timestamp, CreatedTimestamp)
+    assert isinstance(sysobj.created_timestamp.timestamp, float)
 
 
 def test_sysobj_created_datetime(sysobj: SystemObject):
-    assert isinstance(sysobj.created_datetime, datetime)
+    assert isinstance(sysobj.created_timestamp.datetime, datetime)
 
 
 def test_sysobj_created_strfdatetime(sysobj: SystemObject):
-    assert isinstance(sysobj.created_strfdatetime, str)
+    assert isinstance(sysobj.created_timestamp.strfdatetime, str)
 
 
 def test_sysobj_created_strfdate(sysobj: SystemObject):
-    assert isinstance(sysobj.created_strfdate, str)
+    assert isinstance(sysobj.created_timestamp.strfdate, str)
 
 
 def test_sysobj_created_delta(sysobj: SystemObject):
-    assert isinstance(sysobj.created_delta, timedelta)
+    assert isinstance(sysobj.created_timestamp.delta, timedelta)
 
 
 def test_sysobj_is_new_enough(sysobj: SystemObject):
-    assert sysobj.is_new_enough(timedelta(days=1))
+    assert sysobj.created_timestamp.is_new_enough(timedelta(days=1))
 
 
 def test_sysobj_is_new_enough_not_timedelta(sysobj: SystemObject):
     with raises(TypeError):
-        sysobj.is_new_enough(1e5)
+        sysobj.modified_timestamp.is_new_enough(1e5)
 
 
 def test_sysobj_from_path(dir_obj: Directory):
@@ -235,7 +250,7 @@ def test_sysobj_from_parent(settings_file: SettingsFile):
 
 
 def test_sysobj_clsname(sysobj: SystemObject):
-    assert sysobj.clsname in __sysobj_names__
+    assert sysobj.__class__.__name__ in __sysobj_names__
 
 
 def test_dir_obj_filelist(subdir_with_files: Directory):

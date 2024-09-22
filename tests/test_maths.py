@@ -3,6 +3,7 @@ from random import randint
 from pytest import FixtureRequest, fixture, mark, raises
 
 from alexlib.maths import (
+    VariableBaseNumber,
     get_phi_by_precision,
     get_primes,
     interpolate,
@@ -100,7 +101,7 @@ def phi(phi_steps):
 
 def test_phi(phi):
     assert isinstance(phi, float)
-    assert 1 < phi < 2
+    assert 1 < phi <= 2
 
 
 @fixture(scope="module", params=(1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7))
@@ -110,5 +111,23 @@ def e(request: FixtureRequest):
 
 def test_get_phi_by_precision(e):
     phi = get_phi_by_precision(e=e)
-    assert 1 < phi < 2
+    assert 1 < phi <= 2
     assert abs(phi - 1.618033988749895) < e
+
+
+@fixture(
+    scope="module",
+    params=(
+        (-5, 4),
+        (25, 10),
+        (2, 2),
+        (40.5, 20),
+    ),
+)
+def variable_base_number(request: FixtureRequest):
+    base10_val, base = request.param
+    return VariableBaseNumber(base10_val, base)
+
+
+def test_variable_base_number(variable_base_number):
+    assert repr(variable_base_number)

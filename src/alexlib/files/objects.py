@@ -22,10 +22,9 @@ Dependencies: collections, dataclasses, datetime, functools, json, logging, os, 
 """
 
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from functools import cached_property, partial
+from functools import cached_property
 from itertools import chain
 from os import stat_result
 from pathlib import Path
@@ -45,31 +44,92 @@ from alexlib.files.utils import path_search, sha256sum
 __sysobj_names__ = ("Directory", "File", "SystemObject")
 
 
+@dataclass(frozen=True)
+class SystemTimestamp:
+    """class for system timestamps"""
+
+    timestamp: float
+
+    @property
+    def datetime(self) -> datetime:
+        """gets timestamp datetime"""
+        return datetime.fromtimestamp(self.timestamp)
+
+    @property
+    def strfdate(self) -> str:
+        """gets timestamp strfdate"""
+        return self.datetime.strftime(DATE_FORMAT)
+
+    @property
+    def strfdatetime(self) -> str:
+        """gets timestamp strfdatetime"""
+        return self.datetime.strftime(DATETIME_FORMAT)
+
+    @property
+    def delta(self) -> timedelta:
+        """gets timestamp delta"""
+        return datetime.now() - self.datetime
+
+    def is_new_enough(self, min_delta: timedelta) -> bool:
+        """checks if timestamp is new enough"""
+        if not isinstance(min_delta, timedelta):
+            raise TypeError(f"{min_delta} is not a timedelta")
+        return self.delta < min_delta
+
+    def __repr__(self) -> str:
+        """gets timestamp representation"""
+        return f"{self.__class__.__name__}({self.strfdatetime})"
+
+    def __str__(self) -> str:
+        """gets timestamp string"""
+        return self.strfdatetime
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "SystemTimestamp":
+        """creates system timestamp from stat result"""
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @classmethod
+    def from_path(cls, path: Path) -> "SystemTimestamp":
+        """creates system timestamp from path"""
+        return cls.from_stat_result(path.stat())
+
+
+@dataclass(frozen=True)
+class CreatedTimestamp(SystemTimestamp):
+    """class for created timestamps"""
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "CreatedTimestamp":
+        """creates created timestamp from stat result"""
+        return cls(stat.st_ctime)
+
+
+@dataclass(frozen=True)
+class ModifiedTimestamp(SystemTimestamp):
+    """class for modified timestamps"""
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "ModifiedTimestamp":
+        """creates modified timestamp from stat result"""
+        return cls(stat.st_mtime)
+
+
 @dataclass
 class SystemObject:
     """base class for File and Directory"""
 
-    name: str
     path: Path
-    include: list[str] = field(default_factory=list, repr=False)
-    exclude: list[str] = field(default_factory=list, repr=False)
-    max_ascends: int = field(repr=False, default=8)
 
-    @property
+    @cached_property
     def isfile(self) -> bool:
         """checks if path is a file"""
         return self.path.is_file() or self.__class__.__name__ == "File"
 
-    @property
+    @cached_property
     def isdir(self) -> bool:
         """checks if path is a directory"""
         return self.path.is_dir() or self.__class__.__name__ == "Directory"
-
-    def get_parent(self, name: str) -> Path:
-        """gets parent path by name"""
-        if name not in self.path.parts:
-            raise ValueError(f"{name} not in parents[{self.path.parts}]")
-        return [x for x in self.path.parents if x.name == name][-1]
 
     @property
     def nparents(self) -> int:
@@ -86,81 +146,27 @@ class SystemObject:
         """gets path size"""
         return self.stat.st_size
 
-    @property
-    def modified_timestamp(self) -> float:
+    @cached_property
+    def modified_timestamp(self) -> ModifiedTimestamp:
         """gets path modified timestamp"""
-        return self.stat.st_mtime
-
-    @property
-    def created_timestamp(self) -> float:
-        """gets path created timestamp"""
-        return self.stat.st_ctime
-
-    @property
-    def modified_datetime(self) -> datetime:
-        """gets path modified datetime"""
-        return datetime.fromtimestamp(self.modified_timestamp)
-
-    @property
-    def created_datetime(self) -> datetime:
-        """gets path created datetime"""
-        return datetime.fromtimestamp(self.created_timestamp)
-
-    @property
-    def modified_strfdate(self) -> str:
-        """gets path modified strfdate"""
-        return self.modified_datetime.strftime(DATE_FORMAT)
-
-    @property
-    def created_strfdate(self) -> str:
-        """gets path created strfdate"""
-        return self.created_datetime.strftime(DATE_FORMAT)
-
-    @property
-    def modified_strfdatetime(self) -> str:
-        """gets path modified strfdatetime"""
-        return self.modified_datetime.strftime(DATETIME_FORMAT)
-
-    @property
-    def created_strfdatetime(self) -> str:
-        """gets path created strfdatetime"""
-        return self.created_datetime.strftime(DATETIME_FORMAT)
-
-    @property
-    def modified_delta(self) -> timedelta:
-        """gets path modified delta"""
-        return datetime.now() - self.modified_datetime
-
-    @property
-    def created_delta(self) -> timedelta:
-        """gets path created delta"""
-        return datetime.now() - self.created_datetime
-
-    def is_new_enough(
-        self,
-        min_delta: timedelta,
-    ) -> bool:
-        """checks if path is new enough"""
-        if not isinstance(min_delta, timedelta):
-            raise TypeError(f"{min_delta} is not a timedelta")
-        return self.created_delta < min_delta
+        return ModifiedTimestamp.from_stat_result(self.stat)
 
     @cached_property
-    def clsname(self) -> str:
-        """gets class name"""
-        return self.__class__.__name__
+    def created_timestamp(self) -> CreatedTimestamp:
+        """gets path created timestamp"""
+        return CreatedTimestamp.from_stat_result(self.stat)
 
     @classmethod
     def from_path(cls, path: Path, **kwargs):
         """creates system object from path"""
         if isinstance(path, str):
             path = Path(path)
-        return cls(path=path, name=path.name, **kwargs)
+        return cls(path=path, **kwargs)
 
     @classmethod
     def from_name(cls, name: str, **kwargs):
         """creates system object from name"""
-        return cls(name=name, path=path_search(name, **kwargs), **kwargs)
+        return cls(path=path_search(name, **kwargs), **kwargs)
 
     @classmethod
     def from_parent(
@@ -174,11 +180,12 @@ class SystemObject:
             start_path = Path(start_path)
         if not start_path.exists():
             raise FileNotFoundError(f"{start_path} does not exist")
-        ret, start_parents = None, list(start_path.parents)
-        while ret is None and start_parents:
-            candidate = start_parents.pop(-1) / filename
-            ret = candidate if notexistok or candidate.exists() else None
-        return cls.from_path(ret)
+        ret = [x for x in start_path.parents if (x / filename).exists()]
+        if ret:
+            return cls.from_path(ret[-1] / filename)
+        if notexistok:
+            return cls.from_path(start_path / filename)
+        raise FileNotFoundError(f"{filename} not found in {start_path}")
 
     @classmethod
     def find(cls, name: str, **kwargs):
@@ -201,10 +208,6 @@ class File(SystemObject):
     def __repr__(self) -> str:
         """gets file representation"""
         return f"{self.__class__.__name__}({self.name})"
-
-    def rm(self) -> None:
-        """removes file"""
-        self.path.unlink()
 
     def rename(self, name: str, overwrite: bool = False) -> None:
         """renames file"""
@@ -280,31 +283,6 @@ class File(SystemObject):
     def replace_text(self, old: str, new: str) -> None:
         """replaces text in file"""
         self.path.write_text(self.text.replace(old, new))
-
-    @cached_property
-    def read_func(self) -> Callable:
-        """gets read function"""
-        if self.istype("xlsx"):
-            from pandas import read_excel
-
-            ret = partial(read_excel, self.path)
-        elif self.istype("csv"):
-            from pandas import read_csv
-
-            ret = partial(read_csv, self.path)
-        elif self.istype("sql"):
-            from pandas import read_sql
-
-            ret = read_sql
-        elif self.istype("json"):
-            from pandas import read_json
-
-            ret = partial(read_json, self.text)
-        elif self.istype("txt"):
-            return self.path.read_text
-        else:
-            raise TypeError(f"read func not loaded for {self.path.suffix}")
-        return ret
 
     def copy_to(self, destination: Path, overwrite: bool = False) -> "File":
         """copies file to destination"""
