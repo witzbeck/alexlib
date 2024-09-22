@@ -135,9 +135,13 @@ def test_settings_init(settings_file: SettingsFile):
 
 def test_settings_envdict_init(settings_file: SettingsFile):
     assert isinstance(settings_file.envdict, dict)
+
+
+def test_settings_envdict_has_values(settings_file: SettingsFile):
     assert len(settings_file.envdict) > 0
 
 
+@mark.slow
 def test_save_png_format(figure: Figure, figure_path: Path):
     """Test saving a figure in PNG format."""
     _ = figure
@@ -145,6 +149,7 @@ def test_save_png_format(figure: Figure, figure_path: Path):
     assert figure_path.exists()
 
 
+@mark.slow
 def test_save_with_bbox_inches(figure: Figure, figure_path: Path):
     """Test saving a figure with the bbox_inches parameter."""
     _ = figure
@@ -202,8 +207,11 @@ def test_sysobj_get_parent_failure(sysobj: SystemObject):
         get_parent(sysobj.path, "nonexistent")
 
 
-def test_sysobj_modified_timestamp(sysobj: SystemObject):
+def test_sysobj_modified_timestamp_type(sysobj: SystemObject):
     assert isinstance(sysobj.modified_timestamp, ModifiedTimestamp)
+
+
+def test_sysobj_modified_timestamp_ts(sysobj: SystemObject):
     assert isinstance(sysobj.modified_timestamp.timestamp, float)
 
 
@@ -223,8 +231,11 @@ def test_sysobj_modified_delta(sysobj: SystemObject):
     assert isinstance(sysobj.modified_timestamp.delta, timedelta)
 
 
-def test_sysobj_created_timestamp(sysobj: SystemObject):
+def test_sysobj_created_timestamp_type(sysobj: SystemObject):
     assert isinstance(sysobj.created_timestamp, CreatedTimestamp)
+
+
+def test_sysobj_created_timestamp_ts(sysobj: SystemObject):
     assert isinstance(sysobj.created_timestamp.timestamp, float)
 
 
@@ -271,31 +282,42 @@ def test_sysobj_clsname(sysobj: SystemObject):
     assert sysobj.__class__.__name__ in __sysobj_names__
 
 
-def test_dir_obj_filelist(subdir_with_files: Directory):
+def test_dir_obj_filelist_islist(subdir_with_files: Directory):
     """Test the filelist property of the Directory class."""
     assert isinstance(subdir_with_files.filelist, list)
+
+
+def test_dir_obj_filelist_are_file_objs(subdir_with_files: Directory):
     assert all(isinstance(f, File) for f in subdir_with_files.filelist)
 
 
-def test_dir_obj_dirlist(dir_obj: Directory):
+def test_dir_obj_dirlist_islist(dir_obj: Directory):
     """Test the dirlist property of the Directory class."""
     assert isinstance(dir_obj.dirlist, list)
+
+
+def test_dir_obj_dirlist_are_dir_objs(dir_obj: Directory):
     assert all(isinstance(d, Directory) for d in dir_obj.dirlist)
 
 
-def test_dir_obj_contents(dir_obj: Directory):
+def test_dir_obj_contents_islist(dir_obj: Directory):
     """Test the dirlist property of the Directory class."""
     assert isinstance(dir_obj.dirlist, list)
+
+
+def test_dir_obj_contents_are_paths(dir_obj: Directory):
     assert all(isinstance(d, Path) for d in dir_obj.contents)
 
 
-def test_dir_obj_objlist(subdir_with_files: Directory):
+def test_dir_obj_objlist_islist(subdir_with_files: Directory):
     """Test the contents property of the Directory class."""
     assert isinstance(subdir_with_files.contents, list)
+
+
+def test_dir_obj_objlist_are_sysobjs(subdir_with_files: Directory):
     assert all(issubclass(d.__class__, SystemObject) for d in subdir_with_files.objlist)
 
 
-def test_dir_obj_get_latest_file(subdir_with_files: Directory):
+def test_dir_obj_get_latest_file(subdir_latest_file: File):
     """Test the get_latest_file method of the Directory class."""
-    latest_file = subdir_with_files.get_latest_file()
-    assert isinstance(latest_file, File)
+    assert isinstance(subdir_latest_file, File)

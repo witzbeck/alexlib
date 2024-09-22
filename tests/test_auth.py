@@ -25,7 +25,7 @@ from alexlib.crypto import Cryptographer, SecretValue
 
 
 @fixture(
-    scope="module",
+    scope="session",
     params=(
         "remote.dev.postgres",
         "remote.prod.postgres",
@@ -41,13 +41,13 @@ def auth_key(request: FixtureRequest) -> str:
     return request.param
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def auth_template_path(dir_path: Path):
     test_path = dir_path / "test_template.json"
     return test_path
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def auth_generator(auth_template_path: Path):
     return AuthGenerator(
         name="test_template",
@@ -58,21 +58,22 @@ def auth_generator(auth_template_path: Path):
     )
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def auth_templates(auth_generator: AuthGenerator) -> dict[str, dict[str, str]]:
     return auth_generator.mk_all_templates()
 
 
-@fixture(scope="module")
-def auth_objects(auth_templates: dict[str, dict[str, str]]) -> dict[str, Auth]:
-    return {
-        key: Auth.from_dict(key, template) for key, template in auth_templates.items()
-    }
+@fixture(scope="session")
+def auth_template(
+    auth_templates: dict[str, dict[str, str]], auth_key: str
+) -> dict[str, str]:
+    return auth_key, auth_templates[auth_key]
 
 
-@fixture(scope="module")
-def auth_object(auth_objects: dict[str, Auth], auth_key: str) -> Auth:
-    return auth_objects[auth_key]
+@fixture(scope="session")
+def auth_object(auth_template: dict[str, str]) -> dict[str, Auth]:
+    auth_key, template = auth_template
+    return Auth.from_dict(auth_key, template)
 
 
 def test_auth_generator_init(auth_generator: AuthGenerator):
@@ -85,9 +86,10 @@ def test_auth_template_path(auth_generator: AuthGenerator, auth_template_path: P
     assert auth_generator.path.exists()
 
 
-def test_auth_templates(auth_templates: dict[str, dict[str, str]], auth_key: str):
-    assert auth_key in auth_templates
-    template = auth_templates[auth_key]
+@mark.slow
+def test_auth_templates(auth_template: tuple[str, dict[str, str]]):
+    key, template = auth_template
+    assert isinstance(key, str)
     assert isinstance(template, dict)
     assert len(template) == 7
 
@@ -96,6 +98,7 @@ def test_auth_object_is_auth(auth_object: Auth):
     assert isinstance(auth_object, Auth)
 
 
+@mark.slow
 @mark.parametrize("attr", ("username", "password", "host", "port", "database"))
 def test_auth_object_attrs(attr: str, auth_object: Auth):
     assert hasattr(auth_object, attr)

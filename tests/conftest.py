@@ -136,6 +136,11 @@ def subdir_with_files(faker: Faker, temp_dir: Path, request: FixtureRequest):
 
 
 @fixture(scope="session")
+def subdir_latest_file(subdir_with_files: Directory):
+    return subdir_with_files.get_latest_file()
+
+
+@fixture(scope="session")
 def dir_path(faker: Faker, temp_dir: Path):
     (path := temp_dir / faker.word()).mkdir(exist_ok=True, parents=True)
     return path

@@ -38,7 +38,7 @@ def pop_list_copy(to_pop_list: list):
 
 @fixture(scope="function")
 def popped_item(to_pop_list: list):
-    return get_pop_item(to_pop_list[randint(0, 9)], to_pop_list)
+    return get_pop_item(to_pop_list[randint(0, len(to_pop_list))], to_pop_list)
 
 
 @fixture(scope="function")
