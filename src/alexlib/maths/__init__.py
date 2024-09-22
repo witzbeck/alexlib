@@ -101,14 +101,14 @@ def interpolate(
 
     if y1isnum:
         pass
-    elif issubclass(y1, Callable):
+    elif issubclass(y1.__class__, Callable):
         y1 = y1(x1)
     else:
         raise TypeError("y1 must be a number or a function")
 
     if y2isnum:
         pass
-    elif issubclass(y2, Callable):
+    elif issubclass(y2.__class__, Callable):
         y2 = y2(x2)
     else:
         raise TypeError("y2 must be a number or a function")
