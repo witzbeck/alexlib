@@ -1,4 +1,4 @@
-from pytest import FixtureRequest, fixture
+from pytest import FixtureRequest, fixture, mark
 
 from alexlib.maths import get_primes, randbool
 
@@ -9,25 +9,27 @@ def primes(request: FixtureRequest) -> list[int]:
 
 
 @fixture(scope="module")
-def rbool():
+def rbool() -> bool:
     return randbool()
 
 
-def test_randbool(rbool):
+def test_randbool(rbool: bool):
     assert isinstance(rbool, bool)
 
 
-def test_nprimes_are_ints(primes):
+def test_nprimes_are_ints(primes: list[int]):
     assert all(isinstance(x, int) for x in primes)
 
 
-def test_nprimes_gt_one(primes):
+def test_nprimes_gt_one(primes: list[int]):
     assert all(x > 1 for x in primes)
 
 
-# @mark.parametrize("n", params=(2, 3, 5, 7, 11, 13, 17, 19, 23, 29), indirect=True)
-# def test_nprimes_mod(primes, n):
-#    assert all(x % n or x == n for x in primes)
+@mark.parametrize("n", (2, 3, 5, 7, 11, 13, 17, 19, 23, 29))
+def test_nprimes_mod(primes, n):
+    assert all(x % n or x == n for x in primes)
+
+
 #
 #
 # INTORFLOAT_PARAMS = (
