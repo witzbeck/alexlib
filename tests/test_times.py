@@ -6,6 +6,7 @@ from pytest import FixtureRequest, fixture
 
 from alexlib.constants import EPOCH
 from alexlib.times import (
+    HOLIDAYS,
     ONEDAY,
     CustomDatetime,
     CustomTimedelta,
@@ -74,25 +75,31 @@ def test_can_get_custom_timedelta(ctd: CustomTimedelta) -> None:
 
 def test_xmas_isholiday(this_xmas: CustomDatetime) -> None:
     """Test isholiday method."""
-    assert this_xmas.isholiday
+    assert (
+        this_xmas.isholiday
+    ), f"{this_xmas} should be a holiday but is not in {HOLIDAYS}."
 
 
 def test_not_xmas_isholiday(day_after_xmas: CustomDatetime) -> None:
     """Test isholiday method."""
-    assert not day_after_xmas.isholiday
+    assert not day_after_xmas.isholiday, f"{day_after_xmas} should not be a holiday."
 
 
 def test_weekday_not_weekend(cdt: CustomDatetime) -> None:
     """Test isweekday method."""
-    assert cdt.isweekday is not cdt.isweekend
+    assert (
+        cdt.isweekday is not cdt.isweekend
+    ), f"{cdt} cannot be both a weekday and a weekend."
 
 
 def test_isbusinessday(cdt: CustomDatetime) -> None:
     """Test isbusinessday method."""
     if cdt.isbusinessday:
-        assert not cdt.isholiday and not cdt.isweekend
+        assert (
+            not cdt.isholiday and not cdt.isweekend
+        ), f"{cdt} should be not be a holiday or weekend."
     else:
-        assert cdt.isholiday or cdt.isweekend
+        assert cdt.isholiday or cdt.isweekend, f"{cdt} should be a holiday or weekend."
 
 
 def test_tomorrow(cdt: CustomDatetime) -> None:

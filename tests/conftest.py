@@ -117,14 +117,14 @@ def rand_env(environ_keys: list[str]) -> str:
     return choice(environ_keys)
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory and return its path."""
     with TemporaryDirectory() as temp_dir:
         yield Path(temp_dir)
 
 
-@fixture(scope="module", params=(f"test_dir{i}" for i in range(2)))
+@fixture(scope="session", params=(f"test_dir{i}" for i in range(2)))
 def subdir_with_files(faker: Faker, temp_dir: Path, request: FixtureRequest):
     subdir = temp_dir / request.param
     subdir.resolve()
@@ -135,7 +135,7 @@ def subdir_with_files(faker: Faker, temp_dir: Path, request: FixtureRequest):
     return Directory.from_path(subdir)
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def dir_path(faker: Faker, temp_dir: Path):
     (path := temp_dir / faker.word()).mkdir(exist_ok=True, parents=True)
     return path
@@ -262,7 +262,7 @@ def copy_path(file_path: Path, copy_text: str):
     return file_path
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def auth():
     return Auth.from_dict(
         name="test_auth",
@@ -277,7 +277,7 @@ def auth():
     )
 
 
-@fixture(scope="module")
+@fixture(scope="session")
 def curl():
     return Curl(
         username="testuser",
@@ -388,17 +388,17 @@ def empty_df():
     return DataFrame()
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def df():
     return DataFrame.from_dict({"col1": [1, 2], "col2": [3, 4]})
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def df_with_duplicate_values():
     return DataFrame.from_dict({"col1": [1, 2, 2, 3], "col2": ["a", "b", "b", "c"]})
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def df_to_filter():
     return DataFrame.from_dict(
         {
@@ -409,14 +409,20 @@ def df_to_filter():
     )
 
 
-@fixture(scope="class")
+@fixture(scope="function")
+def df_copy(df):
+    """Return a copy of the DataFrame."""
+    return df.copy()
+
+
+@fixture(scope="session")
 def figure():
     fig = Figure()
     ax = fig.subplots()
-    ax.plot([1, 2, 3], [1, 2, 3])
+    ax.plot([1], [1])
     return fig
 
 
-@fixture(scope="class")
+@fixture(scope="session")
 def figure_path(dir_path: Path):
     return dir_path / "testfig.png"

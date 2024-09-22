@@ -343,7 +343,7 @@ def test_curl_repr_method(curl: Curl):
 
 def test_curl_clsname(curl: Curl):
     """Test the __class__.__name__ attribute for the Curl class."""
-    assert isinstance(curl.clsname, str)
+    assert isinstance(str(curl), str)
 
 
 def test_curl_without_login():

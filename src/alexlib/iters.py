@@ -4,31 +4,6 @@ It includes functionalities to flatten a list of lists, generate index combinati
 produce combinations of elements from a list, iterate through list items in a specific order,
 and manipulate elements based on certain conditions.
 
-Functions:
-    link(lists: list[list]) -> list:
-        Flattens a list of lists into a single list.
-
-    idx_list(shape: list[int]) -> list[tuple[int, ...]]:
-        Generates all possible index tuples for a given ndarray shape.
-
-    get_comb_gen(_list: list, _int: int) -> tuple:
-        Yields all possible combinations of a given size from a list.
-
-    list_gen(_list: list, rand: bool = False, inf: bool = False) -> Any:
-        Generates items from a list. Can return items in random order or infinitely.
-
-    get_pop_item(item: str, _list: list) -> str:
-        Removes a specified item from a list and returns it.
-
-    get_pop_rand_item(_list: list) -> Any:
-        Removes and returns a random item from a list.
-
-    rm_pattern(list_of_strs: list, pattern: str, end: bool = True) -> list:
-        Removes strings from a list that contain a specified pattern.
-
-    get_idx_val(idx_counter: int, in_val: Any, in_list: list[Any], out_list: list[Any]) -> Any:
-        Returns the value from one list at the index corresponding to an element's position in another list.
-
 Each function is designed to offer flexibility and convenience for various list manipulation tasks,
 ranging from simple list flattening to more complex operations like index mapping and pattern removal.
 """
@@ -40,7 +15,7 @@ from random import randint
 from typing import Any
 
 
-def idx_list(shape: list[int]) -> list[tuple[int, ...]]:
+def idx_list(shape: tuple[int]) -> list[tuple[int, ...]]:
     """returns a list of all indices for the shape of an ndarray"""
     return list(product(range(x) for x in shape))
 

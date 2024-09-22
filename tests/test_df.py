@@ -1,9 +1,53 @@
 """Unit tests for the filter_df function in the alexlib.df module."""
 
+from datetime import datetime
+
 from pandas import DataFrame
 from pytest import mark, raises
 
-from alexlib.df import filter_df, get_distinct_col_vals
+from alexlib.df import (
+    add_col,
+    add_timestamp_col,
+    col_pair_to_dict,
+    filter_df,
+    get_distinct_col_vals,
+)
+
+
+def test_add_timestamp_col(df_copy):
+    """Test adding a new column with correct inputs."""
+    result_df = add_timestamp_col(df_copy)
+    assert "datetime" in result_df.columns
+    assert all(isinstance(x, datetime) for x in result_df.loc[:, "datetime"])
+
+
+def test_add_timestamp_col_invalid_input():
+    # Test with invalid DataFrame input
+    with raises(TypeError):
+        add_timestamp_col("not_a_dataframe")
+
+
+def test_add_col(df_copy):
+    """Test adding a new column with correct inputs."""
+    result_df = add_col(df_copy, "D", 100)
+    assert "D" in result_df.columns
+    assert (result_df["D"] == 100).all()
+
+
+def test_add_col_invalid_input(df_copy):
+    """Test with invalid DataFrame input."""
+    with raises(TypeError):
+        add_col("not_a_dataframe", "D", 100)
+
+
+def test_col_pair_to_dict(df):
+    """Test with valid inputs."""
+    result_dict = col_pair_to_dict("col1", "col2", df)
+    assert isinstance(result_dict, dict)
+
+    # Test with non-existent columns
+    with raises(KeyError):
+        col_pair_to_dict("X", "Y", df)
 
 
 def test_empty_df_is_df(empty_df):

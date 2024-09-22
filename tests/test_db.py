@@ -8,32 +8,32 @@ from pytest import fixture, raises
 from alexlib.db.objects import Column, Name, Schema, Table
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def schema():
     """Return a schema object"""
     return Schema("test_schema")
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def table(df):
     """Return a table object"""
     return Table.from_df(schema_name="test_schema", name="test_table", df=df)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def series(df: DataFrame) -> Series:
     """Return a series object"""
     col = choice(list(df.columns))
-    return df.loc[:, col]
+    return df.loc[:, col].copy()
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def column(series: Series):
     """Return a column object"""
     return Column("test_column", "test_table", "test_schema", series=series)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def valid_name():
     """Return a valid name object"""
     return Name("valid_name123")
