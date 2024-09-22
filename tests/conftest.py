@@ -41,7 +41,13 @@ from alexlib.constants import (
 from alexlib.core import chkcmd, get_clipboard_cmd
 from alexlib.crypto import Cryptographer
 from alexlib.files import DotenvFile, JsonFile, SettingsFile, TomlFile
-from alexlib.files.objects import Directory, File, SystemObject
+from alexlib.files.objects import (
+    CreatedTimestamp,
+    Directory,
+    File,
+    ModifiedTimestamp,
+    SystemObject,
+)
 from alexlib.files.utils import write_json
 from alexlib.times import ONEDAY, CustomDatetime
 
@@ -97,7 +103,7 @@ def day_after_xmas(this_xmas: CustomDatetime):
     return this_xmas + ONEDAY
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def cryptographer() -> Cryptographer:
     return Cryptographer.new()
 
@@ -112,7 +118,7 @@ def environ_keys():
     return list(environ.keys())
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_env(environ_keys: list[str]) -> str:
     return choice(environ_keys)
 
@@ -151,12 +157,22 @@ def dir_obj(dir_path: Path):
     return Directory.from_path(dir_path)
 
 
-@fixture(scope="class")
+@fixture(scope="module")
+def dir_obj_created_ts(dir_obj: Directory) -> CreatedTimestamp:
+    return dir_obj.created_timestamp
+
+
+@fixture(scope="module")
+def dir_obj_modified_ts(dir_obj: Directory) -> ModifiedTimestamp:
+    return dir_obj.modified_timestamp
+
+
+@fixture(scope="function")
 def sysobj(file_path: Path):
     return SystemObject.from_path(file_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def text_file_path(dir_path: Path) -> Path:
     """Create a text file and return its path."""
     text_file = dir_path / "test.txt"
@@ -165,7 +181,7 @@ def text_file_path(dir_path: Path) -> Path:
     return text_file
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def text_file_obj(text_file_path: Path) -> File:
     """Create a File object and return it."""
     return File.from_path(text_file_path)
@@ -233,17 +249,17 @@ def settings_file(settings_path: Path):
     return SettingsFile.from_path(settings_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_key(settings_file: SettingsFile):
     return choice(list(settings_file.envdict.keys()))
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_val(settings_file: SettingsFile, rand_key: str):
     return settings_file.envdict[rand_key]
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def file_path(temp_dir: Path, faker: Faker):
     test_file = temp_dir / NamedTemporaryFile("w", delete=False).name
     test_file.write_text(faker.text())
@@ -251,17 +267,17 @@ def file_path(temp_dir: Path, faker: Faker):
     test_file.unlink()
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def file_obj(file_path: Path) -> File:
     return File.from_path(file_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def copy_text():
     return "Text copied to clipboard successfully."
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def copy_path(file_path: Path, copy_text: str):
     file_path.write_text(copy_text)
     return file_path
@@ -370,7 +386,7 @@ def secret_store(secrets: dict) -> SecretStore:
     return SecretStore.from_dict(secrets)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def cmd():
     try:
         get_clipboard_cmd()
@@ -378,12 +394,12 @@ def cmd():
         return None
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def hascmd(cmd):
     return chkcmd(cmd[0]) if cmd is not None else False
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def csv_path(dir_path: Path):
     return dir_path / "test_df.csv"
 

@@ -36,7 +36,7 @@ from alexlib.core import (
     show_dict,
     to_clipboard,
 )
-from alexlib.files.utils import path_search, sha256sum
+from alexlib.files.utils import path_search
 
 __sysobj_names__ = ("Directory", "File", "SystemObject")
 
@@ -204,10 +204,6 @@ class File(SystemObject):
     name: str = field(default=None)
     path: Path = field(default=None, repr=False)
     encrypted: bool = field(default=False, repr=False)
-
-    def __hash__(self) -> str:
-        """gets file hash"""
-        return sha256sum(self.path)
 
     def __repr__(self) -> str:
         """gets file representation"""

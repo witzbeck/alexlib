@@ -37,8 +37,7 @@ from functools import partial
 from itertools import chain
 from typing import Any
 
-from pandas import DataFrame, Series, to_datetime
-from sqlalchemy import Engine
+from pandas import DataFrame
 
 from alexlib.iters import rm_pattern
 
@@ -136,17 +135,6 @@ def col_vals_to_dict(df: DataFrame, key_col: str, val_col: str) -> dict[str:Any]
     return {x[key_col]: x[val_col] for x in recs}
 
 
-def ts_col_to_dt(
-    df: DataFrame,
-    ts_col: str,
-    dt_col: str,
-) -> DataFrame:
-    """converts a timestamp column to a datetime column"""
-    col = df.loc[:, ts_col]
-    df.loc[:, dt_col] = to_datetime(col)
-    return df
-
-
 def set_type_list(df: DataFrame, type_: Any, cols: list[str]) -> DataFrame:
     """
     Efficiently sets the type of specified columns in a DataFrame.
@@ -183,11 +171,6 @@ def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
     return df.head(to) if head else df.tail(to)
 
 
-def series_col(df: DataFrame, col: str) -> Series:
-    """gets a column from a dataframe as a series"""
-    return Series(df.loc[:, col])
-
-
 def get_distinct_col_vals(df: DataFrame, col: str) -> list:
     """gets distinct values from col in df"""
     return list(df.loc[:, col].unique())
@@ -214,25 +197,3 @@ def rm_df_col_pattern(
     else:
         raise ValueError("input not recognized")
     return df.loc[:, new_cols]
-
-
-def df_to_db(
-    df: DataFrame,
-    engine: Engine,
-    table_name: str,
-    schema: str = None,
-    if_exists: str = "replace",
-    index: bool = False,
-    chunksize: int = 10000,
-    method: str = "multi",
-) -> None:
-    """sends df to db"""
-    df.to_sql(
-        table_name,
-        engine,
-        if_exists=if_exists,
-        schema=schema,
-        index=index,
-        chunksize=chunksize,
-        method=method,
-    )

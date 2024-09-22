@@ -12,6 +12,7 @@ from alexlib.files.objects import (
     File,
     ModifiedTimestamp,
     SystemObject,
+    SystemTimestamp,
     __sysobj_names__,
 )
 from alexlib.files.utils import (
@@ -321,3 +322,62 @@ def test_dir_obj_objlist_are_sysobjs(subdir_with_files: Directory):
 def test_dir_obj_get_latest_file(subdir_latest_file: File):
     """Test the get_latest_file method of the Directory class."""
     assert isinstance(subdir_latest_file, File)
+
+
+def test_dir_obj_created_timestamp_repr(dir_obj_created_ts: CreatedTimestamp):
+    assert isinstance(repr(dir_obj_created_ts), str)
+
+
+def test_dir_obj_created_timestamp_str(dir_obj_created_ts: CreatedTimestamp):
+    assert isinstance(str(dir_obj_created_ts), str)
+
+
+def test_dir_obj_modified_timestamp_repr(dir_obj_modified_ts: ModifiedTimestamp):
+    assert isinstance(repr(dir_obj_modified_ts), str)
+
+
+def test_dir_obj_modified_timestamp_str(dir_obj_modified_ts: ModifiedTimestamp):
+    assert isinstance(str(dir_obj_modified_ts), str)
+
+
+def test_system_timestamp_not_implemented_from_stat_result():
+    with raises(NotImplementedError):
+        SystemTimestamp.from_stat_result(None)
+
+
+def test_system_timestamp_from_path(dir_path: Path):
+    with raises(NotImplementedError):
+        sys_ts = SystemTimestamp.from_path(dir_path)
+        assert isinstance(sys_ts, SystemTimestamp)
+
+
+def test_system_obj_from_string_path():
+    obj = SystemObject.from_path(".")
+    assert isinstance(obj, SystemObject)
+
+
+def test_system_obj_from_parent():
+    obj = SystemObject.from_parent(".gitignore", Path(".").resolve(), notexistok=False)
+    assert isinstance(obj, SystemObject)
+
+
+def test_system_obj_from_parent_notreal_but_fine():
+    obj = SystemObject.from_parent("notrealfile", Path("."), notexistok=True)
+    assert isinstance(obj, SystemObject)
+
+
+def test_system_obj_from_parent_not_exist():
+    with raises(FileNotFoundError):
+        SystemObject.from_parent("notrealfile", Path("."), notexistok=False)
+
+
+def test_file_obj_repr(text_file_obj: File):
+    assert isinstance(repr(text_file_obj), str)
+
+
+def test_file_obj_str(text_file_obj: File):
+    assert isinstance(str(text_file_obj), str)
+
+
+def test_file_clipboard(text_file_obj: File):
+    assert isinstance(text_file_obj.clip(), str)

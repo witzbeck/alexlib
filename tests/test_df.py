@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from pandas import DataFrame
-from pytest import mark, raises
+from pytest import fixture, mark, raises
 
 from alexlib.df import (
     add_col,
@@ -11,7 +11,46 @@ from alexlib.df import (
     col_pair_to_dict,
     filter_df,
     get_distinct_col_vals,
+    rm_df_col_pattern,
+    set_type_list,
+    split_df,
 )
+
+
+@fixture(scope="session")
+def df_to_split():
+    return DataFrame({"col1": range(10), "col2": range(10, 20)})
+
+
+def test_split_df(df_to_split):
+    """Test splitting the DataFrame based on a given ratio."""
+    ratio = 0.5
+    result = split_df(df_to_split, ratio)
+    expected_length = int(len(df_to_split) * ratio)
+    assert (
+        len(result) == expected_length
+    ), "DataFrame split did not result in the expected length"
+
+
+def test_type_setting(df):
+    """Test changing the data type of specified columns."""
+    df = set_type_list(df, "float", ["col1"])
+    assert all(
+        isinstance(x, float) for x in df["col1"]
+    ), "Column col1 should be converted to float."
+
+
+def test_type_setting_invalid(df):
+    """Test with an invalid data type."""
+    with raises(TypeError):
+        set_type_list(df, "invalid_type", ["col1"])
+
+
+@mark.parametrize("ratio", [-1, 1.5])
+def test_split_df_invalid_ratio(ratio, df_to_split):
+    """Test with a ratio outside the range of 0 to 1."""
+    with raises(ValueError):
+        split_df(df_to_split, ratio)
 
 
 def test_add_timestamp_col(df_copy):
@@ -113,3 +152,35 @@ def test_distinct_values(df_with_duplicate_values, col, expected):
     """Test retrieving distinct column values."""
     distinct_values = get_distinct_col_vals(df_with_duplicate_values, col)
     assert distinct_values == expected, f"Distinct values in {col} should be {expected}"
+
+
+@fixture(scope="session")
+def df_with_column_pattern():
+    return DataFrame.from_dict(
+        {
+            "alpha_1": [1, 2, 3],
+            "beta_1": [4, 5, 6],
+            "alpha_2": [7, 8, 9],
+            "gamma": [10, 11, 12],
+        }
+    )
+
+
+@mark.parametrize(
+    "column_pattern, expected_columns",
+    [
+        ("alpha", ["beta_1", "gamma"]),
+        ("beta", ["alpha_1", "alpha_2", "gamma"]),
+        ("gamma", ["alpha_1", "beta_1", "alpha_2"]),
+    ],
+)
+def test_rm_df_col_pattern(df_with_column_pattern, column_pattern, expected_columns):
+    """Test removing columns based on a pattern."""
+    result_df = rm_df_col_pattern(column_pattern, df_with_column_pattern, end=False)
+    assert sorted(result_df.columns) == sorted(expected_columns)
+
+
+def test_rm_df_col_pattern_no_match(df_with_column_pattern):
+    """Test removing columns based on a pattern that does not match any columns."""
+    result_df = rm_df_col_pattern("delta", df_with_column_pattern)
+    assert sorted(result_df.columns) == sorted(df_with_column_pattern.columns)
