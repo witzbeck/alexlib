@@ -3,22 +3,18 @@ This module provides a collection of utility functions and classes for file and 
 including manipulation, searching, and database interactions.
 
 Key functionalities include:
-- `figsave`: Save matplotlib figures to a specified directory.
 - `eval_parents`, `path_search`: Evaluate and search for file paths based on inclusion and exclusion criteria.
-- `copy_csv_str`: Generate a PostgreSQL COPY statement for a given CSV file.
 - `SystemObject`: A base class for representing files and directories with utility methods for checking file types,
   retrieving system information, and more.
 - `File`: A subclass of SystemObject specialized for file operations like renaming, deleting, reading content,
   and manipulating various file formats (CSV, SQL, JSON, etc.).
 - `Directory`: A subclass of SystemObject for directory-specific operations, including retrieving directory contents,
   and applying operations to files within the directory.
-- Utility functions for applying methods to lists of SystemObject instances and updating file versions.
 
 The module leverages external libraries such as `pandas` for DataFrame operations, `pathlib` for path manipulations,
 and `sqlalchemy` for database interactions. It is designed to facilitate common file and directory operations
 in Python scripting and data processing tasks.
 
-Dependencies: collections, dataclasses, datetime, functools, json, logging, os, pathlib, random, typing, matplotlib, pandas, sqlalchemy
 """
 
 from collections import Counter
@@ -32,8 +28,9 @@ from random import choice
 
 from pandas import DataFrame
 
-from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
+from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT, PROJECT_PATH
 from alexlib.core import (
+    chktype,
     flatten_dict,
     path_istype,
     show_dict,
@@ -164,11 +161,6 @@ class SystemObject:
         return cls(path=path, **kwargs)
 
     @classmethod
-    def from_name(cls, name: str, **kwargs):
-        """creates system object from name"""
-        return cls(path=path_search(name, **kwargs), **kwargs)
-
-    @classmethod
     def from_parent(
         cls,
         filename: str,
@@ -176,10 +168,7 @@ class SystemObject:
         notexistok: bool = False,
     ) -> "SystemObject":
         """returns file in parent directory"""
-        if not isinstance(start_path, Path):
-            start_path = Path(start_path)
-        if not start_path.exists():
-            raise FileNotFoundError(f"{start_path} does not exist")
+        chktype(start_path, Path, mustexist=True)
         ret = [x for x in start_path.parents if (x / filename).exists()]
         if ret:
             return cls.from_path(ret[-1] / filename)
@@ -188,9 +177,24 @@ class SystemObject:
         raise FileNotFoundError(f"{filename} not found in {start_path}")
 
     @classmethod
-    def find(cls, name: str, **kwargs):
+    def find(
+        cls,
+        pattern: str,
+        start_path: Path = PROJECT_PATH,
+        include: list[str] = None,
+        exclude: list[str] = None,
+        max_ascends: int = 5,
+    ) -> "SystemObject":
         """finds system object by name"""
-        return cls(path=path_search(name, **kwargs))
+        return cls(
+            path=path_search(
+                pattern,
+                start_path=start_path,
+                include=include,
+                exclude=exclude,
+                max_ascends=max_ascends,
+            )
+        )
 
 
 @dataclass
@@ -476,18 +480,11 @@ class Directory(SystemObject):
 
     def get_latest_file(self) -> File:
         """gets last produced file object"""
-        try:
-            dates = [x.modified_datetime for x in self.filelist]
-            idx = dates.index(max(dates))
-        except PermissionError("can't get last mod time"):
-            names = [x.name for x in self.filelist]
-            idx = names.index(max(names))
-        return self.filelist[idx]
-
-    def rm_files(self) -> None:
-        """removes files"""
-        for file in self.filelist:
-            file.rm()
+        if self.hasnofiles:
+            raise FileNotFoundError("no files in directory")
+        files = self.filelist
+        idx = files.index(max(files, key=lambda x: x.modified_timestamp.timestamp))
+        return files[idx]
 
     def teardown(self, warn: bool = True) -> None:
         """tears down directory"""
@@ -500,8 +497,8 @@ class Directory(SystemObject):
             raise ValueError(msg)
         for d in self.dirlist:
             d.teardown(warn=warn)
-            d.rm_files()
-        self.rm_files()
+            (f.path.unlink() for f in d.filelist)
+        (f.path.unlink() for f in self.filelist)
         self.path.rmdir()
 
     @property

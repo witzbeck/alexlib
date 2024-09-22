@@ -3,7 +3,7 @@ from pathlib import Path
 from random import choice
 
 from matplotlib.figure import Figure
-from pytest import mark, raises
+from pytest import fixture, mark, raises
 
 from alexlib.files import JsonFile, SettingsFile, TomlFile
 from alexlib.files.objects import (
@@ -22,6 +22,24 @@ from alexlib.files.utils import (
     read_json,
     read_toml,
 )
+
+
+@fixture(scope="module")
+def this_file_path() -> Path:
+    return Path(__file__)
+
+
+@fixture(scope="module")
+def this_dir_path(this_file_path: Path) -> Path:
+    return this_file_path.parent
+
+
+def test_find_this_file(this_file_path: Path, this_dir_path: Path):
+    assert this_file_path.exists()
+    assert this_dir_path.exists()
+    file = File.find(this_file_path.name, start_path=this_dir_path)
+    assert file.path == this_file_path
+    assert isinstance(file, File)
 
 
 def test_instantiation(text_file_obj: File):

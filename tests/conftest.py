@@ -383,9 +383,30 @@ def csv_path(dir_path: Path):
     return dir_path / "test_df.csv"
 
 
+@fixture(scope="session")
+def empty_df():
+    return DataFrame()
+
+
 @fixture(scope="class")
 def df():
     return DataFrame.from_dict({"col1": [1, 2], "col2": [3, 4]})
+
+
+@fixture(scope="class")
+def df_with_duplicate_values():
+    return DataFrame.from_dict({"col1": [1, 2, 2, 3], "col2": ["a", "b", "b", "c"]})
+
+
+@fixture(scope="class")
+def df_to_filter():
+    return DataFrame.from_dict(
+        {
+            "name": ["Alice", "Bob", "Charlie", "David"],
+            "age": [25, 30, 35, 40],
+            "city": ["New York", "Los Angeles", "Chicago", "Houston"],
+        }
+    )
 
 
 @fixture(scope="class")
