@@ -1,6 +1,15 @@
+from random import randint
+
 from pytest import FixtureRequest, fixture, mark, raises
 
-from alexlib.maths import get_primes, interpolate, isintorfloat, randbool
+from alexlib.maths import (
+    get_phi_by_precision,
+    get_primes,
+    interpolate,
+    isintorfloat,
+    phi_generator,
+    randbool,
+)
 
 
 @fixture(scope="module", params=list(range(10, 46, 7)))
@@ -75,3 +84,31 @@ def test_interpolate_error1():
 def test_interpolate_error2():
     with raises(TypeError):
         interpolate(1, 0, 2, 0, "b")
+
+
+@fixture(scope="module")
+def phi_steps():
+    return randint(1, 10)
+
+
+@fixture(scope="module")
+def phi(phi_steps):
+    generator = phi_generator()
+    values = [next(generator) for _ in range(phi_steps)]
+    return values[-1]
+
+
+def test_phi(phi):
+    assert isinstance(phi, float)
+    assert 1 < phi < 2
+
+
+@fixture(scope="module", params=(1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7))
+def e(request: FixtureRequest):
+    return request.param
+
+
+def test_get_phi_by_precision(e):
+    phi = get_phi_by_precision(e=e)
+    assert 1 < phi < 2
+    assert abs(phi - 1.618033988749895) < e

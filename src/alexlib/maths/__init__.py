@@ -32,6 +32,7 @@ Features:
 - Representation of numbers in variable base systems
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from functools import cached_property
 from math import sqrt
@@ -41,8 +42,6 @@ from typing import Callable, Iterable
 
 from numpy import array
 from pandas import DataFrame, Series
-
-from alexlib.times import timeit
 
 
 def get_primes(n: int) -> list[int]:
@@ -120,50 +119,29 @@ def interpolate(
     return ret
 
 
-@dataclass
-class GoldenRatio:
-    """Golden Ratio class"""
-
-    phi: float = field(default=None, repr=False)
-    e: float = field(default=1e-6, repr=False)
-
-    def __post_init__(self) -> None:
-        """sets phi to the golden ratio"""
-        self.phi = self.fast(e=self.e)
-
-    @staticmethod
-    def get_error(*args) -> float:
-        """returns the absolute difference between two numbers"""
-        return abs(args[0] - args[1])
-
-    @staticmethod
-    def phigen(phi: int = 1) -> Iterable[float]:
-        """returns a generator for the golden ratio"""
-        while True:
-            yield (phi := 1 + (1 / phi))
-
-    @staticmethod
-    def fibgen(a: int = 0, b: int = 1) -> Iterable[int]:
-        """returns a generator for the fibonacci sequence"""
-        while True:
-            c = a + b
-            a = b
-            b = c
-            yield c
-
-    @staticmethod
-    @timeit
-    def fast(
-        e: float = 1e-6,
-        phi: int = 1,
-    ) -> float:
-        """returns the golden ratio to the specified precision"""
-        while True:
-            if abs(phi - (phi := 1 + (1 / phi))) <= e:
-                return phi
+def phi_generator(phi: int = 1) -> Generator[float]:
+    """returns a generator for the golden ratio"""
+    while True:
+        yield (phi := 1 + (1 / phi))
 
 
-# pylint: disable=unnecessary-lambda
+def fibonacci_generator(a: int = 0, b: int = 1) -> Generator[int]:
+    """returns a generator for the fibonacci sequence"""
+    while True:
+        c = a + b
+        a = b
+        b = c
+        yield c
+
+
+def get_phi_by_precision(e: float = 1e-6) -> float:
+    """returns the golden ratio to the specified precision"""
+    phi = 1
+    while True:
+        if abs(phi - (phi := 1 + (1 / phi))) <= e:
+            return phi
+
+
 def get_quantiles(lst: list, tiles: int = 100) -> dict[int, float]:
     """returns a dict of quantiles for a list"""
     if not isinstance(lst, list):
