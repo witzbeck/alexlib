@@ -3,7 +3,7 @@ from pathlib import Path
 from pytest import FixtureRequest, fixture
 
 from alexlib.constants import RECIPES_PATH
-from alexlib.files.recipe import Recipe, RecipeBase
+from recipes import Recipe, RecipeBase
 
 
 @fixture(

@@ -5,14 +5,16 @@ from random import choice
 from matplotlib.figure import Figure
 from pytest import fixture, mark, raises
 
-from alexlib.files import JsonFile, SettingsFile, TomlFile
-from alexlib.files.objects import (
+from alexlib.files import (
     CreatedTimestamp,
     Directory,
     File,
+    JsonFile,
     ModifiedTimestamp,
+    SettingsFile,
     SystemObject,
     SystemTimestamp,
+    TomlFile,
     __sysobj_names__,
 )
 from alexlib.files.utils import (

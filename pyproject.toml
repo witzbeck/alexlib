@@ -5,7 +5,10 @@ description = "A toolset for building machine learning solutions."
 authors = ["Alex Beckwith <57322567+witzbeck@users.noreply.github.com>"]
 readme = "README.md"
 license = "MIT"
-packages = [{ include = "alexlib", from = "src" }]
+packages = [
+    { include = "alexlib", from = "src" },
+    { include = "recipes", from = "src" },
+]
 package-mode = true
 
 [tool.poetry.dependencies]
@@ -84,7 +87,7 @@ target-version = "py312"
 extend-select = ["I"] # Allow linter to sort imports.
 fixable = ["ALL"]     # Allow fix for all enabled rules (when `--fix`) is provided.
 
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"           # Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"      # Allow unused variables when underscore-prefixed.
 select = ["E4", "E7", "E9", "F", "B", "Q", "W", "C", "I", "C901"]
 
 [tool.ruff.lint.isort]

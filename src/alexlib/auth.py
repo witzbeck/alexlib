@@ -30,7 +30,7 @@ from alexlib.constants import CREDS, SA_DIALECT_MAP_PATH
 from alexlib.core import chkenv, chktype
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randdigit, randdigits, randlets
-from alexlib.files.objects import File
+from alexlib.files import File
 from alexlib.files.utils import read_json, write_json
 
 AUTH_TEMPLATE = {

@@ -1,6 +1,6 @@
 from pytest import fixture
 
-from alexlib.files.pdfs import Font
+from recipes.pdfs import Font
 
 
 @fixture(scope="module")

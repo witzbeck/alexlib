@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 from alexlib.constants import PROJECT_PATH
 from alexlib.core import show_environ
-from alexlib.files.objects import Directory
+from alexlib.files import Directory
 
 
 def main():

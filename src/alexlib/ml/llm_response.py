@@ -7,7 +7,7 @@ from itertools import chain
 from json import dumps
 from pathlib import Path
 
-from alexlib.files.objects import File
+from alexlib.files import File
 
 ML_PATH = Path(__file__).parent
 PROJ_PATH = ML_PATH.parent
@@ -179,6 +179,7 @@ class MarkdownResponse(LargeLanguageModelResponse):
                 self.heading_indices,
                 self.heading_indices[1:] + [self.last_content_line_index],
                 self.formatted_heading_index.keys(),
+                strict=False,
             )
         }
         self.heading_step_map = {k: v for k, v in self.heading_step_map.items() if v}
