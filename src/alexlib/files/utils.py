@@ -21,8 +21,7 @@ in Python scripting and data processing tasks.
 Dependencies: collections, dataclasses, datetime, functools, json, logging, os, pathlib, random, typing, matplotlib, pandas, sqlalchemy
 """
 
-from collections.abc import Callable, Hashable, Mapping
-from functools import partial
+from collections.abc import Hashable, Mapping
 from hashlib import sha256
 from json import dumps
 from json import loads as json_loads
@@ -38,43 +37,45 @@ from alexlib.core import chktype
 logger = getLogger(__name__)
 
 
-def read_path_as_dict(
-    path: Path,
-    loadsfunc: Callable,
-    mustexist: bool = True,
-) -> dict[Hashable, str]:
-    """reads loadable file"""
-    chktype(path, Path, mustexist=mustexist)
-    return loadsfunc(path.read_text())
+def get_parent(path: Path, parent_name: str) -> Path:
+    """gets parent path by name"""
+    chktype(path, Path, mustexist=True)
+    if parent_name not in path.parts:
+        toprint_parts = "\n" + "\n".join([f"\t{x}" for x in path.parts]) + "\n"
+        raise ValueError(f"{parent_name} not in parents[{toprint_parts}]")
+    return [x for x in path.parents if x.name == parent_name][-1]
 
 
-read_json = partial(
-    read_path_as_dict,
-    loadsfunc=json_loads,
-)
+def read_json(path: Path) -> dict[Hashable, str]:
+    """reads json file"""
+    chktype(path, Path, mustexist=True)
+    return json_loads(path.read_text())
+
+
 try:
     from tomllib import loads as toml_loads
 
-    read_toml = partial(
-        read_path_as_dict,
-        loadsfunc=toml_loads,
-    )
+    def read_toml(path: Path) -> dict[str, str]:
+        """reads toml file"""
+        chktype(path, Path, mustexist=True)
+        return toml_loads(path.read_text())
+
 except ImportError as e:
     read_toml = None
     logger.debug(f"toml support only available ^3.11: {e}")
 
 
-def to_json(dict_: dict[str:str], path: Path) -> None:
+def write_json(dict_: dict[str:str], path: Path) -> None:
     """writes dict to path"""
     path.write_text(dumps(dict_, indent=4))
 
 
-def load_dotenv(dotenv_path: Path, toenviron: bool = True) -> dict[str, str]:
-    """load a dotenv file into a dictionary"""
-    if not dotenv_path.exists():
-        raise FileNotFoundError(f"{dotenv_path} not found")
-    d = {
-        k: v.strip("'").strip('"')
+def read_dotenv(dotenv_path: Path) -> dict[str, str]:
+    """read a dotenv file into a dictionary"""
+    chktype(dotenv_path, Path, mustexist=True)
+    print(dotenv_path.read_text())
+    return {
+        k: v.strip("'").strip('"').strip()
         for k, v in [
             x.split("=")
             for x in [
@@ -84,9 +85,11 @@ def load_dotenv(dotenv_path: Path, toenviron: bool = True) -> dict[str, str]:
             ]
         ]
     }
-    if toenviron:
-        environ.update(d)
-    return d
+
+
+def load_dotenv(dotenv_path: Path) -> dict[str, str]:
+    """load a dotenv file into a dictionary"""
+    return environ.update(read_dotenv(dotenv_path))
 
 
 def figsave(
@@ -192,19 +195,6 @@ def is_json(path: Union[Path, str]) -> bool:
     return path.suffix.lower() == ".json"
 
 
-def dump_dotenv(path: Path, pairs: Mapping[str, str]) -> None:
-    """Write key-value pairs to a dotenv file."""
-    content = "\n".join(f"{key}={value}" for key, value in pairs.items())
-    path.write_text(content)
-    logger.info(f"Dumped {len(pairs)} key-value pairs to {path}")
-
-
-def dump_envs_json(path: Path, pairs: Mapping[str, str]) -> None:
-    """Write key-value pairs to a JSON file."""
-    path.write_text(dumps(pairs))
-    logger.info(f"Dumped {len(pairs)} key-value pairs to {path}")
-
-
 def dump_envs(
     path: Union[Path, str, None] = None,
     pairs: Mapping[str, str] = None,
@@ -216,9 +206,10 @@ def dump_envs(
         raise FileExistsError(f"{path} already exists. Use force=True to overwrite.")
     pairs = pairs if pairs is not None else environ
     if is_dotenv(path):
-        dump_dotenv(path, pairs)
+        content = "\n".join(f"{key}={value}" for key, value in pairs.items())
+        path.write_text(content)
     elif is_json(path):
-        dump_envs_json(path, pairs)
+        path.write_text(dumps(pairs, indent=4))
     else:
         raise ValueError(f"Unsupported file type: {path.suffix}")
-    logger.info(f"Dumped environment to {path}")
+    logger.info(f"Dumped {len(pairs)} environment variables to {path}")

@@ -18,7 +18,7 @@ The module relies on standard Python libraries such as `dataclasses`, `datetime`
 `json`, `logging`, `os`, `pathlib`, `socket`, `typing`, and `subprocess`, ensuring compatibility and ease of integration.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import partial
 from json import JSONDecodeError, dumps
 from json import loads as json_loads
@@ -34,11 +34,6 @@ from typing import Any, Hashable
 from alexlib.constants import CLIPBOARD_COMMANDS_PATH
 
 logger = getLogger(__name__)
-
-
-def get_local_tz() -> timezone:
-    """returns local timezone"""
-    return datetime.now().astimezone().tzinfo
 
 
 def isnone(w: str) -> bool:
@@ -73,6 +68,93 @@ def istrue(w: str | int) -> bool:
             ret = bool(w)
         except TypeError:
             ret = False
+    return ret
+
+
+def chktext(
+    text: str,
+    prefix: str = None,
+    value: str = None,
+    suffix: str = None,
+) -> bool:
+    """checks if text starts with prefix, contains value, or ends with suffix"""
+    text = text.lower()
+    if prefix:
+        ret = text.startswith(prefix.lower())
+    elif value:
+        ret = value.lower() in text
+    elif suffix:
+        ret = text.endswith(suffix.lower())
+    else:
+        raise ValueError("need valid input")
+    return ret
+
+
+iswindows = partial(chktext, platform, prefix="win")
+ismacos = partial(chktext, platform, prefix="darwin")
+islinux = partial(chktext, platform, prefix="linux")
+
+
+def path_istype(path: Path, suffix: str) -> bool:
+    """checks if path is of specified type"""
+    path_suffix = path.suffix.lower()
+    norm_suffix = suffix.lower().strip(".")
+    return path_suffix.endswith(norm_suffix)
+
+
+def chktype(
+    obj: object,
+    type_: type,
+    mustexist: bool = True,
+    suffix: str = None,
+) -> object:
+    """confirms correct type or raises error"""
+    if not isinstance(obj, type_):
+        raise TypeError(f"input is {type(obj)}, not {type_}")
+
+    ispath = isinstance(obj, Path)
+    exists = obj.exists() if ispath else True
+
+    if ispath and mustexist and not exists:
+        raise FileNotFoundError(f"{obj} must exist but doesn't")
+    if ispath and suffix is not None and not path_istype(obj, suffix):
+        raise ValueError(f"{obj} must be of type {suffix}")
+    return obj
+
+
+def chkenv(
+    envname: str,
+    need: bool = True,
+    ifnull: bool = None,
+    astype: type = None,
+) -> Any:
+    """gets/checks/converts environment variable"""
+    val = getenv(envname)
+    isblank = val == ""
+    isnone_ = isnone(val)
+    istrue_ = istrue(val)
+    isfalse = val == "False"
+    ifnotnone = ifnull is not None
+    astypenotnone = astype is not None
+
+    if val and astype is None:
+        ret = val
+    elif (isblank or isnone_) and ifnotnone:
+        ret = ifnull
+    elif isnone_ and need:
+        raise ValueError(envname)
+    elif isblank and need:
+        raise ValueError(envname)
+    elif isblank or isnone_:
+        ret = None
+    elif astypenotnone:
+        ret = envcast(val, astype, need=need)
+    elif istrue_:
+        ret = True
+    elif isfalse:
+        ret = False
+    else:
+        ret = val
     return ret
 
 
@@ -116,47 +198,6 @@ def aslist(val: str, sep: str = ",") -> list[Any]:
     return ret
 
 
-def chktext(
-    text: str,
-    prefix: str = None,
-    value: str = None,
-    suffix: str = None,
-) -> bool:
-    """checks if text starts with prefix, contains value, or ends with suffix"""
-    text = text.lower()
-    if prefix:
-        ret = text.startswith(prefix.lower())
-    elif value:
-        ret = value.lower() in text
-    elif suffix:
-        ret = text.endswith(suffix.lower())
-    else:
-        raise ValueError("need valid input")
-    return ret
-
-
-iswindows = partial(chktext, platform, prefix="win")
-ismacos = partial(chktext, platform, prefix="darwin")
-islinux = partial(chktext, platform, prefix="linux")
-
-
-def chktype(
-    obj: object,
-    type_: type,
-    mustexist: bool = True,
-) -> object:
-    """confirms correct type or raises error"""
-    if not isinstance(obj, type_):
-        raise TypeError(f"input is {type(obj)}, not {type_}")
-
-    ispath = isinstance(obj, Path)
-    exists = obj.exists() if ispath else True
-
-    if ispath and mustexist and not exists:
-        raise FileNotFoundError(f"{obj} must exist but doesn't")
-    return obj
-
-
 def envcast(
     val: str,
     astype: type,
@@ -186,42 +227,6 @@ def envcast(
         return chktype(ret, astype, mustexist=need)
     except TypeError:
         return ret
-
-
-def chkenv(
-    envname: str,
-    need: bool = True,
-    ifnull: bool = None,
-    astype: type = None,
-) -> Any:
-    """gets/checks/converts environment variable"""
-    val = getenv(envname)
-    isblank = val == ""
-    isnone_ = isnone(val)
-    istrue_ = istrue(val)
-    isfalse = val == "False"
-    ifnotnone = ifnull is not None
-    astypenotnone = astype is not None
-
-    if val and astype is None:
-        ret = val
-    elif (isblank or isnone_) and ifnotnone:
-        ret = ifnull
-    elif isnone_ and need:
-        raise ValueError(envname)
-    elif isblank and need:
-        raise ValueError(envname)
-    elif isblank or isnone_:
-        ret = None
-    elif astypenotnone:
-        ret = envcast(val, astype, need=need)
-    elif istrue_:
-        ret = True
-    elif isfalse:
-        ret = False
-    else:
-        ret = val
-    return ret
 
 
 def flatten_dict(

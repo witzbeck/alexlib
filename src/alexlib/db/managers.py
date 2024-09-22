@@ -43,23 +43,21 @@ from logging import info
 from pathlib import Path
 from shutil import copyfile
 from sqlite3 import Connection as SQLiteConnection
+from sqlite3 import Cursor
 from sqlite3 import Cursor as SQLiteCursor
 from sqlite3 import connect as sqlite_connect
 from typing import Any
 
 from pandas import DataFrame, read_sql
-from psycopg import Cursor
-from psycopg.errors import UndefinedTable
 from sqlalchemy import Connection, Engine, create_engine
 from sqlalchemy_utils import create_database, database_exists
 
 from alexlib.auth import Auth, Curl
 from alexlib.core import chkenv, ping
-from alexlib.db.objects import Name, Schema, Table
-from alexlib.db.sql import SQL, create_cmd, drop_cmd, mk_view_text, truncate_table_cmd
-from alexlib.db.utils import get_dfs_threaded
+from alexlib.db.objects import Name
+from alexlib.db.sql import SQL
 from alexlib.df import get_distinct_col_vals
-from alexlib.files.config import Settings
+from alexlib.files import SettingsFile
 from alexlib.files.objects import Directory, File
 
 
@@ -229,92 +227,6 @@ class RecordManager:
 
 
 @dataclass
-class BaseObjectManager:
-    """Base object manager class"""
-
-    exec_mgr: ExecutionManager = field(repr=False)
-    object_type: str = field(default=None, repr=False)
-    object_col: str = field(default=None, repr=False)
-
-    def drop(self, name: str, schema: str = None) -> None:
-        """drops object"""
-        self.exec_mgr.execute(drop_cmd(self.object_type, name, schema=schema))
-
-    def create(self, name: str, schema: str = None) -> None:
-        """creates object"""
-        if not isinstance(name, Name):
-            name = Name(name)
-        self.exec_mgr.execute(create_cmd(self.object_type, name, schema=schema))
-
-
-@dataclass
-class SchemaManager(BaseObjectManager):
-    """Schema manager class"""
-
-    object_type: str = field(default="schema", repr=False)
-    object_col: str = field(default="table_schema", repr=False)
-
-    def exists(self, name: str) -> bool:
-        """checks if schema exists"""
-        return name in [
-            self.exec_mgr.fetchall(
-                "select schema_name from information_schema.schemata"
-            )
-        ]
-
-    def truncate(self, schema: Schema) -> None:
-        """truncates schema"""
-        return [
-            self.exec_mgr.execute(truncate_table_cmd(name, schema=schema))
-            for name in schema.tables
-        ]
-
-
-@dataclass
-class TableManager(BaseObjectManager):
-    """Table manager class"""
-
-    object_type: str = field(default="table", repr=False)
-    object_col: str = field(default="table_name", repr=False)
-    schema: Schema = field(default=None, repr=False)
-
-    def truncate(self, name: str, schema: str = None) -> None:
-        """truncates table"""
-        self.exec_mgr.execute(truncate_table_cmd(name, schema=schema))
-
-    def drop_schema_tables(self) -> None:
-        """drops all tables in schema"""
-        self.drop(self.schema.name)
-        self.create(self.schema.name)
-
-    def drop_table_pattern(self, pattern: str) -> None:
-        """drops tables matching pattern"""
-        return [self.drop(table) for table in self.schema.tables if pattern in table]
-
-
-@dataclass
-class ViewManager(TableManager):
-    """View manager class"""
-
-    object_type: str = field(default="view", repr=False)
-
-    # pylint: disable=arguments-renamed
-    def create(self, name: str, sql: SQL) -> None:
-        """makes view in database"""
-        statement = mk_view_text(name, sql)
-        return self.exec_mgr.execute(statement)
-
-
-@dataclass
-class ColumnManager(BaseObjectManager):
-    """Column manager class"""
-
-    object_type: str = field(default="column", repr=False)
-    object_col: str = field(default="column_name", repr=False)
-    table: Table = field(default=None, repr=False)
-
-
-@dataclass
 class BaseConnectionManager:
     """Connection manager class"""
 
@@ -323,7 +235,7 @@ class BaseConnectionManager:
     engine: Engine = field(init=False, repr=False)
     cnxn: Connection = field(init=False, repr=False)
     exec_mgr: ExecutionManager = field(init=False, repr=False)
-    settings: Settings = field(init=False, repr=False)
+    settings: SettingsFile = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         """sets attributes"""
@@ -512,38 +424,6 @@ class DatabaseManager:
         auth = Auth(auth) if not isinstance(auth, Auth) else auth
         return cls(cnxn_mgr=BaseConnectionManager.from_auth(auth))
 
-    def show_row_counts(
-        self,
-        schema: str | list[str] | None = None,
-        table: str | list[str] | None = None,
-        system_schemas: bool = False,
-    ) -> None:
-        """prints row counts for tables"""
-        if not system_schemas:
-            d = {
-                k: v
-                for k, v in self.query_mgr.schema_tables.items()
-                if k not in ["information_schema", "pg_catalog"]
-            }
-        if isinstance(schema, str):
-            schema = [schema]
-        if schema:
-            d = {k: v for k, v in d.items() if k in schema}
-
-        for schema_, tables in d.items():
-            print(schema_)
-            if isinstance(table, str):
-                tables = [table]
-            if table:
-                tables = [tbl for tbl in tables if tbl in table]
-            for tbl in tables:
-                try:
-                    sql = f'SELECT count(*) FROM {schema_}."{tbl}"'
-                    rows = self.query_mgr.fetchone(sql)
-                    print(f"\t{schema_}.{tbl} = {rows} rows")
-                except UndefinedTable:
-                    print(f"\t{schema_}.{tbl} = UndefinedTable")
-
     def file_to_db(
         self,
         file: File,
@@ -706,12 +586,12 @@ class LocalETL:
         return [x for x in self.resources_dir.filelist if x.name.endswith(".sql")]
 
     @property
-    def file_prefixes(self) -> list[str]:
+    def file_prefixes(self) -> set[str]:
         """returns list of prefixes for sql files"""
-        return list(set(x.path.stem.split("_")[0] for x in self.sql_files))
+        return {x.path.stem.split("_")[0] for x in self.sql_files}
 
     @cached_property
-    def landing_files(self) -> dict[str:File]:
+    def landing_files(self) -> dict[str, File]:
         """returns dict of landing files"""
         return {
             "_".join(x.path.stem.split("_")[1:]): x
@@ -720,7 +600,7 @@ class LocalETL:
         }
 
     @cached_property
-    def main_files(self) -> dict[str:File]:
+    def main_files(self) -> dict[str, File]:
         """returns dict of main files"""
         return {
             "_".join(x.path.stem.split("_")[1:]): x
@@ -729,7 +609,7 @@ class LocalETL:
         }
 
     @cached_property
-    def file_dict(self) -> dict[str : dict[str:File]]:
+    def file_dict(self) -> dict[str, dict[str, File]]:
         """returns dict of file dicts"""
         return {
             prefix: {
@@ -741,7 +621,7 @@ class LocalETL:
         }
 
     @cached_property
-    def table_dict(self) -> dict[str:File]:
+    def table_dict(self) -> dict[str, File]:
         """returns dict of tables"""
         return {k: list(v) for k, v in self.file_dict.items()}
 
@@ -762,22 +642,16 @@ class LocalETL:
         replace: tuple[str, str] = None,
     ) -> dict[str:DataFrame]:
         """gets dataframes from files"""
-        return get_dfs_threaded(files, engine, replace=replace)
+        return files, engine, replace
 
     @cached_property
     def landing_data(self) -> dict[str:DataFrame]:
         """returns dict of landing data"""
-        return get_dfs_threaded(
-            self.landing_files, self.remote_engine, replace=self.replace
-        )
+        return self.landing_files, self.remote_engine, self.replace
 
     def get_main_data(self) -> dict[str:DataFrame]:
         """returns dict of main data"""
-        return get_dfs_threaded(
-            self.main_files,
-            self.localdb,
-            replace=self.replace,
-        )
+        return self.main_files, self.localdb, self.replace
 
     @property
     def main_data(self) -> dict[str:DataFrame]:
@@ -790,7 +664,7 @@ class LocalETL:
         return {k: len(v) for k, v in data_dict.items()}
 
     @cached_property
-    def landing_lens(self) -> dict[str:int]:
+    def landing_lens(self) -> dict[str, int]:
         """returns dict of landing dataframe lengths"""
         return LocalETL.get_df_dict_lens(self.landing_data)
 
@@ -813,7 +687,7 @@ class LocalETL:
     # pylint: disable=expression-not-assigned
     @staticmethod
     def insert_data(
-        data_dict: dict[str:DataFrame],
+        data_dict: dict[str, DataFrame],
         cnxn: SQLiteConnection,
         index: bool = False,
         if_exists: str = "replace",

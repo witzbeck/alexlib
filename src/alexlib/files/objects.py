@@ -3,44 +3,36 @@ This module provides a collection of utility functions and classes for file and 
 including manipulation, searching, and database interactions.
 
 Key functionalities include:
-- `figsave`: Save matplotlib figures to a specified directory.
 - `eval_parents`, `path_search`: Evaluate and search for file paths based on inclusion and exclusion criteria.
-- `copy_csv_str`: Generate a PostgreSQL COPY statement for a given CSV file.
 - `SystemObject`: A base class for representing files and directories with utility methods for checking file types,
   retrieving system information, and more.
 - `File`: A subclass of SystemObject specialized for file operations like renaming, deleting, reading content,
   and manipulating various file formats (CSV, SQL, JSON, etc.).
 - `Directory`: A subclass of SystemObject for directory-specific operations, including retrieving directory contents,
   and applying operations to files within the directory.
-- Utility functions for applying methods to lists of SystemObject instances and updating file versions.
 
 The module leverages external libraries such as `pandas` for DataFrame operations, `pathlib` for path manipulations,
 and `sqlalchemy` for database interactions. It is designed to facilitate common file and directory operations
 in Python scripting and data processing tasks.
 
-Dependencies: collections, dataclasses, datetime, functools, json, logging, os, pathlib, random, typing, matplotlib, pandas, sqlalchemy
 """
 
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from functools import cached_property, partial
+from functools import cached_property
 from itertools import chain
-from json import JSONDecodeError, dumps, load, loads
-from logging import info
 from os import stat_result
 from pathlib import Path
 from random import choice
-from typing import Any
 
 from pandas import DataFrame
-from sqlalchemy import Engine
 
-from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT
+from alexlib.constants import DATE_FORMAT, DATETIME_FORMAT, PROJECT_PATH
 from alexlib.core import (
-    chkenv,
+    chktype,
     flatten_dict,
+    path_istype,
     show_dict,
     to_clipboard,
 )
@@ -49,123 +41,92 @@ from alexlib.files.utils import path_search, sha256sum
 __sysobj_names__ = ("Directory", "File", "SystemObject")
 
 
+@dataclass(frozen=True)
+class SystemTimestamp:
+    """class for system timestamps"""
+
+    timestamp: float
+
+    @property
+    def datetime(self) -> datetime:
+        """gets timestamp datetime"""
+        return datetime.fromtimestamp(self.timestamp)
+
+    @property
+    def strfdate(self) -> str:
+        """gets timestamp strfdate"""
+        return self.datetime.strftime(DATE_FORMAT)
+
+    @property
+    def strfdatetime(self) -> str:
+        """gets timestamp strfdatetime"""
+        return self.datetime.strftime(DATETIME_FORMAT)
+
+    @property
+    def delta(self) -> timedelta:
+        """gets timestamp delta"""
+        return datetime.now() - self.datetime
+
+    def is_new_enough(self, min_delta: timedelta) -> bool:
+        """checks if timestamp is new enough"""
+        if not isinstance(min_delta, timedelta):
+            raise TypeError(f"{min_delta} is not a timedelta")
+        return self.delta < min_delta
+
+    def __repr__(self) -> str:
+        """gets timestamp representation"""
+        return f"{self.__class__.__name__}({self.strfdatetime})"
+
+    def __str__(self) -> str:
+        """gets timestamp string"""
+        return self.strfdatetime
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "SystemTimestamp":
+        """creates system timestamp from stat result"""
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @classmethod
+    def from_path(cls, path: Path) -> "SystemTimestamp":
+        """creates system timestamp from path"""
+        return cls.from_stat_result(path.stat())
+
+
+@dataclass(frozen=True)
+class CreatedTimestamp(SystemTimestamp):
+    """class for created timestamps"""
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "CreatedTimestamp":
+        """creates created timestamp from stat result"""
+        return cls(stat.st_ctime)
+
+
+@dataclass(frozen=True)
+class ModifiedTimestamp(SystemTimestamp):
+    """class for modified timestamps"""
+
+    @classmethod
+    def from_stat_result(cls, stat: stat_result) -> "ModifiedTimestamp":
+        """creates modified timestamp from stat result"""
+        return cls(stat.st_mtime)
+
+
 @dataclass
 class SystemObject:
     """base class for File and Directory"""
 
-    name: str = field(default=None)
-    path: Path = field(default=None)
-    include: list[str] = field(default_factory=list, repr=False)
-    exclude: list[str] = field(default_factory=list, repr=False)
-    max_ascends: int = field(repr=False, default=8)
+    path: Path
 
-    @property
+    @cached_property
     def isfile(self) -> bool:
         """checks if path is a file"""
         return self.path.is_file() or self.__class__.__name__ == "File"
 
-    @property
+    @cached_property
     def isdir(self) -> bool:
         """checks if path is a directory"""
         return self.path.is_dir() or self.__class__.__name__ == "Directory"
-
-    @property
-    def haspath(self) -> bool:
-        """checks if path is set"""
-        return self.path is not None
-
-    @property
-    def hasname(self) -> bool:
-        """checks if name is set"""
-        return self.name is not None
-
-    @property
-    def user(self) -> str:
-        """gets username from environment variable"""
-        return chkenv("USERNAME", need=False)
-
-    @property
-    def hasuser(self) -> bool:
-        """checks if user is set"""
-        return self.user is not None
-
-    @staticmethod
-    def add_path_cond(cur_list: list[str], toadd: str | list[str]) -> list[str]:
-        """adds a path condition to a list of path conditions"""
-        if isinstance(toadd, str):
-            toadd = [toadd]
-        elif not toadd:
-            toadd = []
-        if isinstance(cur_list, str):
-            cur_list = [cur_list]
-        return cur_list + toadd
-
-    def get_path(
-        self,
-        include: list[str] | str = None,
-        exclude: list[str] | str = None,
-        start_path: Path = Path(__file__).parent,
-    ) -> Path:
-        """gets path from name or path"""
-        if include or self.include:
-            include = SystemObject.add_path_cond(self.include, include)
-        if exclude or self.exclude:
-            exclude = SystemObject.add_path_cond(self.exclude, exclude)
-        if isinstance(self.path, Path):
-            ret = self.path
-        elif self.haspath and isinstance(self.path, str):
-            ret = Path(self.path)
-        elif self.haspath and self.__class__.__name__ in __sysobj_names__:
-            ret = self.path.path
-        elif self.name is not None:
-            ret = path_search(
-                self.name,
-                include=include,
-                exclude=exclude,
-                start_path=start_path,
-                max_ascends=self.max_ascends,
-            )
-        else:
-            n, p = self.name, self.path
-            raise ValueError(f"need name cur={n} or path cur={p}")
-        return ret
-
-    def set_path(self):
-        """sets path from name or path"""
-        self.path = self.get_path(include=self.include)
-
-    def get_name(self):
-        """gets name from path or name"""
-        if self.hasname:
-            ret = self.name
-        elif self.haspath and self.__class__.__name__ in __sysobj_names__:
-            ret = self.path.name
-        elif self.haspath:
-            ret = self.path.stem
-        elif self.name is None and self.path is None:
-            raise ValueError("need name or path")
-        else:
-            ret = self.name
-        return ret
-
-    def set_name(self, name: str) -> None:
-        """sets name from path or name"""
-        self.name = name if name else self.get_name()
-
-    def __post_init__(self) -> None:
-        """sets path and name"""
-        self.set_path()
-        if not isinstance(self.path, Path):
-            raise TypeError(f"{self.path} is not Path")
-        self.set_name(self.get_name())
-        if not isinstance(self.name, str):
-            raise TypeError(f"{self.name} is not str")
-
-    def get_parent(self, name: str) -> Path:
-        """gets parent path by name"""
-        if name not in self.parts:
-            raise ValueError(f"{name} not in parents[{self.parts}]")
-        return [x for x in self.path.parents if x.name == name][-1]
 
     @property
     def nparents(self) -> int:
@@ -178,119 +139,19 @@ class SystemObject:
         return self.path.stat()
 
     @property
-    def uid(self) -> int:
-        """gets path uid"""
-        return self.stat.st_uid
-
-    @property
-    def gid(self) -> int:
-        """gets path gid"""
-        return self.stat.st_gid
-
-    @property
-    def uidiszero(self) -> bool:
-        """checks if uid is zero"""
-        return self.uid == 0
-
-    @property
-    def gidiszero(self) -> bool:
-        """checks if gid is zero"""
-        return self.gid == 0
-
-    @property
-    def owner(self) -> str:
-        """gets path owner"""
-        if not (self.gidiszero and self.uidiszero):
-            ret = f"{self.gid}:{self.uid}"
-        elif not self.uidiszero:
-            ret = self.uid
-        else:
-            ret = self.user
-        return ret
-
-    @staticmethod
-    def get_path_attr(path: Path, attr: str) -> Any:
-        """gets path attribute"""
-        try:
-            ret = getattr(path.stat(), attr)
-        except AttributeError:
-            ret = getattr(path, attr)
-        return ret
-
-    @property
-    def modified_timestamp(self) -> float:
-        """gets path modified timestamp"""
-        return self.stat.st_mtime
-
-    @property
-    def created_timestamp(self) -> float:
-        """gets path created timestamp"""
-        return self.stat.st_ctime
-
-    @property
-    def modified_datetime(self) -> datetime:
-        """gets path modified datetime"""
-        return datetime.fromtimestamp(self.modified_timestamp)
-
-    @property
-    def created_datetime(self) -> datetime:
-        """gets path created datetime"""
-        return datetime.fromtimestamp(self.created_timestamp)
-
-    @property
-    def modified_strfdate(self) -> str:
-        """gets path modified strfdate"""
-        return self.modified_datetime.strftime(DATE_FORMAT)
-
-    @property
-    def created_strfdate(self) -> str:
-        """gets path created strfdate"""
-        return self.created_datetime.strftime(DATE_FORMAT)
-
-    @property
-    def modified_strfdatetime(self) -> str:
-        """gets path modified strfdatetime"""
-        return self.modified_datetime.strftime(DATETIME_FORMAT)
-
-    @property
-    def created_strfdatetime(self) -> str:
-        """gets path created strfdatetime"""
-        return self.created_datetime.strftime(DATETIME_FORMAT)
-
-    @property
-    def modified_delta(self) -> timedelta:
-        """gets path modified delta"""
-        return datetime.now() - self.modified_datetime
-
-    @property
-    def created_delta(self) -> timedelta:
-        """gets path created delta"""
-        return datetime.now() - self.created_datetime
-
-    def is_new_enough(
-        self,
-        min_delta: timedelta,
-    ) -> bool:
-        """checks if path is new enough"""
-        return self.created_delta < min_delta
+    def size(self) -> int:
+        """gets path size"""
+        return self.stat.st_size
 
     @cached_property
-    def clsname(self) -> str:
-        """gets class name"""
-        return self.__class__.__name__
+    def modified_timestamp(self) -> ModifiedTimestamp:
+        """gets path modified timestamp"""
+        return ModifiedTimestamp.from_stat_result(self.stat)
 
-    @property
-    def exists(self) -> bool:
-        """checks if path exists"""
-        try:
-            return self.path.exists() if self.haspath else False
-        except (FileNotFoundError, PermissionError):
-            return False
-
-    def chk_exists(self) -> None:
-        """checks if path exists"""
-        if not self.exists:
-            raise FileNotFoundError(f"no {self.clsname} @ {self.path}")
+    @cached_property
+    def created_timestamp(self) -> CreatedTimestamp:
+        """gets path created timestamp"""
+        return CreatedTimestamp.from_stat_result(self.stat)
 
     @classmethod
     def from_path(cls, path: Path, **kwargs):
@@ -300,65 +161,40 @@ class SystemObject:
         return cls(path=path, **kwargs)
 
     @classmethod
-    def from_name(cls, name: str, **kwargs):
-        """creates system object from name"""
-        return cls(name=name, **kwargs)
-
-    @classmethod
     def from_parent(
         cls,
         filename: str,
         start_path: Path,
-        parent_name: str = None,
         notexistok: bool = False,
     ) -> "SystemObject":
         """returns file in parent directory"""
-        if not isinstance(start_path, Path):
-            start_path = Path(start_path)
-        if not start_path.exists():
-            raise FileNotFoundError(f"{start_path} does not exist")
-        ret, start_parents = None, list(start_path.parents)
-        if parent_name:
-            parent = max(x for x in start_parents if x.name == parent_name)
-            ret = parent / filename
-        else:
-            while ret is None and start_parents:
-                candidate = start_parents.pop(-1) / filename
-                ret = candidate if notexistok or candidate.exists() else None
-        return cls.from_path(ret)
+        chktype(start_path, Path, mustexist=True)
+        ret = [x for x in start_path.parents if (x / filename).exists()]
+        if ret:
+            return cls.from_path(ret[-1] / filename)
+        if notexistok:
+            return cls.from_path(start_path / filename)
+        raise FileNotFoundError(f"{filename} not found in {start_path}")
 
     @classmethod
-    def from_start(cls, start: Path, name: str = None, **kwargs) -> "SystemObject":
-        """creates system object from starting path"""
-        if name is not None:
-            name = name
-        elif hasattr(cls, "name") and cls.name is not None:
-            name = cls.name
-        else:
-            raise ValueError("need name (or use child class with default name)")
-        return cls.from_parent(name, start, **kwargs)
-
-    def eval_method(
-        self,
-        method: str,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """evaluates a method"""
-        func = getattr(self, method)
-        return func(*args, **kwargs)
-
-    @classmethod
-    def find(cls, name: str, **kwargs):
+    def find(
+        cls,
+        pattern: str,
+        start_path: Path = PROJECT_PATH,
+        include: list[str] = None,
+        exclude: list[str] = None,
+        max_ascends: int = 5,
+    ) -> "SystemObject":
         """finds system object by name"""
-        return cls(path=path_search(name, **kwargs))
-
-
-def eval_method_list(
-    method: str, lst: list[SystemObject], *args, **kwargs
-) -> list[Any]:
-    """evaluates a method on a list of system objects"""
-    return [x.eval_method(method, *args, **kwargs) for x in lst]
+        return cls(
+            path=path_search(
+                pattern,
+                start_path=start_path,
+                include=include,
+                exclude=exclude,
+                max_ascends=max_ascends,
+            )
+        )
 
 
 @dataclass
@@ -377,69 +213,16 @@ class File(SystemObject):
         """gets file representation"""
         return f"{self.__class__.__name__}({self.name})"
 
-    def rm(self) -> None:
-        """removes file"""
-        self.path.unlink()
-
     def rename(self, name: str, overwrite: bool = False) -> None:
         """renames file"""
         newpath = self.path.parent / name
         if overwrite and newpath.exists():
             newpath.unlink()
         self.path.rename(self.path.parent / name)
-        self.path = newpath
-        self.set_name(name)
 
     def istype(self, suffix: str) -> bool:
         """checks if file is of type"""
-        low = self.path.suffix.lower()
-        other = suffix.strip(".").lower()
-        return low.endswith(other)
-
-    @property
-    def isxlsx(self) -> bool:
-        """checks if file is xlsx"""
-        return self.istype(".xlsx")
-
-    @property
-    def issql(self) -> bool:
-        """checks if file is sql"""
-        return self.istype(".sql")
-
-    @property
-    def iscsv(self) -> bool:
-        """checks if file is csv"""
-        return self.istype(".csv")
-
-    @property
-    def isjson(self) -> bool:
-        """checks if file is json"""
-        return self.istype(".json")
-
-    @property
-    def isyaml(self) -> bool:
-        """checks if file is yaml"""
-        return self.istype(".yaml") or self.istype(".yml")
-
-    @property
-    def istoml(self) -> bool:
-        """checks if file is or might be toml"""
-        return self.istype(".toml") or self.name.startswith(".")
-
-    @property
-    def istxt(self) -> bool:
-        """checks if file is txt"""
-        return self.istype(".txt")
-
-    @property
-    def ispy(self) -> bool:
-        """checks if file is py"""
-        return self.istype(".py")
-
-    @property
-    def isipynb(self) -> bool:
-        """checks if file is ipynb"""
-        return self.istype(".ipynb")
+        return path_istype(self.path, suffix)
 
     @property
     def text(self) -> str:
@@ -449,13 +232,9 @@ class File(SystemObject):
         except UnicodeDecodeError:
             return self.path.read_text(encoding="utf8")
 
-    def text_to_clipboard(
-        self,
-        toappend: str = "",
-        toprepend: str = "",
-    ) -> None:
+    def clip(self) -> None:
         """copies file text to clipboard"""
-        return to_clipboard(f"{toprepend}{self.text}{toappend}")
+        return to_clipboard(self.text)
 
     @property
     def lines(self) -> list[str]:
@@ -509,180 +288,6 @@ class File(SystemObject):
         """replaces text in file"""
         self.path.write_text(self.text.replace(old, new))
 
-    @property
-    def start_val(self) -> str:
-        """gets start val"""
-        env = "report_start"
-        val = chkenv(env, need=False)
-        return f"'{val}'"
-
-    @property
-    def end_val(self) -> str:
-        """gets end val"""
-        env = "report_end"
-        val = chkenv(env, need=False)
-        return f"'{val}'"
-
-    @property
-    def start_text(self) -> str:
-        """gets start text"""
-        return chkenv("report_start_text", need=False)
-
-    @property
-    def end_text(self) -> str:
-        """gets end text"""
-        return chkenv("report_end_text", need=False)
-
-    def get_sql(self, replace: list[tuple[str, str]] = None) -> str:
-        """gets sql from file"""
-        sql = self.text
-        if isinstance(replace, tuple):
-            sql = sql.replace(*replace)
-        elif isinstance(replace, list):
-            for tup in replace:
-                sql = sql.replace(*tup)
-        elif replace is not None:
-            raise ValueError(
-                f"{replace} must be tuple | list[tuple] but is {type(replace)}"
-            )
-        if self.start_text and self.start_val and not replace:
-            sql = sql.replace(self.start_text, self.start_val)
-        if self.end_text and self.end_val and not replace:
-            sql = sql.replace(self.end_text, self.end_val)
-        return sql
-
-    @cached_property
-    def read_func(self) -> Callable:
-        """gets read function"""
-        if self.isxlsx:
-            from pandas import read_excel
-
-            ret = partial(read_excel, self.path)
-        elif self.iscsv:
-            from pandas import read_csv
-
-            ret = partial(read_csv, self.path)
-        elif self.issql:
-            from pandas import read_sql
-
-            ret = read_sql
-        elif self.isjson:
-            from pandas import read_json
-
-            ret = partial(read_json, self.text)
-        elif self.istxt:
-            return self.path.read_text
-        else:
-            raise TypeError(f"read func not loaded for {self.path.suffix}")
-        return ret
-
-    def get_df(
-        self,
-        engine: Engine = None,
-        replace: tuple[str, str] = None,
-        **kwargs,
-    ) -> DataFrame:
-        """gets dataframe from file"""
-        if self.issql and engine is None:
-            raise ValueError("need engine to get df from db")
-        if not self.issql and kwargs:
-            ret = self.read_func(**kwargs)
-        elif not self.issql:
-            ret = self.read_func()
-        else:
-            sql = self.get_sql(replace=replace)
-            ret = self.read_func(sql, engine)
-        return ret
-
-    def load_json(self) -> dict:
-        """loads json from file"""
-        if not self.isjson:
-            raise TypeError("this method is reserved for json files")
-        try:
-            ret = loads(self.text)
-        except JSONDecodeError:
-            with self.path.open() as f:
-                ret = load(f)
-        return ret
-
-    @classmethod
-    def to_json(cls, _dict: dict, path: Path) -> object:
-        """writes json to file"""
-        json_str = dumps(_dict)
-        path.write_text(json_str)
-        return cls(path=path)
-
-    @classmethod
-    def from_df(cls, df: DataFrame, path: Path):
-        """writes dataframe to file"""
-        funcname = f"to_{path.suffix.strip('.')}"
-        func = getattr(df, funcname)
-        func(path)
-        return cls(path=path)
-
-    @cached_property
-    def comment_chars(self):
-        """gets comment chars"""
-        if self.issql:
-            line = "--"
-            multi = ["/*", """*/"""]
-        elif self.ispy:
-            line = """#"""
-            multi = ['''"""''', '''"""''']
-        else:
-            line = ""
-            multi = ["", ""]
-        return {"line": line, "multi": multi}
-
-    @cached_property
-    def comment_line_chars(self):
-        """gets comment line chars"""
-        return self.comment_chars["line"]
-
-    @cached_property
-    def comment_lines_chars(self):
-        """gets comment lines chars"""
-        return self.comment_chars["multi"]
-
-    @staticmethod
-    def mk_header_lines(
-        created_by: str,
-        created_on: str,
-        comment_lines_chars: list[str],
-    ) -> str:
-        """makes header lines"""
-        lc, rc = comment_lines_chars
-        return [
-            lc,
-            f"\tCreated By: {created_by}",
-            f"\tCreated On: {created_on}\n",
-            "\tModified By:",
-            "\tModified On:\n",
-            rc,
-        ]
-
-    def get_header_lines(self) -> list[str]:
-        """gets header lines"""
-        return File.mk_header_lines(
-            self.user, self.created_strfdatetime, self.comment_lines_chars
-        )
-
-    @property
-    def hasheader(self) -> bool:
-        """checks if file has header"""
-        ssmspart = "command from SSMS"
-        leftchar = self.comment_lines_chars[0]
-        firstline = self.text.split("\n")[0]
-        return leftchar in firstline and ssmspart not in firstline
-
-    def add_header(self) -> None:
-        """adds header to file"""
-        if self.hasheader:
-            info(f"{self.path} already has header")
-        else:
-            self.prepend_lines(self.get_header_lines())
-            info(f"header written to {self.path}")
-
     def copy_to(self, destination: Path, overwrite: bool = False) -> "File":
         """copies file to destination"""
         destexists = destination.exists()
@@ -719,7 +324,7 @@ class Directory(SystemObject):
         return list(self.path.iterdir())
 
     @property
-    def dirlist(self) -> list[SystemObject]:
+    def dirlist(self) -> list["Directory"]:
         """gets directory list"""
         return [Directory.from_path(x) for x in self.contents if x.is_dir()]
 
@@ -741,12 +346,12 @@ class Directory(SystemObject):
         return reprfiles + dirswithfiles
 
     @staticmethod
-    def _tree_item(obj: SystemObject) -> dict[str:SystemObject]:
+    def _tree_item(obj: SystemObject) -> dict[str, SystemObject]:
         """returns item conditioned on system object type"""
         return obj if obj.path.is_file() else obj.tree
 
     @staticmethod
-    def _show_tree_item(obj: SystemObject) -> dict[str:SystemObject]:
+    def _show_tree_item(obj: SystemObject) -> dict[str, SystemObject]:
         """returns represention of item for console display"""
         return repr(obj) if obj.path.is_file() else obj._reprlist
 
@@ -795,12 +400,12 @@ class Directory(SystemObject):
     @property
     def csv_filelist(self) -> list[File]:
         """gets csv file list"""
-        return self.get_type_filelist("csv")
+        return self.get_type_filelist("csv", allchildren=True)
 
     @property
     def sql_filelist(self) -> list[File]:
         """gets sql file list"""
-        return self.get_type_filelist("sql")
+        return self.get_type_filelist("sql", allchildren=True)
 
     @property
     def nfiles(self) -> int:
@@ -823,21 +428,19 @@ class Directory(SystemObject):
         return self.ndirs == 0
 
     @property
-    def dirswithoutfiles(self) -> list[SystemObject]:
+    def dirswithoutfiles(self) -> list["Directory"]:
         """gets directories with files"""
-        d = self.dirlist
-        return [x for x in d if x.hasnofiles]
+        return [x for x in self.dirlist if x.hasnofiles]
 
     @property
-    def dirswithfiles(self) -> list[SystemObject]:
+    def dirswithfiles(self) -> list["Directory"]:
         """gets directories with files"""
-        d = self.dirlist
-        return [x for x in d if not x.hasnofiles]
+        return [x for x in self.dirlist if not x.hasnofiles]
 
     @property
     def isempty(self) -> bool:
         """checks if directory is empty"""
-        return self.hasnodirs and self.hasnofiles
+        return len(self.contents) == 0
 
     @property
     def nchildfiles(self) -> int:
@@ -859,6 +462,11 @@ class Directory(SystemObject):
         )
 
     @property
+    def size(self) -> int:
+        """gets directory size"""
+        return sum(x.size for x in self.allchildfiles)
+
+    @property
     def allchilddirs(self) -> list[SystemObject]:
         """gets all child directories"""
         return self.dirlist + list(
@@ -872,18 +480,11 @@ class Directory(SystemObject):
 
     def get_latest_file(self) -> File:
         """gets last produced file object"""
-        try:
-            dates = [x.modified_datetime for x in self.filelist]
-            idx = dates.index(max(dates))
-        except PermissionError("can't get last mod time"):
-            names = [x.name for x in self.filelist]
-            idx = names.index(max(names))
-        return self.filelist[idx]
-
-    def rm_files(self) -> None:
-        """removes files"""
-        for file in self.filelist:
-            file.rm()
+        if self.hasnofiles:
+            raise FileNotFoundError("no files in directory")
+        files = self.filelist
+        idx = files.index(max(files, key=lambda x: x.modified_timestamp.timestamp))
+        return files[idx]
 
     def teardown(self, warn: bool = True) -> None:
         """tears down directory"""
@@ -896,23 +497,9 @@ class Directory(SystemObject):
             raise ValueError(msg)
         for d in self.dirlist:
             d.teardown(warn=warn)
-            d.rm_files()
-        self.rm_files()
+            (f.path.unlink() for f in d.filelist)
+        (f.path.unlink() for f in self.filelist)
         self.path.rmdir()
-
-    def apply_to_files(
-        self,
-        method,
-        *args,
-        **kwargs,
-    ) -> list[File]:
-        """applies method to files"""
-        eval_method_list(
-            method,
-            self.filelist,
-            *args,
-            **kwargs,
-        )
 
     @property
     def randfile(self) -> File:
@@ -945,8 +532,12 @@ class Directory(SystemObject):
         if self.isempty:
             ret = self.nparents
         else:
-            maxdirp = max(x.nparents for x in self.allchilddirs)
-            maxfilep = max(x.nparents for x in self.allchildfiles)
+            maxdirp = (
+                max(x.nparents for x in self.allchilddirs) if self.allchilddirs else 0
+            )
+            maxfilep = (
+                max(x.nparents for x in self.allchildfiles) if self.allchildfiles else 0
+            )
             ret = max(maxdirp, maxfilep)
         return 1 + ret
 

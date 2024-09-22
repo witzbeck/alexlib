@@ -31,7 +31,7 @@ from alexlib.core import chkenv, chktype
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randdigit, randdigits, randlets
 from alexlib.files.objects import File
-from alexlib.files.utils import read_json, to_json
+from alexlib.files.utils import read_json, write_json
 
 AUTH_TEMPLATE = {
     "username": "",
@@ -40,6 +40,7 @@ AUTH_TEMPLATE = {
     "port": "",
     "database": "",
 }
+DIALECT_MAP = read_json(SA_DIALECT_MAP_PATH)
 
 
 @dataclass
@@ -194,11 +195,6 @@ class Curl:
     dialect: str = field(default="postgres", repr=False)
     sid: str = field(default=None, repr=False)
 
-    @property
-    def clsname(self) -> str:
-        """returns the name of the Curl class"""
-        return self.__class__.__name__
-
     def __repr__(self) -> str:
         """returns the repr of the Curl object"""
         return str(self)
@@ -211,8 +207,7 @@ class Curl:
     @property
     def system(self) -> str:
         """returns a system string for connection urls"""
-        dialect_map = read_json(SA_DIALECT_MAP_PATH)
-        return dialect_map[self.dialect]
+        return DIALECT_MAP[self.dialect]
 
     @property
     def login(self) -> str:
@@ -228,9 +223,7 @@ class Curl:
     @property
     def hostport(self) -> str:
         """returns a host:port string for connection urls"""
-        if not self.host:
-            ret = None
-        elif not self.port:
+        if self.port is None:
             ret = self.host
         else:
             ret = f"{self.host}:{self.port}"
@@ -293,14 +286,9 @@ class SecretStore(File):
 
     secrets: dict[str:SecretValue] = field(default_factory=dict)
 
-    @property
-    def keys(self) -> list[str]:
-        """returns a list of credential keys"""
-        return list(self.secrets.keys())
-
     def __len__(self) -> int:
         """returns the number of credentials"""
-        return len(self.keys)
+        return len(self.secrets)
 
     def get_cred(self, key: str) -> str:
         """returns a credential value"""
@@ -309,8 +297,6 @@ class SecretStore(File):
     def __post_init__(self) -> None:
         """creates a SecretStore object"""
         self.secrets = SecretStore.encode_str_dict(self.secrets)
-        if self.exists:
-            super().__post_init__()
 
     @staticmethod
     def sensor_input(input_: str, fill: str = "*") -> str:
@@ -329,10 +315,10 @@ class SecretStore(File):
         """returns the repr of the SecretStore object"""
         clsname = self.__class__.__name__
         lines = "\n".join(
-            [
+            (
                 f"\t{key} = {SecretStore.sensor_input(self.secrets[key])}"
-                for key in self.keys
-            ]
+                for key in self.secrets.keys()
+            )
         )
         return f"{clsname}(\n{lines}\n)"
 
@@ -355,7 +341,6 @@ class SecretStore(File):
             path=path,
         )
 
-    # pylint: disable=arguments-differ
     @classmethod
     def from_path(
         cls,
@@ -406,49 +391,24 @@ class Auth:
     store: SecretStore = field(default=None, repr=False)
     crypt: Cryptographer = field(init=False, repr=False)
 
-    @property
-    def clsname(self) -> str:
-        """returns the name of the auth class"""
-        return self.__class__.__name__
-
     def __repr__(self) -> str:
         """returns the repr of the auth object"""
-        return f"{self.clsname}({self.name})"
-
-    @property
-    def haskey(self) -> bool:
-        """returns True if key attribute exists"""
-        return self.key is not None
-
-    @property
-    def hasstore(self) -> bool:
-        """returns True if store attribute exists"""
-        return self.store is not None
+        return f"{self.__class__.__name__}({self.name})"
 
     @property
     def hascrypt(self) -> bool:
         """returns True if crypt attribute exists"""
         return hasattr(self, "crypt")
 
-    @property
-    def keyname(self) -> str:
-        """returns the name of the key file"""
-        return f"{self.name}.key"
-
-    @property
+    @cached_property
     def keypath(self) -> Path:
         """returns the path to the key file"""
-        return CREDS / self.keyname
+        return (CREDS / self.name).with_suffix(".key")
 
-    @property
-    def storename(self) -> str:
-        """returns the name of the store file"""
-        return f"{self.name}.store"
-
-    @property
+    @cached_property
     def storepath(self) -> Path:
         """returns the path to the store file"""
-        return CREDS / self.storename
+        return (CREDS / self.name).with_suffix(".store")
 
     @property
     def key(self) -> SecretValue:
@@ -461,35 +421,32 @@ class Auth:
             ret = SecretValue.new_key()
         return ret
 
-    def get_store(self) -> SecretValue:
+    @staticmethod
+    def get_store(
+        store: SecretStore | Path | dict[str:str] | None = None,
+        key: SecretValue | Path | None = None,
+        storepath: Path | None = None,
+        name: str | None = None,
+    ) -> SecretValue:
         """returns a SecretStore object"""
-        isstore = isinstance(self.store, SecretStore)
-        ispath = isinstance(self.store, Path)
-        if isstore:
-            ret = self.store
-        elif ispath:
-            ret = SecretStore.from_path(self.store, key=self.key)
-        elif self.storepath.exists():
-            ret = SecretStore.from_path(self.storepath, key=self.key)
+        if isinstance(store, SecretStore):
+            ret = store
+        elif isinstance(store, Path):
+            ret = SecretStore.from_path(store, key=key)
+        elif storepath.exists():
+            ret = SecretStore.from_path(storepath, key=key)
         else:
-            ret = SecretStore(name=self.name)
+            ret = SecretStore(name=name)
         return ret
 
-    def set_store(self) -> None:
-        """sets the store attribute"""
-        self.store = self.get_store()
-
-    def get_crypt(self) -> Cryptographer:
+    @staticmethod
+    def get_crypt(key: SecretValue | Path = None) -> Cryptographer:
         """returns a Cryptographer object"""
-        try:
-            ret = Cryptographer.from_key(self.key)
-        except ValueError:
+        if key is not None:
+            ret = Cryptographer.from_key(key)
+        else:
             ret = Cryptographer.new()
         return ret
-
-    def set_crypt(self) -> None:
-        """sets the crypt attribute"""
-        self.crypt = self.get_crypt()
 
     def get_secret_bytes(self) -> bytes:
         """returns the encrypted store as bytes"""
@@ -498,18 +455,12 @@ class Auth:
     @staticmethod
     def write_file(to_write: bytes | str, path: Path) -> None:
         """writes bytes or str to path"""
-        isbytes = isinstance(to_write, bytes)
-        isstr = isinstance(to_write, str)
-        if not (isbytes or isstr):
-            raise TypeError(f"{to_write} must be str or bytes")
-        if not isinstance(path, Path):
-            raise TypeError("path must be Path")
-        if isbytes:
+        chktype(to_write, (bytes, str))
+        chktype(path, Path, mustexist=False)
+        if isinstance(to_write, bytes):
             path.write_bytes(to_write)
-        elif isstr:
+        elif isinstance(to_write, str):
             path.write_text(to_write)
-        if not path.exists():
-            raise FileExistsError(f"{type(to_write)} not written")
 
     def write_store(self) -> None:
         """writes the store file"""
@@ -534,7 +485,7 @@ class Auth:
         """sets get_attr methods"""
         return [
             setattr(self, f"get_{key}", partial(self.store.get_cred, key=key))
-            for key in self.store.keys
+            for key in self.store.secrets.keys()
         ]
 
     def run_getattr(self, attr: str) -> str:
@@ -544,32 +495,32 @@ class Auth:
             raise AttributeError(f"{attr} returned None")
         return ret
 
-    @property
+    @cached_property
     def username(self) -> str:
         """returns the username"""
         return self.run_getattr("get_username")
 
-    @property
+    @cached_property
     def password(self) -> str:
         """returns the password"""
         return self.run_getattr("get_password")
 
-    @property
+    @cached_property
     def host(self) -> str:
         """returns the host name"""
         return self.run_getattr("get_host")
 
-    @property
+    @cached_property
     def port(self) -> int:
         """returns the port number"""
         return self.run_getattr("get_port")
 
-    @property
+    @cached_property
     def database(self) -> str:
         """returns the database name"""
         return self.run_getattr("get_database")
 
-    @property
+    @cached_property
     def curl(self) -> Curl:
         """returns a Curl object"""
         return Curl(
@@ -606,15 +557,15 @@ class Auth:
                 self.name = ".".join(self.name)
             except TypeError:
                 self.name = ".".join(self.name[0])
-        if not self.hasstore and not self.storepath.exists():
+        if self.store is None and not self.storepath.exists():
             raise ValueError("must have store or storepath")
-        self.set_crypt()
-        self.set_store()
+        self.crypt = self.get_crypt(key=self.key)
+        self.store = self.get_store(
+            store=self.store, key=self.key, storepath=self.storepath, name=self.name
+        )
         self.set_get_attrs()
         if not (self.storepath.exists() and self.keypath.exists()):
             self.write_files()
-        if self.store.secrets:
-            self.reencrypt_files()
 
     def update_value(self, key: str, value: str) -> None:
         """updates a value in the auth object"""
@@ -634,7 +585,7 @@ class Auth:
     @classmethod
     def from_dict(cls, name: str, dict_: dict[str:str]) -> "Auth":
         """returns an Auth object from a dict"""
-        store_path = CREDS / f"{name}.store"
+        store_path = (CREDS / name).with_suffix(".store")
         store = SecretStore.from_dict(dict_, path=store_path)
         return cls(name, store=store)
 
@@ -707,7 +658,7 @@ class AuthGenerator:
 
     def write_template_file(self) -> None:
         """writes template file to path"""
-        to_json(self.mk_all_templates(), self.path)
+        write_json(self.mk_all_templates(), self.path)
 
     @property
     def towrite(self) -> bool:
@@ -741,7 +692,7 @@ class AuthGenerator:
             raise TypeError("template_path must be Path or dict")
         for k, v in auths.items():
             store_path = CREDS / f"{k}.store"
-            to_json(v, store_path)
+            write_json(v, store_path)
             store = SecretStore.from_dict(v, path=store_path)
             handler = Auth(
                 name=k,

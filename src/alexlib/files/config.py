@@ -27,71 +27,17 @@ from dataclasses import dataclass, field
 from logging import INFO, basicConfig
 from os import environ
 from pathlib import Path
-from random import choice
-from typing import Any
 
-from alexlib.constants import DATETIME_FORMAT, LOG_PATH
-from alexlib.core import envcast, isnone
+from alexlib.constants import (
+    DATETIME_FORMAT,
+    DOTENV_PATH,
+    LOG_FORMAT,
+    LOG_PATH,
+    PROJECT_PATH,
+)
+from alexlib.core import chktype
 from alexlib.files.objects import File
-
-ConfigFormat = str
-ConfigType = type[str]
-ConfigValue = str
-ConfigKey = str
-
-
-@dataclass
-class EnvironmentVariable:
-    """A class to handle environment variables"""
-
-    key: str = field(default=None)
-    value: str = field(default=None)
-    type_: type = field(default=str)
-
-    def __str__(self) -> str:
-        """Returns the key=value string"""
-        return f"{self.key}={self.value}"
-
-    @property
-    def varisset(self) -> bool:
-        """Returns True if the variable is set, False otherwise"""
-        return not isnone(self.value)
-
-    @property
-    def envisset(self) -> bool:
-        """Returns True if the variable is set in the environment, False otherwise"""
-        return self.key in environ
-
-    @property
-    def isnotstr(self) -> bool:
-        """Returns True if the variable is not a string, False otherwise"""
-        return not isinstance(self.type_, str)
-
-    @staticmethod
-    def setenv(key: str, value: str) -> None:
-        """Sets the environment variable"""
-        try:
-            environ[key] = value
-        except TypeError:
-            environ[key] = str(value).strip('"')
-
-    def __post_init__(self) -> None:
-        """Sets the environment variable if it is not set"""
-        EnvironmentVariable.setenv(self.key, self.value)
-        if self.isnotstr:
-            self.value = envcast(self.value, self.type_)
-
-    @classmethod
-    def from_pair(cls, key: str, value: str):
-        """Creates an EnvironmentVariable from a key-value pair"""
-        return cls(key=key, value=value)
-
-    @classmethod
-    def from_line(cls, line: str):
-        """Creates an EnvironmentVariable from a line"""
-        idx = line.index("=")
-        k, v = line[:idx], line[idx + 1 :]
-        return cls.from_pair(k, v)
+from alexlib.files.utils import is_dotenv, is_json, write_json
 
 
 @dataclass
@@ -103,32 +49,16 @@ class ConfigFile(File):
     loglevel: int = field(default=INFO)
     eventlevel: int = field(default=INFO)
     logformat: str = field(
-        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        default=LOG_FORMAT,
     )
 
     def __repr__(self) -> str:
         """Returns a string representation of the object"""
         return f"{self.clsname}({self.path.drive}/.../{self.name})"
 
-    @property
-    def isdotenv(self) -> bool:
-        """Returns True if the file is a dotenv, False otherwise"""
-        return self.name.startswith(".env")
-
-    @property
-    def nenvs(self) -> int:
+    def __len__(self) -> int:
         """Returns the number of environment variables"""
         return len(self.envdict)
-
-    @property
-    def keys(self) -> list[str]:
-        """Returns the keys of the environment variables"""
-        return self.envdict.keys()
-
-    @property
-    def rand_key(self) -> str:
-        """Returns a random key"""
-        return choice(list(self.envdict.keys()))
 
     def add_pair(
         self,
@@ -136,139 +66,49 @@ class ConfigFile(File):
         value: str,
         tofile: bool = True,
         toenv: bool = True,
-        todict: bool = True,
     ) -> None:
         """Adds a key-value pair to the environment variables"""
+        chktype(key, str)
+        self.envdict[key] = value
         if toenv:
             environ[key] = value
-        if todict:
-            self.envdict[key] = value
-        if tofile and self.isdotenv:
+        if tofile and is_dotenv(self.path):
             self.append_lines([f"{key}={value}"])
+        elif tofile and is_json(self.path):
+            self.to_json()
         elif tofile:
             raise ValueError("only handles dotenvs rn")
 
-    @staticmethod
-    def to_dotenv(path: Path, dict_: dict) -> None:
+    @property
+    def dotenv_lines(self) -> list[str]:
+        """Returns the lines of the dotenv file"""
+        return [f"{key}={value}" for key, value in self.envdict.items()]
+
+    def to_dotenv(self, path: Path = DOTENV_PATH) -> None:
         """Writes a dictionary to a dotenv file"""
-        lines = [f"{key}={value}" for key, value in dict_.items()]
-        path.write_text("\n".join(lines))
+        path.write_text("\n".join(self.dotenv_lines))
 
-    @staticmethod
-    def setenvs(dict_: dict) -> None:
-        """Sets the environment variables from a dictionary"""
-        return [EnvironmentVariable.setenv(k, v) for k, v in dict_.items()]
-
-    def read_dotenv(self) -> dict[str:Any]:
-        """Reads a dotenv file"""
-        lst = [
-            EnvironmentVariable.from_line(line.strip())
-            for line in self.lines
-            if "=" in line
-        ]
-        return {x.key: x.value for x in lst}
+    def to_json(self, path: Path = PROJECT_PATH / "settings.json") -> None:
+        """Writes a dictionary to a JSON file"""
+        write_json(self.envdict, path)
 
     def get_envdict(self) -> dict[str:str]:
         """Returns the environment variables as a dictionary"""
-        if self.isjson:
-            dict_ = self.load_json()
-        elif self.isdotenv:
-            dict_ = self.read_dotenv()
-        return dict_
-
-    def set_envdict(self) -> None:
-        """Sets the environment variables from the dictionary"""
-        self.envdict = self.get_envdict()
-        ConfigFile.setenvs(self.envdict)
+        raise NotImplementedError("This method must be implemented in a subclass")
 
     def __post_init__(self) -> None:
         """Sets the environment variables and basic configuration"""
-        super().__post_init__()
-        self.set_envdict()
+        if self.path.exists():
+            self.envdict = self.get_envdict()
+            environ.update({str(k): str(v) for k, v in self.envdict.items()})
         self.set_basic_config()
-
-    @classmethod
-    def from_path(cls, path: str | Path, **kwargs):
-        """Creates a ConfigFile from a path"""
-        if isinstance(path, str):
-            path = Path(path)
-        if not path.exists():
-            return cls(name=f"{path.name}{path.suffix}")
-        return cls(path=path, **kwargs)
-
-    @classmethod
-    def from_name(cls, name: str, **kwargs):
-        """Creates a ConfigFile from a name"""
-        return cls(name=name, **kwargs)
-
-    @classmethod
-    def from_dotenv(cls, name: str = None, **kwargs):
-        """Creates a ConfigFile from a dotenv name"""
-        clsname = ".env"
-        clsname = clsname if name is None else f"{clsname}.{name}"
-        return cls.from_name(name=clsname, **kwargs)
-
-    def __add__(self, other: object) -> object:
-        """Adds two ConfigFiles"""
-        self.envdict.update(other.envdict)
-        return self
-
-    @classmethod
-    def from_name_list(cls, names: list[str], **kwargs):
-        """Creates a ConfigFile from a list of names"""
-        env_dict = {}
-        for name in names:
-            print(name)
-            file = cls.from_name(name, **kwargs)
-            env_dict.update(file.envdict)
-        file.envdict = env_dict
-        file.name = "envs"
-        return file
-
-    @classmethod
-    def from_dotenv_name_list(cls, names: list[str], **kwargs):
-        """Creates a ConfigFile from a list of dotenv names"""
-        names = [f".env.{name}" for name in names]
-        return cls.from_name_list(names, **kwargs)
-
-    @classmethod
-    def from_start(cls, start: Path, **kwargs) -> "ConfigFile":
-        """Creates a ConfigFile from a starting path"""
-        return cls.from_parent(cls.name, start, **kwargs)
-
-    def mkdir(self, name: str, exist_ok: bool = True) -> Path:
-        """Creates a directory"""
-        (dr := self.path / name).mkdir(name, exist_ok=exist_ok)
-        return dr
 
     def set_basic_config(self) -> None:
         """Sets the basic configuration"""
-        name = self.path.stem
-        logfile = LOG_PATH / f"{name}.log"
+        logfile = LOG_PATH / f"{PROJECT_PATH.stem}.log"
         basicConfig(
             filename=logfile,
             format=self.logformat,
             datefmt=DATETIME_FORMAT,
             level=self.loglevel,
         )
-
-
-@dataclass
-class DotEnv(ConfigFile):
-    """A class to handle dotenv files"""
-
-    name: str = field(default=".env")
-
-    @property
-    def lines(self) -> list[str]:
-        """Returns the lines of the file"""
-        all_lines = super().lines
-        nocomments = [x[: x.index("#")] if "#" in x else x for x in all_lines]
-        return [x for x in nocomments if x]
-
-
-@dataclass
-class Settings(ConfigFile):
-    """A class to handle settings files"""
-
-    name: str = field(default="settings.json")

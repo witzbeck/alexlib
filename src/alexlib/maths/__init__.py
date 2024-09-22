@@ -32,6 +32,7 @@ Features:
 - Representation of numbers in variable base systems
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from functools import cached_property
 from math import sqrt
@@ -41,8 +42,6 @@ from typing import Callable, Iterable
 
 from numpy import array
 from pandas import DataFrame, Series
-
-from alexlib.times import timeit
 
 
 def get_primes(n: int) -> list[int]:
@@ -73,7 +72,7 @@ def discrete_exp_dist(
 
 def isintorfloat(x: int | float) -> bool:
     """returns True if x is an int or float"""
-    return isinstance(x, (int, float))
+    return not isinstance(x, bool) and isinstance(x, (int, float))
 
 
 def interpolate(
@@ -101,14 +100,14 @@ def interpolate(
 
     if y1isnum:
         pass
-    elif issubclass(y1, Callable):
+    elif issubclass(y1.__class__, Callable):
         y1 = y1(x1)
     else:
         raise TypeError("y1 must be a number or a function")
 
     if y2isnum:
         pass
-    elif issubclass(y2, Callable):
+    elif issubclass(y2.__class__, Callable):
         y2 = y2(x2)
     else:
         raise TypeError("y2 must be a number or a function")
@@ -120,50 +119,29 @@ def interpolate(
     return ret
 
 
-@dataclass
-class GoldenRatio:
-    """Golden Ratio class"""
-
-    phi: float = field(default=None, repr=False)
-    e: float = field(default=1e-6, repr=False)
-
-    def __post_init__(self) -> None:
-        """sets phi to the golden ratio"""
-        self.phi = self.fast(e=self.e)
-
-    @staticmethod
-    def get_error(*args) -> float:
-        """returns the absolute difference between two numbers"""
-        return abs(args[0] - args[1])
-
-    @staticmethod
-    def phigen(phi: int = 1) -> Iterable[float]:
-        """returns a generator for the golden ratio"""
-        while True:
-            yield (phi := 1 + (1 / phi))
-
-    @staticmethod
-    def fibgen(a: int = 0, b: int = 1) -> Iterable[int]:
-        """returns a generator for the fibonacci sequence"""
-        while True:
-            c = a + b
-            a = b
-            b = c
-            yield c
-
-    @staticmethod
-    @timeit
-    def fast(
-        e: float = 1e-6,
-        phi: int = 1,
-    ) -> float:
-        """returns the golden ratio to the specified precision"""
-        while True:
-            if abs(phi - (phi := 1 + (1 / phi))) <= e:
-                return phi
+def phi_generator(phi: int = 1) -> Generator[float]:
+    """returns a generator for the golden ratio"""
+    while True:
+        yield (phi := 1 + (1 / phi))
 
 
-# pylint: disable=unnecessary-lambda
+def fibonacci_generator(a: int = 0, b: int = 1) -> Generator[int]:
+    """returns a generator for the fibonacci sequence"""
+    while True:
+        c = a + b
+        a = b
+        b = c
+        yield c
+
+
+def get_phi_by_precision(e: float = 1e-6) -> float:
+    """returns the golden ratio to the specified precision"""
+    phi = 1
+    while True:
+        if abs(phi - (phi := 1 + (1 / phi))) <= e:
+            return phi
+
+
 def get_quantiles(lst: list, tiles: int = 100) -> dict[int, float]:
     """returns a dict of quantiles for a list"""
     if not isinstance(lst, list):
@@ -309,43 +287,20 @@ class VariableBaseNumber:
             self.exp_dict[exp] = val
             exp -= 1
             unit = self.get_unit(exp)
-        toupdate = {i: 0 for i in range(self.highest_exp) if i not in self.exponents}
+        toupdate = {
+            i: 0 for i in range(self.highest_exp) if i not in self.exp_dict.keys()
+        }
         self.exp_dict.update(toupdate)
-
-    @property
-    def exponents(self) -> list[int]:
-        """returns a list of exponents"""
-        return self.exp_dict.keys()
-
-    @property
-    def vals(self) -> list[int]:
-        """returns a list of values"""
-        return self.exp_dict.values()
-
-    @property
-    def exp_items(self) -> list[tuple[int, int]]:
-        """returns a list of exponent-value tuples"""
-        return self.exp_dict.items()
 
     @property
     def unit_dict(self) -> dict[int, int]:
         """returns a dict of units"""
-        return {self.get_unit(exp): unit for exp, unit in self.exp_items}
-
-    @property
-    def units(self) -> list[int]:
-        """returns a list of units"""
-        return self.unit_dict.keys()
-
-    @property
-    def unit_items(self) -> list[tuple[int, int]]:
-        """returns a list of unit-value tuples"""
-        return self.unit_dict.items()
+        return {self.get_unit(exp): unit for exp, unit in self.exp_dict.items()}
 
     @property
     def lowest_exp(self) -> int:
         """returns the lowest exponent"""
-        return min(self.exponents)
+        return min(self.exp_dict.keys())
 
     @property
     def lowest_unit(self) -> int:
@@ -354,20 +309,17 @@ class VariableBaseNumber:
 
     def __str__(self) -> str:
         """returns the base10_val as a string"""
-        left = "".join([self.get_char(val) for exp, val in self.exp_items if exp >= 0])
+        left = "".join(
+            [self.get_char(val) for exp, val in self.exp_dict.items() if exp >= 0]
+        )
         if self.hasdecimal:
             right = "." + "".join(
-                [self.get_char(val) for exp, val in self.exp_items if exp < 0]
+                [self.get_char(val) for exp, val in self.exp_dict.items() if exp < 0]
             )
         else:
             right = ""
         return self.sign + left + right
 
-    @property
-    def clsname(self) -> str:
-        """returns the class name"""
-        return self.__class__.__name__
-
     def __repr__(self) -> str:
         """returns the class name and string representation"""
-        return f"{self.clsname}({str(self)})"
+        return f"{self.__class__.__name__}({str(self)})"

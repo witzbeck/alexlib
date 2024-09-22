@@ -5,11 +5,11 @@ repos:
         name: poetry-lock
         entry: poetry lock --no-update
         language: system
+        types: [toml]
         pass_filenames: false
-        always_run: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: end-of-file-fixer
       - id: check-json
@@ -25,7 +25,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    rev: v0.6.6
     hooks:
       - id: ruff
         types_or: [python, pyi, jupyter]
@@ -39,30 +39,17 @@ repos:
     hooks:
       - id: python-use-type-annotations
 
-  -   repo: local
-      hooks:
-        - id: rm-old-covertura
-          name: Remove old covertura reports
-          entry: rm -rf .coverage .coverage.xml htmlcov
-          language: system
-          types: [python]
-          pass_filenames: false
-        - id: pytest-check
-          name: pytest with coverage
-          entry: pytest --cov=alexlib -m "not slow"
-          language: system
-          types: [python]
-          pass_filenames: false
-          always_run: true
-
-  - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 2.3.5
+  - repo: local
     hooks:
-      - id: sqlfluff-fix
-        name: SQLFluff Fix
-        types: [sql]
-        entry: sqlfluff fix --force --config pyproject.toml
-      - id: sqlfluff-lint
-        name: SQLFluff Lint
-        types: [sql]
-        entry: sqlfluff lint --config pyproject.toml
+      - id: rm-old-covertura
+        name: Remove old covertura reports
+        entry: rm -rf .coverage .coverage.xml htmlcov
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: pytest-check
+        name: pytest with coverage
+        entry: poetry run pytest --cov=alexlib -n auto
+        language: system
+        types: [python]
+        pass_filenames: false

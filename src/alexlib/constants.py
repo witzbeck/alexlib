@@ -16,7 +16,10 @@ PROJECT_PATH = SOURCE_PATH.parent
 
 RESOURCES_PATH = PROJECT_PATH / "resources"
 DATA_PATH = PROJECT_PATH / "data"
+
 LOG_PATH = PROJECT_PATH / "logs"
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 RECIPES_PATH = DATA_PATH / "recipe_files"
 
 PYPROJECT_PATH = PROJECT_PATH / "pyproject.toml"

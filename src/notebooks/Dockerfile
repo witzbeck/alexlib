@@ -1,28 +1,30 @@
-#!/bin/bash
+# Use an official Python runtime as a parent image
+FROM quay.io/jupyter/base-notebook:latest
 
-# Step 1: Create a Dockerfile
-cat > Dockerfile <<EOF
-# Use the official Jupyter base image
-FROM jupyter/base-notebook
-
-# Install additional Python packages if needed
+# install dependancies
 USER root
-RUN pip install numpy pandas matplotlib
+RUN apt-get update && apt-get install -y \
+git git-lfs \
+build-essential \
+cmake \
+libpq-dev \
+python3-dev
 
-# Switch back to the non-root 'jovyan' user provided by the base image
-USER jovyan
+RUN apt-get clean && \
+rm -rf /var/lib/apt/lists/*
 
-# Expose the port Jupyter will run on
+COPY requirements.txt /tmp/requirements.txt
+
+# Install the required libraries for your notebook
+RUN pip3 install -U --no-cache-dir -r /tmp/requirements.txt
+# RUN pip3 install -U --no-cache-dir -e .
+
+# set PATH
+ENV PATH=/root/.local/bin:$PATH
+
+COPY . /home/jovyan/work
+
+WORKDIR /home/jovyan/work
+
+# Expose the port used by Kernel
 EXPOSE 8888
-EOF
-
-# Step 2: Build the Docker Image
-docker build -t my-jupyter-server .
-
-# Step 3: Run the Docker Container
-docker run -d --name my-jupyter-instance -p 8888:8888 \
-  --restart always \
-  -v /path/to/local/notebooks:/home/jovyan/work \
-  my-jupyter-server
-
-echo "Jupyter Server is running and available on port 8888 of the host machine."

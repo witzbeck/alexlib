@@ -25,62 +25,36 @@ datetime module.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from functools import cached_property, partial, wraps
+from datetime import date, datetime, timedelta, timezone
+from functools import wraps
 from logging import info
 from math import floor
-from os import getenv
 from random import randint
 from time import perf_counter
 from typing import Any
 
 from pandas import Timestamp
-from pandas.tseries.holiday import Holiday, USFederalHolidayCalendar
+from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import BDay
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String
-from sqlalchemy.orm import declarative_base
 
 from alexlib.constants import EPOCH_SECONDS
 
 ONEDAY = timedelta(days=1)
+__custom_dt_attrs__ = (
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "microsecond",
+    "tzinfo",
+)
 
-Base = declarative_base()
 
-get_env_user = partial(getenv, "USER")
-
-
-class TimerLog(Base):
-    """A timer log class for storing timer logs."""
-
-    __tablename__ = "timer_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=True)
-    action = Column(String, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    duration = Column(Float, nullable=False)
-    duration_unit = Column(String, nullable=False)
-    additional_info = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    def __repr__(self) -> str:
-        """Get the timer log representation."""
-        attrs = "\n".join(
-            [
-                f"{key}: {val}"
-                for key, val in {
-                    "id": self.id,
-                    "user_id": self.user_id,
-                    "action": self.action,
-                    "start_time": self.start_time,
-                    "end_time": self.end_time,
-                    "duration": self.duration,
-                }.items()
-                if val
-            ]
-        )
-        return "\n".join([f"{self.__class__.__name__}(", attrs, ")"])
+def get_local_tz() -> timezone:
+    """returns local timezone"""
+    return datetime.now().astimezone().tzinfo
 
 
 @dataclass(frozen=True)
@@ -325,6 +299,15 @@ def get_rand_timedelta() -> timedelta:
     )
 
 
+def get_holidays() -> list[date]:
+    """Get a list of US Federal Holidays."""
+    dts = list(USFederalHolidayCalendar().holidays().to_pydatetime())
+    return {dt.date() for dt in dts}
+
+
+HOLIDAYS = get_holidays()
+
+
 class CustomTimedelta(timedelta):
     """custom timedelta class with extra methods"""
 
@@ -339,7 +322,7 @@ class CustomTimedelta(timedelta):
         return super().__new__(cls, *args, **kwargs)
 
     @classmethod
-    def rand(cls) -> timedelta():
+    def rand(cls) -> timedelta:
         """Generate a random timedelta object."""
         return cls(seconds=get_rand_timedelta().total_seconds())
 
@@ -380,19 +363,11 @@ class CustomDatetime(datetime):
         """create a new instance of the class"""
         if args and isinstance(args[0], (CustomDatetime, datetime)):
             instance = args[0]
-            attrs = [
-                "year",
-                "month",
-                "day",
-                "hour",
-                "minute",
-                "second",
-                "microsecond",
-                "tzinfo",
-            ]
-            args = [
-                getattr(instance, attr) for attr in attrs if hasattr(instance, attr)
-            ]
+            args = (
+                getattr(instance, attr)
+                for attr in __custom_dt_attrs__
+                if hasattr(instance, attr)
+            )
         return super().__new__(cls, *args, **kwargs)
 
     def __round__(self, td: timedelta) -> datetime:
@@ -405,11 +380,6 @@ class CustomDatetime(datetime):
         """Generate a random datetime object."""
         return cls.fromtimestamp(get_rand_datetime().timestamp())
 
-    @cached_property
-    def holidays(self) -> list[Holiday]:
-        """returns a list of US Federal Holidays"""
-        return [x.date() for x in USFederalHolidayCalendar().holidays().to_pydatetime()]
-
     @property
     def isholiday(self) -> bool:
         """
@@ -417,7 +387,7 @@ class CustomDatetime(datetime):
         Returns:
             bool: True if the current date is a holiday, False otherwise.
         """
-        return self.date() in self.holidays
+        return self.date() in HOLIDAYS
 
     @property
     def isweekday(self) -> bool:
@@ -449,16 +419,12 @@ class CustomDatetime(datetime):
         """returns the next day"""
         return self + ONEDAY
 
-    @cached_property
-    def one_busday(self) -> BDay:
-        """returns a pandas business day offset"""
-        return BDay(1)
-
     def get_last_busday(self) -> datetime:
         """returns the last business day"""
         chkdate = Timestamp(self.yesterday)
-        while chkdate in self.holidays:
-            chkdate = chkdate - self.one_busday
+        bday = BDay(1)
+        while chkdate in HOLIDAYS:
+            chkdate = chkdate - bday
         return CustomDatetime(chkdate.to_pydatetime())
 
     @property
@@ -469,17 +435,3 @@ class CustomDatetime(datetime):
     def get_epoch_self_divmod(self, td: timedelta) -> tuple[float, float]:
         """returns the divmod of the datetime and epoch_seconds"""
         return divmod(self.epoch_self_dif, td.total_seconds())
-
-
-class Users(Base):
-    """A user class for storing user information."""
-
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, default=get_env_user)
-
-
-if __name__ == "__main__":
-    get_rand_datetime()
-    get_rand_timedelta()

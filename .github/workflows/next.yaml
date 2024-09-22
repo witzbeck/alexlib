@@ -1,14 +1,8 @@
 name: Python project workflow
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - "**/*.md"
   pull_request:
-    branches: [ main ]
-    paths-ignore:
-      - "**/*.md"
+    branches: [ next/* ]
 
 jobs:
   build:
@@ -30,7 +24,6 @@ jobs:
     # Set up Python
     # ---------------------------------------------
     - name: Set up Python
-      id: setup-python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
@@ -49,11 +42,11 @@ jobs:
     # load cached poetry dependencies if available
     # ---------------------------------------------
     - name: Load cached virtualenv
-      id: load-cached-virtualenv
+      id: cached-poetry-dependencies
       uses: actions/cache@v4
       with:
         path: .venv
-        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
         restore-keys: |
           ${{ runner.os }}-poetry-
     
@@ -67,7 +60,7 @@ jobs:
     # install dependencies if cache does not exist
     #----------------------------------------------
     - name: Install dependencies
-      if: steps.load-cached-virtualenv.outputs.cache-hit != 'true'
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: poetry install --with test --no-interaction --no-root
     
     #----------------------------------------------
