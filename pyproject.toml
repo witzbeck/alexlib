@@ -27,7 +27,7 @@ openai = "^1.46"
 scipy = "^1.13"
 
 [tool.poetry.group.test.dependencies]
-ruff = "^0.4.4"
+ruff = "^0.6.7"
 pytest = "^8.1"
 pytest-cov = "^5.0"
 pytest-xdist = "^3.6.1"
