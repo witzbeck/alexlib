@@ -6,11 +6,37 @@ which drops columns from a DataFrame that are invariable (having the same value 
 """
 
 # Explicit imports
+from random import randint
 from unittest import TestCase, main
 
 from pandas import DataFrame
+from pytest import fixture
 
 from alexlib.df import drop_invariate_cols
+
+
+@fixture(scope="session")
+def df_scale_height_param() -> tuple[int]:
+    return randint(1, 100)
+
+
+@fixture(scope="session")
+def df_scale_width_param() -> tuple[int]:
+    return randint(1, 100)
+
+
+@fixture(scope="session")
+def invariate_df(df_scale_height_param, df_scale_width_param):
+    return DataFrame.from_dict(
+        {f"col{i}": [i] * df_scale_height_param for i in range(df_scale_width_param)}
+    )
+
+
+@fixture(scope="session")
+def variable_df(df_scale_height_param, df_scale_width_param):
+    return DataFrame.from_dict(
+        {f"col{i}": [i] * df_scale_height_param for i in range(df_scale_width_param)}
+    )
 
 
 class TestDropInvariateCols(TestCase):

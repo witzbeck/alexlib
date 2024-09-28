@@ -102,16 +102,18 @@ def get_unique_col_vals(col: str, df: DataFrame | list[DataFrame]) -> list:
     returns:
         val_list = list of unique values
     """
+    # check if df is a single df
     if isinstance(df, DataFrame):
         vals = df.loc[:, col].unique()  # str from slice
+    # check if df is a list of dfs
+    elif isinstance(df, list):
+        vals_list = [get_unique_col_vals(col, d) for d in df]
+        vals = set(chain.from_iterable(vals_list))
+    # check if df is a dict of dfs
     elif isinstance(df, dict):
         vals = get_unique_col_vals(col, list(df.values()))
-    elif isinstance(df, list):
-        func = get_unique_col_vals
-        vals_list = [func(col, d) for d in df]
-        vals = set(chain.from_iterable(vals_list))
     else:
-        raise TypeError("need df or list of dfs")
+        raise TypeError(f"need df or list of dfs but got {type(df)}")
     return list(vals)
 
 

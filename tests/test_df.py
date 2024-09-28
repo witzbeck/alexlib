@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from pandas import DataFrame
-from pytest import fixture, mark, raises
+from pytest import FixtureRequest, fixture, mark, raises
 
 from alexlib.df import (
     add_col,
@@ -11,6 +11,8 @@ from alexlib.df import (
     col_pair_to_dict,
     filter_df,
     get_distinct_col_vals,
+    get_unique_col_vals,
+    get_val_order,
     rm_df_col_pattern,
     set_type_list,
     split_df,
@@ -184,3 +186,75 @@ def test_rm_df_col_pattern_no_match(df_with_column_pattern):
     """Test removing columns based on a pattern that does not match any columns."""
     result_df = rm_df_col_pattern("delta", df_with_column_pattern)
     assert sorted(result_df.columns) == sorted(df_with_column_pattern.columns)
+
+
+@fixture(scope="module")
+def sample_df():
+    """Sample Data for Testing"""
+    data = {"A": [1, 2, 3, 4, 5], "B": [10, 20, 30, 40, 50]}
+    return DataFrame.from_dict(data)
+
+
+@fixture(scope="module")
+def filtered_valid_df(sample_df):
+    return filter_df(sample_df, "A", 3)
+
+
+def test_filter_df_with_one_valid_value(filtered_valid_df):
+    """Test for Valid Value"""
+    assert (
+        len(filtered_valid_df) == 1
+    ), "The filtered DataFrame should have only one row"
+
+
+def test_filter_df_with_valid_value_by_index(filtered_valid_df):
+    """Test for Valid Value"""
+    assert filtered_valid_df["B"].iloc[0] == 30, "The value in column 'B' should be 30"
+
+
+def test_filter_df_with_nonexistent_value(sample_df):
+    """Test for Nonexistent Value"""
+    filtered_df = filter_df(sample_df, "A", 99)
+    assert filtered_df.empty, "DataFrame should be empty for a nonexistent value"
+
+
+def test_get_val_order(sample_df):
+    """Test for Value Order"""
+    order = get_val_order(sample_df, "A", 3, "B", 30)
+    assert (
+        order == 0
+    ), "The order of the value 3 in column 'A' after filtering 'B' for 30 should be 2"
+
+
+@fixture(scope="session")
+def sample_df_with_duplicates():
+    """Fixture to provide a sample DataFrame."""
+    data = {"col1": [1, 2, 2, 3, 3, 3], "col2": ["a", "b", "b", "c", "c", "c"]}
+    return DataFrame.from_dict(data)
+
+
+@fixture(
+    scope="session",
+    params=(
+        ("col1", [1, 2, 3]),
+        ("col2", ["a", "b", "c"]),
+    ),
+)
+def col_expected(request: FixtureRequest) -> list:
+    """Fixture to provide expected unique values for col1."""
+    return request.param
+
+
+def test_get_unique_col_vals(sample_df_with_duplicates, col_expected):
+    """Test extracting unique values from a DataFrame."""
+    col, col_expected = col_expected
+    assert (
+        sorted(get_unique_col_vals(col=col, df=sample_df_with_duplicates))
+        == col_expected
+    )
+
+
+def test_get_unique_col_vals_invalid_input():
+    """Test with invalid input to ensure proper error handling."""
+    with raises(TypeError):
+        get_unique_col_vals("col1", "not_a_dataframe")
