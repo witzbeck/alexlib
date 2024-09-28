@@ -1,6 +1,7 @@
 """Unit tests for the filter_df function in the alexlib.df module."""
 
 from datetime import datetime
+from random import randint
 
 from pandas import DataFrame
 from pytest import FixtureRequest, fixture, mark, raises
@@ -9,6 +10,7 @@ from alexlib.df import (
     add_col,
     add_timestamp_col,
     col_pair_to_dict,
+    drop_invariate_cols,
     filter_df,
     get_distinct_col_vals,
     get_unique_col_vals,
@@ -258,3 +260,61 @@ def test_get_unique_col_vals_invalid_input():
     """Test with invalid input to ensure proper error handling."""
     with raises(TypeError):
         get_unique_col_vals("col1", "not_a_dataframe")
+
+
+@fixture(scope="session")
+def df_scale_height_param() -> tuple[int]:
+    return randint(1, 100)
+
+
+@fixture(scope="session")
+def df_scale_width_param() -> tuple[int]:
+    return randint(1, 100)
+
+
+@fixture(scope="session")
+def invariate_df(df_scale_height_param, df_scale_width_param):
+    return DataFrame.from_dict(
+        {
+            "A": [1] * df_scale_height_param,
+            "B": [2] * df_scale_height_param,
+            "C": [randint(1, 1000) for _ in range(df_scale_height_param)],
+        }
+    )
+
+
+@fixture(scope="session")
+def post_drop_df(invariate_df):
+    return drop_invariate_cols(invariate_df)
+
+
+@fixture(scope="session")
+def variate_df(df_scale_height_param, df_scale_width_param):
+    return DataFrame.from_dict(
+        {
+            "A": [randint(1, 1000) for _ in range(df_scale_height_param)],
+            "B": [randint(1, 1000) for _ in range(df_scale_height_param)],
+            "C": [randint(1, 1000) for _ in range(df_scale_height_param)],
+        }
+    )
+
+
+@mark.parametrize("col,isretained", [("A", False), ("B", False), ("C", True)])
+def test_drop_invariate_cols(post_drop_df: DataFrame, col: str, isretained: bool):
+    """Test dropping invariable columns."""
+    assert isinstance(post_drop_df, DataFrame), "Output should be a DataFrame."
+    assert isinstance(col, str), "Column name should be a string."
+    assert isinstance(isretained, bool), "isretained should be a boolean."
+    assert (
+        col in post_drop_df.columns
+    ) == isretained, f"Columns = {post_drop_df.columns}"
+
+
+def test_drop_variate_cols(variate_df: DataFrame):
+    """Test with a DataFrame where all columns are variable."""
+    assert isinstance(variate_df, DataFrame), "Input should be a DataFrame."
+    result_df = drop_invariate_cols(variate_df)
+    assert isinstance(result_df, DataFrame), "Output should be a DataFrame."
+    assert sorted(result_df.columns) == sorted(
+        variate_df.columns
+    ), "All columns should be retained."

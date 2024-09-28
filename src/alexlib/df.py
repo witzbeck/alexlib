@@ -158,7 +158,8 @@ def set_type_list(df: DataFrame, type_: Any, cols: list[str]) -> DataFrame:
 
 def drop_invariate_cols(df: DataFrame) -> DataFrame:
     """Drops columns that have the same value in every row."""
-    return df.loc[:, df.nunique() != 1]
+    keep_cols = df.columns[df.nunique() != 1]
+    return df.loc[:, keep_cols]
 
 
 def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
