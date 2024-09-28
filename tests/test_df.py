@@ -21,7 +21,7 @@ from alexlib.df import (
 )
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def df_to_split():
     return DataFrame({"col1": range(10), "col2": range(10, 20)})
 
@@ -158,7 +158,7 @@ def test_distinct_values(df_with_duplicate_values, col, expected):
     assert distinct_values == expected, f"Distinct values in {col} should be {expected}"
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def df_with_column_pattern():
     return DataFrame.from_dict(
         {
@@ -228,7 +228,7 @@ def test_get_val_order(sample_df):
     ), "The order of the value 3 in column 'A' after filtering 'B' for 30 should be 2"
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def sample_df_with_duplicates():
     """Fixture to provide a sample DataFrame."""
     data = {"col1": [1, 2, 2, 3, 3, 3], "col2": ["a", "b", "b", "c", "c", "c"]}
@@ -236,7 +236,7 @@ def sample_df_with_duplicates():
 
 
 @fixture(
-    scope="session",
+    scope="module",
     params=(
         ("col1", [1, 2, 3]),
         ("col2", ["a", "b", "c"]),
@@ -262,17 +262,17 @@ def test_get_unique_col_vals_invalid_input():
         get_unique_col_vals("col1", "not_a_dataframe")
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def df_scale_height_param() -> tuple[int]:
     return randint(1, 100)
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def df_scale_width_param() -> tuple[int]:
     return randint(1, 100)
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def invariate_df(df_scale_height_param, df_scale_width_param):
     return DataFrame.from_dict(
         {
@@ -283,12 +283,12 @@ def invariate_df(df_scale_height_param, df_scale_width_param):
     )
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def post_drop_df(invariate_df):
     return drop_invariate_cols(invariate_df)
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def variate_df(df_scale_height_param, df_scale_width_param):
     return DataFrame.from_dict(
         {
@@ -318,3 +318,23 @@ def test_drop_variate_cols(variate_df: DataFrame):
     assert sorted(result_df.columns) == sorted(
         variate_df.columns
     ), "All columns should be retained."
+
+
+@fixture(scope="module")
+def df_with_pair():
+    return DataFrame({"A": [1, 2, 3], "B": ["one", "two", "three"], "C": [4, 5, 6]})
+
+
+@fixture(scope="module")
+def expected_pair_dict():
+    return {1: "one", 2: "two", 3: "three"}
+
+
+def test_invalid_columns_col_pair_to_dict(df_with_pair):
+    with raises(KeyError):
+        col_pair_to_dict("X", "Y", df_with_pair)
+
+
+def test_dict_conversion_col_pair_to_dict(df_with_pair, expected_pair_dict):
+    result_dict = col_pair_to_dict("A", "B", df_with_pair)
+    assert result_dict == expected_pair_dict, f"Conversion failed, result={result_dict}"

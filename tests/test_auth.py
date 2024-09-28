@@ -25,7 +25,7 @@ from alexlib.crypto import Cryptographer, SecretValue
 
 
 @fixture(
-    scope="session",
+    scope="module",
     params=(
         "remote.dev.postgres",
         "remote.prod.postgres",
@@ -41,13 +41,13 @@ def auth_key(request: FixtureRequest) -> str:
     return request.param
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_template_path(dir_path: Path):
     test_path = dir_path / "test_template.json"
     return test_path
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_generator(auth_template_path: Path):
     return AuthGenerator(
         name="test_template",
@@ -58,19 +58,19 @@ def auth_generator(auth_template_path: Path):
     )
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_templates(auth_generator: AuthGenerator) -> dict[str, dict[str, str]]:
     return auth_generator.mk_all_templates()
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_template(
     auth_templates: dict[str, dict[str, str]], auth_key: str
 ) -> dict[str, str]:
     return auth_key, auth_templates[auth_key]
 
 
-@fixture(scope="session")
+@fixture(scope="module")
 def auth_object(auth_template: dict[str, str]) -> dict[str, Auth]:
     auth_key, template = auth_template
     return Auth.from_dict(auth_key, template)
@@ -331,12 +331,24 @@ def test_authpart_str_method(auth_part: AuthPart):
     assert isinstance(str(auth_part), str)
 
 
-def test_login_rand_method():
+@fixture(scope="module")
+def rand_login() -> Login:
+    return Login.rand()
+
+
+def test_login_rand_init(rand_login: Login):
     """Test the rand method for the Login class."""
-    login = Login.rand()
-    assert isinstance(login, Login)
-    assert isinstance(login.user, Username)
-    assert isinstance(login.pw, Password)
+    assert isinstance(rand_login, Login)
+
+
+def test_login_rand_user(rand_login: Login):
+    """Test the rand method for the Login class."""
+    assert isinstance(rand_login.user, Username)
+
+
+def test_login_rand_password(rand_login: Login):
+    """Test the rand method for the Login class."""
+    assert isinstance(rand_login.pw, Password)
 
 
 def test_curl_repr_method(curl: Curl):
