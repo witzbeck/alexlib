@@ -26,24 +26,6 @@ def get_comb_gen(_list: list, _int: int) -> Generator[tuple, None, None]:
         yield pair
 
 
-def list_gen(_list: list, rand: bool = False, inf: bool = False) -> Any:
-    """returns a generator for a list of items
-    - if rand is True, the items are returned in random order
-    - if inf is True, the items can be returned infinitely
-    """
-    _list = list(_list)
-    while True:
-        _len = len(_list)
-        if _len > 0:
-            _idx = randint(0, _len) if rand else 0
-            if inf:
-                yield _list[_idx]
-            else:
-                yield _list.pop(_idx)
-        else:
-            break
-
-
 def get_pop_item(item: str, _list: list) -> str:
     """returns an item from a list and removes it from the list"""
     return _list.pop(_list.index(item))

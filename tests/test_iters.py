@@ -3,7 +3,12 @@ from random import randint
 
 from pytest import fixture
 
-from alexlib.iters import get_comb_gen, get_pop_item, get_pop_rand_item, idx_list
+from alexlib.iters import (
+    get_comb_gen,
+    get_pop_item,
+    get_pop_rand_item,
+    idx_list,
+)
 
 
 @fixture(scope="module")
