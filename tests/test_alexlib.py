@@ -18,8 +18,6 @@ def version_from_sys() -> Version:
 
 @fixture(scope="session")
 def version_from_pyproject() -> Version:
-    if version_info <= (3, 10):
-        skip("Python 3.11+ required for pyproject.toml support")
     return Version.from_pyproject()
 
 
@@ -31,6 +29,8 @@ def test_version_from_sys(version_from_sys: Version):
 
 
 def test_version_from_pyproject(version_from_pyproject: Version):
+    if version_info <= (3, 10):
+        skip("Python 3.11+ required for pyproject.toml support")
     assert isinstance(
         version_from_pyproject.major, int
     ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
@@ -44,6 +44,8 @@ def test_version_from_pyproject(version_from_pyproject: Version):
 
 
 def test_version_eq(version_from_sys: Version, version_from_pyproject: Version):
+    if version_info <= (3, 10):
+        skip("Python 3.11+ required for pyproject.toml support")
     assert version_from_sys != version_from_pyproject
 
 
