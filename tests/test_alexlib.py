@@ -18,8 +18,8 @@ def version_from_sys() -> Version:
 
 @fixture(scope="session")
 def version_from_pyproject() -> Version:
-    if version_info < (3, 10):
-        skip("Python 3.10+ required for pyproject.toml support")
+    if version_info <= (3, 10):
+        skip("Python 3.11+ required for pyproject.toml support")
     return Version.from_pyproject()
 
 

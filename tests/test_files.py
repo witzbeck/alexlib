@@ -149,8 +149,8 @@ def test_toml_file_init(toml_file: TomlFile):
 
 def test_read_toml(toml_file: TomlFile):
     """Test reading a TOML file"""
-    if version_info < (3, 10):
-        skip("Python 3.10+ required for TOML support")
+    if version_info <= (3, 10):
+        skip("Python 3.11+ required for TOML support")
     assert read_toml(toml_file.path) == {"key": "value"}
 
 
