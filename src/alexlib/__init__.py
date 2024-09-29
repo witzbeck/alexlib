@@ -27,7 +27,10 @@ class Version:
 
     @classmethod
     def from_pyproject(cls, path: Path = PYPROJECT_PATH) -> "Version":
-        dict_ = read_toml(path)
+        if read_toml is None:
+            raise ImportError("pyproject.toml support requires toml package")
+        else:
+            dict_ = read_toml(path)
         try:
             ret = dict_["project"]["version"]
         except KeyError:

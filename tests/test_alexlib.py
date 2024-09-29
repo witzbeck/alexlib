@@ -16,11 +16,6 @@ def version_from_sys() -> Version:
     return Version.from_sys()
 
 
-@fixture(scope="session")
-def version_from_pyproject() -> Version:
-    return Version.from_pyproject()
-
-
 def test_version_from_sys(version_from_sys: Version):
     assert version_from_sys.major == version_info.major
     assert version_from_sys.minor == version_info.minor
@@ -28,10 +23,11 @@ def test_version_from_sys(version_from_sys: Version):
     assert version_from_sys.project_name == "Python"
 
 
-def test_version_from_pyproject(version_from_pyproject: Version):
+def test_version_from_pyproject():
     if version_info.minor <= 10:
         skip("Python 3.11+ required for pyproject.toml support")
     else:
+        version_from_pyproject = Version.from_pyproject()
         assert isinstance(
             version_from_pyproject.major, int
         ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
@@ -44,10 +40,11 @@ def test_version_from_pyproject(version_from_pyproject: Version):
         assert version_from_pyproject.project_name == "alexlib"
 
 
-def test_version_eq(version_from_sys: Version, version_from_pyproject: Version):
+def test_version_eq(version_from_sys: Version):
     if version_info.minor <= 10:
         skip("Python 3.11+ required for pyproject.toml support")
     else:
+        version_from_pyproject = Version.from_pyproject()
         assert version_from_sys != version_from_pyproject
 
 
