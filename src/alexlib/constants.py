@@ -15,10 +15,9 @@ MODULE_PATH = Path(__file__).parent
 SOURCE_PATH = MODULE_PATH.parent
 PROJECT_PATH = SOURCE_PATH.parent
 
-RESOURCES_PATH = PROJECT_PATH / "resources"
-DATA_PATH = PROJECT_PATH / "data"
+(DATA_PATH := PROJECT_PATH / "data").mkdir(exist_ok=True)
 
-LOG_PATH = PROJECT_PATH / "logs"
+(LOG_PATH := PROJECT_PATH / "logs").mkdir(exist_ok=True)
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 RECIPES_PATH = DATA_PATH / "recipe_files"

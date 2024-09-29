@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from os import stat_result
 from pathlib import Path
 from random import choice
 
@@ -39,6 +40,16 @@ from alexlib.files.utils import (
 @fixture(scope="module")
 def this_file_path() -> Path:
     return Path(__file__)
+
+
+@fixture(scope="module")
+def this_file_stat(this_file_path: Path) -> stat_result:
+    return this_file_path.stat()
+
+
+@fixture(scope="module")
+def this_file_st_ctime(this_file_stat: stat_result) -> float:
+    return this_file_stat.st_ctime
 
 
 @fixture(scope="module")
@@ -568,3 +579,8 @@ def test_file_obj_modified_timestamp_delta(file_obj: File):
 
 def test_file_obj_modified_timestamp_is_new_enough(file_obj: File):
     assert file_obj.modified_timestamp.is_new_enough(timedelta(days=1))
+
+
+def test_system_timestamp_repr(this_file_st_ctime: float):
+    sys_ts = SystemTimestamp(this_file_st_ctime)
+    assert isinstance(repr(sys_ts), str)
