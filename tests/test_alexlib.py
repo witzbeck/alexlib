@@ -1,6 +1,6 @@
 from sys import path, version_info
 
-from pytest import fixture
+from pytest import fixture, skip
 
 from alexlib import Version
 from alexlib.constants import MODULE_PATH
@@ -18,6 +18,8 @@ def version_from_sys() -> Version:
 
 @fixture(scope="session")
 def version_from_pyproject() -> Version:
+    if version_info < (3, 10):
+        skip("Python 3.10+ required for pyproject.toml support")
     return Version.from_pyproject()
 
 

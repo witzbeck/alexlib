@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from os import stat_result
 from pathlib import Path
 from random import choice
+from sys import version_info
 
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
@@ -148,6 +149,8 @@ def test_toml_file_init(toml_file: TomlFile):
 
 def test_read_toml(toml_file: TomlFile):
     """Test reading a TOML file"""
+    if version_info < (3, 10):
+        skip("Python 3.10+ required for TOML support")
     assert read_toml(toml_file.path) == {"key": "value"}
 
 
