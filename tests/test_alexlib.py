@@ -29,24 +29,26 @@ def test_version_from_sys(version_from_sys: Version):
 
 
 def test_version_from_pyproject(version_from_pyproject: Version):
-    if version_info <= (3, 10):
+    if version_info.minor <= 10:
         skip("Python 3.11+ required for pyproject.toml support")
-    assert isinstance(
-        version_from_pyproject.major, int
-    ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
-    assert isinstance(
-        version_from_pyproject.minor, int
-    ), f"minor: {version_from_pyproject.minor} is {type(version_from_pyproject.minor)}"
-    assert isinstance(
-        version_from_pyproject.patch, int
-    ), f"patch: {version_from_pyproject.patch} is {type(version_from_pyproject.patch)}"
-    assert version_from_pyproject.project_name == "alexlib"
+    else:
+        assert isinstance(
+            version_from_pyproject.major, int
+        ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
+        assert isinstance(
+            version_from_pyproject.minor, int
+        ), f"minor: {version_from_pyproject.minor} is {type(version_from_pyproject.minor)}"
+        assert isinstance(
+            version_from_pyproject.patch, int
+        ), f"patch: {version_from_pyproject.patch} is {type(version_from_pyproject.patch)}"
+        assert version_from_pyproject.project_name == "alexlib"
 
 
 def test_version_eq(version_from_sys: Version, version_from_pyproject: Version):
-    if version_info <= (3, 10):
+    if version_info.minor <= 10:
         skip("Python 3.11+ required for pyproject.toml support")
-    assert version_from_sys != version_from_pyproject
+    else:
+        assert version_from_sys != version_from_pyproject
 
 
 @fixture(scope="module")
