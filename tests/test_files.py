@@ -5,7 +5,7 @@ from random import choice
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
 
-from alexlib.constants import PROJECT_PATH
+from alexlib.constants import MODULE_PATH
 from alexlib.files import (
     CreatedTimestamp,
     Directory,
@@ -369,7 +369,7 @@ def test_system_obj_from_string_path():
 
 
 def test_system_obj_from_parent():
-    obj = SystemObject.from_parent(".gitignore", PROJECT_PATH, notexistok=False)
+    obj = SystemObject.from_parent(".gitignore", MODULE_PATH, notexistok=False)
     assert isinstance(obj, SystemObject)
 
 
