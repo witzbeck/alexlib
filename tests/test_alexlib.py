@@ -1,6 +1,6 @@
 from sys import path, version_info
 
-from pytest import fixture, skip
+from pytest import fixture, raises
 
 from alexlib import Version
 from alexlib.constants import MODULE_PATH
@@ -25,7 +25,8 @@ def test_version_from_sys(version_from_sys: Version):
 
 def test_version_from_pyproject():
     if version_info.minor <= 10:
-        skip("Python 3.11+ required for pyproject.toml support")
+        with raises(ImportError):
+            Version.from_pyproject()
     else:
         version_from_pyproject = Version.from_pyproject()
         assert isinstance(
@@ -42,7 +43,8 @@ def test_version_from_pyproject():
 
 def test_version_eq(version_from_sys: Version):
     if version_info.minor <= 10:
-        skip("Python 3.11+ required for pyproject.toml support")
+        with raises(ImportError):
+            Version.from_pyproject()
     else:
         version_from_pyproject = Version.from_pyproject()
         assert version_from_sys != version_from_pyproject
