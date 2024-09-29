@@ -5,7 +5,6 @@ from random import choice
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
 
-from alexlib.constants import MODULE_PATH
 from alexlib.files import (
     CreatedTimestamp,
     Directory,
@@ -368,8 +367,18 @@ def test_system_obj_from_string_path():
     assert isinstance(obj, SystemObject)
 
 
-def test_system_obj_from_parent():
-    obj = SystemObject.from_parent(".gitignore", MODULE_PATH, notexistok=False)
+@fixture(scope="module")
+def rand_file_in_parent():
+    here = Path(__file__).parent
+    rand_parent = choice(list(here.parents))
+    rand_file = choice([x for x in rand_parent.iterdir() if x.is_file()])
+    return rand_file
+
+
+def test_system_obj_from_parent(rand_file_in_parent: Path):
+    obj = SystemObject.from_parent(
+        rand_file_in_parent.name, Path(__file__).parent, notexistok=False
+    )
     assert isinstance(obj, SystemObject)
 
 
