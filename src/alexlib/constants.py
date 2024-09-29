@@ -1,5 +1,6 @@
 """Constants for alexlib."""
 
+from calendar import EPOCH
 from datetime import datetime
 from pathlib import Path
 from string import ascii_letters, digits
@@ -7,7 +8,7 @@ from string import ascii_letters, digits
 DATE_FORMAT = "%Y-%m-%d"
 TIME_FORMAT = "%H:%M:%S"
 DATETIME_FORMAT = f"{DATE_FORMAT}T{TIME_FORMAT}"
-EPOCH = datetime(1000, 1, 1)
+EPOCH = datetime(EPOCH, 1, 1)
 EPOCH_SECONDS = EPOCH.timestamp()
 
 MODULE_PATH = Path(__file__).parent
@@ -35,6 +36,28 @@ SQL_CHARS = f"{ascii_letters} _{digits}"
 
 SQL_INFOSCHEMA_COL = "select * from information_schema.columns"
 
-CLIPBOARD_COMMANDS_PATH = RESOURCES_PATH / "clipboard_commands_map.json"
-COLUMN_SUB_PATH = RESOURCES_PATH / "column_substitution_map.json"
-SA_DIALECT_MAP_PATH = RESOURCES_PATH / "sqlalchemy_dialect_map.json"
+CLIPBOARD_COMMANDS_MAP = {
+    "windows": ["clip"],
+    "macos": ["pbcopy"],
+    "linux": [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]],
+}
+COLUMN_SUB_MAP = {
+    " ": "_",
+    "-": "_",
+    "#": "number",
+    "&": "and",
+    "/": "_",
+    "%": "percent",
+    ".": "",
+    ",": "",
+    "<": "lt",
+    ">": "gt",
+    "=": "eq",
+}
+SA_DIALECT_MAP = {
+    "postgres": "postgresql+psycopg://",
+    "oracle": "oracle+oracledb://",
+    "mssql": "mssql+pyodbc://",
+    "mysql": "mysql+mysqldb://",
+    "sqlite": "sqlite:///",
+}

@@ -20,20 +20,20 @@ def idx_list(shape: tuple[int]) -> list[tuple[int, ...]]:
     return list(product(range(x) for x in shape))
 
 
-def get_comb_gen(_list: list, _int: int) -> Generator[tuple, None, None]:
+def get_comb_gen(list_: list, int_: int) -> Generator[tuple, None, None]:
     """returns a generator for all combinations of a list"""
-    for pair in comb(_list, _int):
+    for pair in comb(list_, int_):
         yield pair
 
 
-def get_pop_item(item: str, _list: list) -> str:
+def get_pop_item(item: str, list_: list) -> str:
     """returns an item from a list and removes it from the list"""
-    return _list.pop(_list.index(item))
+    return list_.pop(list_.index(item))
 
 
-def get_pop_rand_item(_list: list) -> Any:
+def get_pop_rand_item(list_: list) -> Any:
     """returns a random item from a list and removes it from the list"""
-    return _list.pop(randint(0, len(_list)))
+    return list_.pop(randint(0, len(list_) - 1))
 
 
 def rm_pattern(list_of_strs: list, pattern: str, end: bool = True) -> list:

@@ -1,7 +1,0 @@
-{
-    "postgres": "postgresql+psycopg://",
-    "oracle": "oracle+oracledb://",
-    "mssql": "mssql+pyodbc://",
-    "mysql": "mysql+mysqldb://",
-    "sqlite": "sqlite:///"
-}

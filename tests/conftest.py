@@ -6,40 +6,31 @@ from random import choice
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from faker import Faker
-from matplotlib.figure import Figure
 from pandas import DataFrame
 from pytest import FixtureRequest, fixture
 
-from alexlib.auth import (
-    Auth,
-    AuthPart,
-    Curl,
-    Login,
-    Password,
-    SecretStore,
-    Server,
-    Username,
-)
 from alexlib.constants import (
-    CLIPBOARD_COMMANDS_PATH,
-    COLUMN_SUB_PATH,
+    CLIPBOARD_COMMANDS_MAP,
+    COLUMN_SUB_MAP,
     CREDS,
     DATA_PATH,
     DATE_FORMAT,
     DATETIME_FORMAT,
+    ENVIRONMENTS,
+    EPOCH,
     HOME,
+    LOG_FORMAT,
+    LOG_PATH,
     MODULE_PATH,
     PROJECT_PATH,
     PYPROJECT_PATH,
-    RESOURCES_PATH,
-    SA_DIALECT_MAP_PATH,
+    SA_DIALECT_MAP,
     SOURCE_PATH,
     SQL_CHARS,
     TIME_FORMAT,
     VENVS,
 )
 from alexlib.core import chkcmd, get_clipboard_cmd
-from alexlib.crypto import Cryptographer
 from alexlib.files import (
     CreatedTimestamp,
     Directory,
@@ -54,26 +45,45 @@ from alexlib.files import (
 from alexlib.files.utils import write_json
 from alexlib.times import ONEDAY, CustomDatetime
 
+CORE_DATETIMES = (EPOCH,)
+CORE_MAPS = (
+    CLIPBOARD_COMMANDS_MAP,
+    COLUMN_SUB_MAP,
+    SA_DIALECT_MAP,
+)
 CORE_PATHS = (
     MODULE_PATH,
     SOURCE_PATH,
     PROJECT_PATH,
-    RESOURCES_PATH,
     DATA_PATH,
+    LOG_PATH,
     PYPROJECT_PATH,
     HOME,
     CREDS,
     VENVS,
-    CLIPBOARD_COMMANDS_PATH,
-    COLUMN_SUB_PATH,
-    SA_DIALECT_MAP_PATH,
 )
 CORE_STRINGS = (
+    LOG_FORMAT,
     DATE_FORMAT,
     TIME_FORMAT,
     DATETIME_FORMAT,
     SQL_CHARS,
-)
+) + ENVIRONMENTS
+
+
+@fixture(scope="session", params=ENVIRONMENTS)
+def environment(request: FixtureRequest) -> str:
+    return request.param
+
+
+@fixture(scope="session", params=CORE_MAPS)
+def core_map(request: FixtureRequest) -> dict[str, str]:
+    return request.param
+
+
+@fixture(scope="session", params=CORE_DATETIMES)
+def core_datetime(request: FixtureRequest) -> datetime:
+    return request.param
 
 
 @fixture(scope="session", params=CORE_PATHS)
@@ -104,11 +114,6 @@ def this_xmas(thisyear: int):
 @fixture(scope="session")
 def day_after_xmas(this_xmas: CustomDatetime):
     return this_xmas + ONEDAY
-
-
-@fixture(scope="function")
-def cryptographer() -> Cryptographer:
-    return Cryptographer.new()
 
 
 @fixture(scope="session")
@@ -286,109 +291,6 @@ def copy_path(file_path: Path, copy_text: str):
     return file_path
 
 
-@fixture(scope="session")
-def auth():
-    return Auth.from_dict(
-        name="test_auth",
-        dict_={
-            "username": "test_user",
-            "password": "test_pass",
-            "key": "value",
-            "host": "test_host",
-            "port": "test_port",
-            "database": "test_database",
-        },
-    )
-
-
-@fixture(scope="session")
-def curl():
-    return Curl(
-        username="testuser",
-        password="testpass",
-        host="localhost",
-        port=5432,
-        database="testdb",
-        dialect="postgres",
-    )
-
-
-@fixture(scope="module")
-def auth_path(dir_path: Path):
-    return dir_path / "auth_store.json"
-
-
-@fixture(scope="function")
-def username():
-    return Username.rand()
-
-
-@fixture(scope="function")
-def password():
-    return Password.rand()
-
-
-@fixture(scope="module")
-def ip() -> str:
-    return Server.rand_ip()
-
-
-@fixture(scope="module")
-def addr() -> str:
-    return Server.rand_addr()
-
-
-@fixture(scope="module")
-def host() -> str:
-    return Server.rand_host()
-
-
-@fixture(scope="module")
-def port() -> int:
-    return Server.rand_port()
-
-
-@fixture(scope="module")
-def rand_server() -> Server:
-    return Server.rand()
-
-
-@fixture(scope="module")
-def regular_server() -> Server:
-    return Server("127.0.0.1", 8080)
-
-
-@fixture(scope="function")
-def login(username: Username, password: Password):
-    return Login(user=username, pw=password)
-
-
-@fixture(scope="module", params=(Username, AuthPart, Password))
-def auth_part(request: FixtureRequest) -> AuthPart:
-    return request.param.rand(letter=True)
-
-
-@fixture(scope="module")
-def server() -> Server:
-    return Server.rand()
-
-
-@fixture(
-    scope="module",
-    params=(
-        {"username": "user", "password": "pass"},
-        {"key1": "value1", "key2": "value2"},
-    ),
-)
-def secrets(request: FixtureRequest) -> dict:
-    return request.param
-
-
-@fixture(scope="module")
-def secret_store(secrets: dict) -> SecretStore:
-    return SecretStore.from_dict(secrets)
-
-
 @fixture(scope="function")
 def cmd():
     try:
@@ -437,16 +339,3 @@ def df_to_filter():
 def df_copy(df):
     """Return a copy of the DataFrame."""
     return df.copy()
-
-
-@fixture(scope="session")
-def figure():
-    fig = Figure()
-    ax = fig.subplots()
-    ax.plot([1], [1])
-    return fig
-
-
-@fixture(scope="session")
-def figure_path(dir_path: Path):
-    return dir_path / "testfig.png"

@@ -24,6 +24,114 @@ from alexlib.auth import (
 from alexlib.crypto import Cryptographer, SecretValue
 
 
+@fixture(scope="module")
+def cryptographer() -> Cryptographer:
+    return Cryptographer.new()
+
+
+@fixture(scope="module")
+def auth():
+    return Auth.from_dict(
+        name="test_auth",
+        dict_={
+            "username": "test_user",
+            "password": "test_pass",
+            "key": "value",
+            "host": "test_host",
+            "port": "test_port",
+            "database": "test_database",
+        },
+    )
+
+
+@fixture(scope="module")
+def curl():
+    return Curl(
+        username="testuser",
+        password="testpass",
+        host="localhost",
+        port=5432,
+        database="testdb",
+        dialect="postgres",
+    )
+
+
+@fixture(scope="module")
+def auth_path(dir_path: Path):
+    return dir_path / "auth_store.json"
+
+
+@fixture(scope="function")
+def username():
+    return Username.rand()
+
+
+@fixture(scope="function")
+def password():
+    return Password.rand()
+
+
+@fixture(scope="module")
+def ip() -> str:
+    return Server.rand_ip()
+
+
+@fixture(scope="module")
+def addr() -> str:
+    return Server.rand_addr()
+
+
+@fixture(scope="module")
+def host() -> str:
+    return Server.rand_host()
+
+
+@fixture(scope="module")
+def port() -> int:
+    return Server.rand_port()
+
+
+@fixture(scope="module")
+def rand_server() -> Server:
+    return Server.rand()
+
+
+@fixture(scope="module")
+def regular_server() -> Server:
+    return Server("127.0.0.1", 8080)
+
+
+@fixture(scope="function")
+def login(username: Username, password: Password):
+    return Login(user=username, pw=password)
+
+
+@fixture(scope="module", params=(Username, AuthPart, Password))
+def auth_part(request: FixtureRequest) -> AuthPart:
+    return request.param.rand(letter=True)
+
+
+@fixture(scope="module")
+def server() -> Server:
+    return Server.rand()
+
+
+@fixture(
+    scope="module",
+    params=(
+        {"username": "user", "password": "pass"},
+        {"key1": "value1", "key2": "value2"},
+    ),
+)
+def secrets(request: FixtureRequest) -> dict:
+    return request.param
+
+
+@fixture(scope="module")
+def secret_store(secrets: dict) -> SecretStore:
+    return SecretStore.from_dict(secrets)
+
+
 @fixture(
     scope="module",
     params=(

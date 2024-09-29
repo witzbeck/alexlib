@@ -153,6 +153,19 @@ def test_settings_envdict_has_values(settings_file: SettingsFile):
     assert len(settings_file.envdict) > 0
 
 
+@fixture(scope="module")
+def figure():
+    fig = Figure()
+    ax = fig.subplots()
+    ax.plot([1], [1])
+    return fig
+
+
+@fixture(scope="module")
+def figure_path(dir_path: Path):
+    return dir_path / "testfig.png"
+
+
 @mark.slow
 def test_save_png_format(figure: Figure, figure_path: Path):
     """Test saving a figure in PNG format."""
