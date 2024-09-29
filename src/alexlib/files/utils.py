@@ -60,7 +60,7 @@ try:
         chktype(path, Path, mustexist=True)
         return toml_loads(path.read_text())
 
-except ImportError as e:
+except ImportError as e:  # pragma: no cover
     read_toml = None
     logger.debug(f"toml support only available ^3.11: {e}")
 
@@ -73,7 +73,6 @@ def write_json(dict_: dict[str:str], path: Path) -> None:
 def read_dotenv(dotenv_path: Path) -> dict[str, str]:
     """read a dotenv file into a dictionary"""
     chktype(dotenv_path, Path, mustexist=True)
-    print(dotenv_path.read_text())
     return {
         k: v.strip("'").strip('"').strip()
         for k, v in [

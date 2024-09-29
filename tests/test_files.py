@@ -397,10 +397,11 @@ def test_system_obj_from_string_path():
 
 @fixture(scope="module")
 def rand_file_in_parent():
-    here = Path(__file__).parent
-    rand_parent = choice(list(here.parents))
-    rand_file = choice([x for x in rand_parent.iterdir() if x.is_file()])
-    return rand_file
+    here, choices = Path(__file__).parent, []
+    while not choices:
+        rand_parent = choice(list(here.parents))
+        choices = [x for x in rand_parent.iterdir() if x.is_file()]
+    return choice(choices)
 
 
 def test_system_obj_from_parent(rand_file_in_parent: Path):
