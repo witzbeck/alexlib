@@ -135,7 +135,7 @@ class File(SystemObject):
         newpath = self.path.parent / name
         if overwrite and newpath.exists():
             newpath.unlink()
-        self.path.rename(self.path.parent / name)
+        self.path = self.path.rename(self.path.parent / name)
 
     def istype(self, suffix: str) -> bool:
         """checks if file is of type"""
