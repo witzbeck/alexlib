@@ -5,6 +5,7 @@ from random import choice
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
 
+from alexlib.constants import PROJECT_PATH
 from alexlib.files import (
     CreatedTimestamp,
     Directory,
@@ -368,7 +369,7 @@ def test_system_obj_from_string_path():
 
 
 def test_system_obj_from_parent():
-    obj = SystemObject.from_parent(".gitignore", Path(".").resolve(), notexistok=False)
+    obj = SystemObject.from_parent(".gitignore", PROJECT_PATH, notexistok=False)
     assert isinstance(obj, SystemObject)
 
 
@@ -391,7 +392,10 @@ def test_file_obj_str(text_file_obj: File):
 
 
 def test_file_clipboard(text_file_obj: File):
-    assert isinstance(text_file_obj.clip(), str)
+    try:
+        assert isinstance(text_file_obj.clip(), str)
+    except OSError:
+        skip("Clipboard not available")
 
 
 @mark.parametrize("label, scale", NBYTES_LABEL_MAP.items())
