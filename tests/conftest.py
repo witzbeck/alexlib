@@ -6,65 +6,84 @@ from random import choice
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from faker import Faker
-from matplotlib.figure import Figure
 from pandas import DataFrame
 from pytest import FixtureRequest, fixture
 
-from alexlib.auth import (
-    Auth,
-    AuthPart,
-    Curl,
-    Login,
-    Password,
-    SecretStore,
-    Server,
-    Username,
-)
 from alexlib.constants import (
-    CLIPBOARD_COMMANDS_PATH,
-    COLUMN_SUB_PATH,
+    CLIPBOARD_COMMANDS_MAP,
+    COLUMN_SUB_MAP,
     CREDS,
     DATA_PATH,
     DATE_FORMAT,
     DATETIME_FORMAT,
+    ENVIRONMENTS,
+    EPOCH,
     HOME,
+    LOG_FORMAT,
+    LOG_PATH,
     MODULE_PATH,
     PROJECT_PATH,
     PYPROJECT_PATH,
-    RESOURCES_PATH,
-    SA_DIALECT_MAP_PATH,
+    SA_DIALECT_MAP,
     SOURCE_PATH,
     SQL_CHARS,
     TIME_FORMAT,
     VENVS,
 )
 from alexlib.core import chkcmd, get_clipboard_cmd
-from alexlib.crypto import Cryptographer
-from alexlib.files import DotenvFile, JsonFile, SettingsFile, TomlFile
-from alexlib.files.objects import Directory, File, SystemObject
+from alexlib.files import (
+    CreatedTimestamp,
+    Directory,
+    DotenvFile,
+    File,
+    JsonFile,
+    ModifiedTimestamp,
+    SettingsFile,
+    SystemObject,
+    TomlFile,
+)
 from alexlib.files.utils import write_json
 from alexlib.times import ONEDAY, CustomDatetime
 
+CORE_DATETIMES = (EPOCH,)
+CORE_MAPS = (
+    CLIPBOARD_COMMANDS_MAP,
+    COLUMN_SUB_MAP,
+    SA_DIALECT_MAP,
+)
 CORE_PATHS = (
     MODULE_PATH,
     SOURCE_PATH,
     PROJECT_PATH,
-    RESOURCES_PATH,
     DATA_PATH,
+    LOG_PATH,
     PYPROJECT_PATH,
     HOME,
     CREDS,
     VENVS,
-    CLIPBOARD_COMMANDS_PATH,
-    COLUMN_SUB_PATH,
-    SA_DIALECT_MAP_PATH,
 )
 CORE_STRINGS = (
+    LOG_FORMAT,
     DATE_FORMAT,
     TIME_FORMAT,
     DATETIME_FORMAT,
     SQL_CHARS,
-)
+) + ENVIRONMENTS
+
+
+@fixture(scope="session", params=ENVIRONMENTS)
+def environment(request: FixtureRequest) -> str:
+    return request.param
+
+
+@fixture(scope="session", params=CORE_MAPS)
+def core_map(request: FixtureRequest) -> dict[str, str]:
+    return request.param
+
+
+@fixture(scope="session", params=CORE_DATETIMES)
+def core_datetime(request: FixtureRequest) -> datetime:
+    return request.param
 
 
 @fixture(scope="session", params=CORE_PATHS)
@@ -97,11 +116,6 @@ def day_after_xmas(this_xmas: CustomDatetime):
     return this_xmas + ONEDAY
 
 
-@fixture(scope="class")
-def cryptographer() -> Cryptographer:
-    return Cryptographer.new()
-
-
 @fixture(scope="session")
 def faker():
     return Faker()
@@ -112,7 +126,7 @@ def environ_keys():
     return list(environ.keys())
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_env(environ_keys: list[str]) -> str:
     return choice(environ_keys)
 
@@ -136,6 +150,11 @@ def subdir_with_files(faker: Faker, temp_dir: Path, request: FixtureRequest):
 
 
 @fixture(scope="session")
+def subdir_latest_file(subdir_with_files: Directory):
+    return subdir_with_files.get_latest_file()
+
+
+@fixture(scope="session")
 def dir_path(faker: Faker, temp_dir: Path):
     (path := temp_dir / faker.word()).mkdir(exist_ok=True, parents=True)
     return path
@@ -146,12 +165,22 @@ def dir_obj(dir_path: Path):
     return Directory.from_path(dir_path)
 
 
-@fixture(scope="class")
+@fixture(scope="module")
+def dir_obj_created_ts(dir_obj: Directory) -> CreatedTimestamp:
+    return dir_obj.created_timestamp
+
+
+@fixture(scope="module")
+def dir_obj_modified_ts(dir_obj: Directory) -> ModifiedTimestamp:
+    return dir_obj.modified_timestamp
+
+
+@fixture(scope="function")
 def sysobj(file_path: Path):
     return SystemObject.from_path(file_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def text_file_path(dir_path: Path) -> Path:
     """Create a text file and return its path."""
     text_file = dir_path / "test.txt"
@@ -160,7 +189,7 @@ def text_file_path(dir_path: Path) -> Path:
     return text_file
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def text_file_obj(text_file_path: Path) -> File:
     """Create a File object and return it."""
     return File.from_path(text_file_path)
@@ -228,17 +257,17 @@ def settings_file(settings_path: Path):
     return SettingsFile.from_path(settings_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_key(settings_file: SettingsFile):
     return choice(list(settings_file.envdict.keys()))
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def rand_val(settings_file: SettingsFile, rand_key: str):
     return settings_file.envdict[rand_key]
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def file_path(temp_dir: Path, faker: Faker):
     test_file = temp_dir / NamedTemporaryFile("w", delete=False).name
     test_file.write_text(faker.text())
@@ -246,126 +275,23 @@ def file_path(temp_dir: Path, faker: Faker):
     test_file.unlink()
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def file_obj(file_path: Path) -> File:
     return File.from_path(file_path)
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def copy_text():
     return "Text copied to clipboard successfully."
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def copy_path(file_path: Path, copy_text: str):
     file_path.write_text(copy_text)
     return file_path
 
 
-@fixture(scope="session")
-def auth():
-    return Auth.from_dict(
-        name="test_auth",
-        dict_={
-            "username": "test_user",
-            "password": "test_pass",
-            "key": "value",
-            "host": "test_host",
-            "port": "test_port",
-            "database": "test_database",
-        },
-    )
-
-
-@fixture(scope="session")
-def curl():
-    return Curl(
-        username="testuser",
-        password="testpass",
-        host="localhost",
-        port=5432,
-        database="testdb",
-        dialect="postgres",
-    )
-
-
-@fixture(scope="module")
-def auth_path(dir_path: Path):
-    return dir_path / "auth_store.json"
-
-
 @fixture(scope="function")
-def username():
-    return Username.rand()
-
-
-@fixture(scope="function")
-def password():
-    return Password.rand()
-
-
-@fixture(scope="module")
-def ip() -> str:
-    return Server.rand_ip()
-
-
-@fixture(scope="module")
-def addr() -> str:
-    return Server.rand_addr()
-
-
-@fixture(scope="module")
-def host() -> str:
-    return Server.rand_host()
-
-
-@fixture(scope="module")
-def port() -> int:
-    return Server.rand_port()
-
-
-@fixture(scope="module")
-def rand_server() -> Server:
-    return Server.rand()
-
-
-@fixture(scope="module")
-def regular_server() -> Server:
-    return Server("127.0.0.1", 8080)
-
-
-@fixture(scope="function")
-def login(username: Username, password: Password):
-    return Login(user=username, pw=password)
-
-
-@fixture(scope="module", params=(Username, AuthPart, Password))
-def auth_part(request: FixtureRequest) -> AuthPart:
-    return request.param.rand(letter=True)
-
-
-@fixture(scope="module")
-def server() -> Server:
-    return Server.rand()
-
-
-@fixture(
-    scope="module",
-    params=(
-        {"username": "user", "password": "pass"},
-        {"key1": "value1", "key2": "value2"},
-    ),
-)
-def secrets(request: FixtureRequest) -> dict:
-    return request.param
-
-
-@fixture(scope="module")
-def secret_store(secrets: dict) -> SecretStore:
-    return SecretStore.from_dict(secrets)
-
-
-@fixture(scope="class")
 def cmd():
     try:
         get_clipboard_cmd()
@@ -373,12 +299,12 @@ def cmd():
         return None
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def hascmd(cmd):
     return chkcmd(cmd[0]) if cmd is not None else False
 
 
-@fixture(scope="class")
+@fixture(scope="function")
 def csv_path(dir_path: Path):
     return dir_path / "test_df.csv"
 
@@ -413,16 +339,3 @@ def df_to_filter():
 def df_copy(df):
     """Return a copy of the DataFrame."""
     return df.copy()
-
-
-@fixture(scope="session")
-def figure():
-    fig = Figure()
-    ax = fig.subplots()
-    ax.plot([1], [1])
-    return fig
-
-
-@fixture(scope="session")
-def figure_path(dir_path: Path):
-    return dir_path / "testfig.png"

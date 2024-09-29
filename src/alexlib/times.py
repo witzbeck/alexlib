@@ -31,7 +31,6 @@ from logging import info
 from math import floor
 from random import randint
 from time import perf_counter
-from typing import Any
 
 from pandas import Timestamp
 from pandas.tseries.holiday import USFederalHolidayCalendar
@@ -237,7 +236,7 @@ def timeit(niter: int = None, toprint: bool = True) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args, **kwargs) -> Callable:
             timer = Timer()
             if niter is None:
                 # Execute the function once if niter is not provided

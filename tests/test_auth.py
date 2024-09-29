@@ -24,6 +24,114 @@ from alexlib.auth import (
 from alexlib.crypto import Cryptographer, SecretValue
 
 
+@fixture(scope="module")
+def cryptographer() -> Cryptographer:
+    return Cryptographer.new()
+
+
+@fixture(scope="module")
+def auth():
+    return Auth.from_dict(
+        name="test_auth",
+        dict_={
+            "username": "test_user",
+            "password": "test_pass",
+            "key": "value",
+            "host": "test_host",
+            "port": "test_port",
+            "database": "test_database",
+        },
+    )
+
+
+@fixture(scope="module")
+def curl():
+    return Curl(
+        username="testuser",
+        password="testpass",
+        host="localhost",
+        port=5432,
+        database="testdb",
+        dialect="postgres",
+    )
+
+
+@fixture(scope="module")
+def auth_path(dir_path: Path):
+    return dir_path / "auth_store.json"
+
+
+@fixture(scope="function")
+def username():
+    return Username.rand()
+
+
+@fixture(scope="function")
+def password():
+    return Password.rand()
+
+
+@fixture(scope="module")
+def ip() -> str:
+    return Server.rand_ip()
+
+
+@fixture(scope="module")
+def addr() -> str:
+    return Server.rand_addr()
+
+
+@fixture(scope="module")
+def host() -> str:
+    return Server.rand_host()
+
+
+@fixture(scope="module")
+def port() -> int:
+    return Server.rand_port()
+
+
+@fixture(scope="module")
+def rand_server() -> Server:
+    return Server.rand()
+
+
+@fixture(scope="module")
+def regular_server() -> Server:
+    return Server("127.0.0.1", 8080)
+
+
+@fixture(scope="function")
+def login(username: Username, password: Password):
+    return Login(user=username, pw=password)
+
+
+@fixture(scope="module", params=(Username, AuthPart, Password))
+def auth_part(request: FixtureRequest) -> AuthPart:
+    return request.param.rand(letter=True)
+
+
+@fixture(scope="module")
+def server() -> Server:
+    return Server.rand()
+
+
+@fixture(
+    scope="module",
+    params=(
+        {"username": "user", "password": "pass"},
+        {"key1": "value1", "key2": "value2"},
+    ),
+)
+def secrets(request: FixtureRequest) -> dict:
+    return request.param
+
+
+@fixture(scope="module")
+def secret_store(secrets: dict) -> SecretStore:
+    return SecretStore.from_dict(secrets)
+
+
 @fixture(
     scope="module",
     params=(
@@ -64,15 +172,16 @@ def auth_templates(auth_generator: AuthGenerator) -> dict[str, dict[str, str]]:
 
 
 @fixture(scope="module")
-def auth_objects(auth_templates: dict[str, dict[str, str]]) -> dict[str, Auth]:
-    return {
-        key: Auth.from_dict(key, template) for key, template in auth_templates.items()
-    }
+def auth_template(
+    auth_templates: dict[str, dict[str, str]], auth_key: str
+) -> dict[str, str]:
+    return auth_key, auth_templates[auth_key]
 
 
 @fixture(scope="module")
-def auth_object(auth_objects: dict[str, Auth], auth_key: str) -> Auth:
-    return auth_objects[auth_key]
+def auth_object(auth_template: dict[str, str]) -> dict[str, Auth]:
+    auth_key, template = auth_template
+    return Auth.from_dict(auth_key, template)
 
 
 def test_auth_generator_init(auth_generator: AuthGenerator):
@@ -85,9 +194,10 @@ def test_auth_template_path(auth_generator: AuthGenerator, auth_template_path: P
     assert auth_generator.path.exists()
 
 
-def test_auth_templates(auth_templates: dict[str, dict[str, str]], auth_key: str):
-    assert auth_key in auth_templates
-    template = auth_templates[auth_key]
+@mark.slow
+def test_auth_templates(auth_template: tuple[str, dict[str, str]]):
+    key, template = auth_template
+    assert isinstance(key, str)
     assert isinstance(template, dict)
     assert len(template) == 7
 
@@ -96,6 +206,7 @@ def test_auth_object_is_auth(auth_object: Auth):
     assert isinstance(auth_object, Auth)
 
 
+@mark.slow
 @mark.parametrize("attr", ("username", "password", "host", "port", "database"))
 def test_auth_object_attrs(attr: str, auth_object: Auth):
     assert hasattr(auth_object, attr)
@@ -328,12 +439,24 @@ def test_authpart_str_method(auth_part: AuthPart):
     assert isinstance(str(auth_part), str)
 
 
-def test_login_rand_method():
+@fixture(scope="module")
+def rand_login() -> Login:
+    return Login.rand()
+
+
+def test_login_rand_init(rand_login: Login):
     """Test the rand method for the Login class."""
-    login = Login.rand()
-    assert isinstance(login, Login)
-    assert isinstance(login.user, Username)
-    assert isinstance(login.pw, Password)
+    assert isinstance(rand_login, Login)
+
+
+def test_login_rand_user(rand_login: Login):
+    """Test the rand method for the Login class."""
+    assert isinstance(rand_login.user, Username)
+
+
+def test_login_rand_password(rand_login: Login):
+    """Test the rand method for the Login class."""
+    assert isinstance(rand_login.pw, Password)
 
 
 def test_curl_repr_method(curl: Curl):

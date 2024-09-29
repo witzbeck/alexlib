@@ -31,7 +31,7 @@ from subprocess import PIPE, CalledProcessError, Popen, SubprocessError, run
 from sys import platform
 from typing import Any, Hashable
 
-from alexlib.constants import CLIPBOARD_COMMANDS_PATH
+from alexlib.constants import CLIPBOARD_COMMANDS_MAP
 
 logger = getLogger(__name__)
 
@@ -293,13 +293,12 @@ def chkcmd(cmd: str) -> bool:
 
 def get_clipboard_cmd() -> list[str]:
     """returns command to copy to clipboard"""
-    commands = json_loads(CLIPBOARD_COMMANDS_PATH.read_text())
     if iswindows():
-        ret = commands["windows"]
+        ret = CLIPBOARD_COMMANDS_MAP["windows"]
     elif ismacos():
-        ret = commands["macos"]
+        ret = CLIPBOARD_COMMANDS_MAP["macos"]
     elif islinux():
-        ret = commands["linux"]
+        ret = CLIPBOARD_COMMANDS_MAP["linux"]
         cmds = next((cmd for cmd in ret if chkcmd(cmd[0])), None)
         if cmds is None:
             raise OSError(

@@ -26,11 +26,11 @@ from random import choice, randint
 
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
-from alexlib.constants import CREDS, SA_DIALECT_MAP_PATH
+from alexlib.constants import CREDS, SA_DIALECT_MAP
 from alexlib.core import chkenv, chktype
 from alexlib.crypto import Cryptographer, SecretValue
 from alexlib.fake import limgen, randdigit, randdigits, randlets
-from alexlib.files.objects import File
+from alexlib.files import File
 from alexlib.files.utils import read_json, write_json
 
 AUTH_TEMPLATE = {
@@ -40,7 +40,6 @@ AUTH_TEMPLATE = {
     "port": "",
     "database": "",
 }
-DIALECT_MAP = read_json(SA_DIALECT_MAP_PATH)
 
 
 @dataclass
@@ -207,7 +206,7 @@ class Curl:
     @property
     def system(self) -> str:
         """returns a system string for connection urls"""
-        return DIALECT_MAP[self.dialect]
+        return SA_DIALECT_MAP[self.dialect]
 
     @property
     def login(self) -> str:

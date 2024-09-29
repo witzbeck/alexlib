@@ -3,7 +3,12 @@ from random import randint
 
 from pytest import fixture
 
-from alexlib.iters import get_comb_gen, get_pop_item, get_pop_rand_item, idx_list
+from alexlib.iters import (
+    get_comb_gen,
+    get_pop_item,
+    get_pop_rand_item,
+    idx_list,
+)
 
 
 @fixture(scope="module")
@@ -26,22 +31,22 @@ def comb_gen() -> Generator[tuple, None, None]:
     return get_comb_gen(list(range(10)), 3)
 
 
-@fixture(scope="function")
+@fixture(scope="class")
 def to_pop_list() -> list:
     return list(range(10))
 
 
-@fixture(scope="function")
+@fixture(scope="class")
 def pop_list_copy(to_pop_list: list):
     return to_pop_list.copy()
 
 
-@fixture(scope="function")
+@fixture(scope="class")
 def popped_item(to_pop_list: list):
-    return get_pop_item(to_pop_list[randint(0, 9)], to_pop_list)
+    return get_pop_item(to_pop_list[randint(0, len(to_pop_list) - 1)], to_pop_list)
 
 
-@fixture(scope="function")
+@fixture(scope="class")
 def popped_rand_item(to_pop_list: list):
     return get_pop_rand_item(to_pop_list)
 

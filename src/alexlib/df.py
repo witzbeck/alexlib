@@ -37,8 +37,7 @@ from functools import partial
 from itertools import chain
 from typing import Any
 
-from pandas import DataFrame, Series, to_datetime
-from sqlalchemy import Engine
+from pandas import DataFrame
 
 from alexlib.iters import rm_pattern
 
@@ -103,16 +102,18 @@ def get_unique_col_vals(col: str, df: DataFrame | list[DataFrame]) -> list:
     returns:
         val_list = list of unique values
     """
+    # check if df is a single df
     if isinstance(df, DataFrame):
         vals = df.loc[:, col].unique()  # str from slice
+    # check if df is a list of dfs
+    elif isinstance(df, list):
+        vals_list = [get_unique_col_vals(col, d) for d in df]
+        vals = set(chain.from_iterable(vals_list))
+    # check if df is a dict of dfs
     elif isinstance(df, dict):
         vals = get_unique_col_vals(col, list(df.values()))
-    elif isinstance(df, list):
-        func = get_unique_col_vals
-        vals_list = [func(col, d) for d in df]
-        vals = set(chain.from_iterable(vals_list))
     else:
-        raise TypeError("need df or list of dfs")
+        raise TypeError(f"need df or list of dfs but got {type(df)}")
     return list(vals)
 
 
@@ -136,17 +137,6 @@ def col_vals_to_dict(df: DataFrame, key_col: str, val_col: str) -> dict[str:Any]
     return {x[key_col]: x[val_col] for x in recs}
 
 
-def ts_col_to_dt(
-    df: DataFrame,
-    ts_col: str,
-    dt_col: str,
-) -> DataFrame:
-    """converts a timestamp column to a datetime column"""
-    col = df.loc[:, ts_col]
-    df.loc[:, dt_col] = to_datetime(col)
-    return df
-
-
 def set_type_list(df: DataFrame, type_: Any, cols: list[str]) -> DataFrame:
     """
     Efficiently sets the type of specified columns in a DataFrame.
@@ -168,7 +158,8 @@ def set_type_list(df: DataFrame, type_: Any, cols: list[str]) -> DataFrame:
 
 def drop_invariate_cols(df: DataFrame) -> DataFrame:
     """Drops columns that have the same value in every row."""
-    return df.loc[:, df.nunique() != 1]
+    keep_cols = df.columns[df.nunique() != 1]
+    return df.loc[:, keep_cols]
 
 
 def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
@@ -181,11 +172,6 @@ def split_df(df: DataFrame, ratio: float, head: bool = True) -> DataFrame:
         raise TypeError(f"{ratio} not {float}")
     to = int(len(df) * ratio)
     return df.head(to) if head else df.tail(to)
-
-
-def series_col(df: DataFrame, col: str) -> Series:
-    """gets a column from a dataframe as a series"""
-    return Series(df.loc[:, col])
 
 
 def get_distinct_col_vals(df: DataFrame, col: str) -> list:
@@ -214,25 +200,3 @@ def rm_df_col_pattern(
     else:
         raise ValueError("input not recognized")
     return df.loc[:, new_cols]
-
-
-def df_to_db(
-    df: DataFrame,
-    engine: Engine,
-    table_name: str,
-    schema: str = None,
-    if_exists: str = "replace",
-    index: bool = False,
-    chunksize: int = 10000,
-    method: str = "multi",
-) -> None:
-    """sends df to db"""
-    df.to_sql(
-        table_name,
-        engine,
-        if_exists=if_exists,
-        schema=schema,
-        index=index,
-        chunksize=chunksize,
-        method=method,
-    )

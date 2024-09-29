@@ -1,5 +1,6 @@
 """Test core functions."""
 
+from datetime import datetime
 from os import environ
 from pathlib import Path
 from subprocess import Popen
@@ -31,6 +32,33 @@ from alexlib.core import (
 from alexlib.files.utils import dump_envs, is_dotenv, is_json, sha256sum
 
 
+def test_core_path(core_path: Path):
+    assert isinstance(core_path, Path)
+    assert core_path.exists()
+
+
+def test_core_string(core_string: str):
+    assert isinstance(core_string, str)
+    assert bool(core_string)
+
+
+def test_environment(environment: str):
+    assert isinstance(environment, str)
+    assert bool(environment)
+
+
+def test_core_map(core_map: dict[str, str]):
+    assert isinstance(core_map, dict)
+    assert all(
+        isinstance(key, str) and isinstance(value, (str, list))
+        for key, value in core_map.items()
+    )
+
+
+def test_core_datetime(core_datetime: datetime):
+    assert isinstance(core_datetime, datetime)
+
+
 @mark.parametrize(
     "string, sep, expected",
     [
@@ -44,7 +72,7 @@ def test_aslist(string: str, sep: str, expected: list[str]) -> None:
     assert lst == expected
 
 
-@fixture(scope="function")
+@fixture(scope="module")
 def _testclass():
     class TestClass:
         def __init__(self):

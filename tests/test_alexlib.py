@@ -1,4 +1,3 @@
-from pathlib import Path
 from sys import path, version_info
 
 from pytest import fixture
@@ -46,23 +45,21 @@ def test_version_eq(version_from_sys: Version, version_from_pyproject: Version):
     assert version_from_sys != version_from_pyproject
 
 
-def test_version_from_str():
-    version = Version.from_str("1.2.3")
-    assert version.major == 1
-    assert version.minor == 2
-    assert version.patch == 3
-    assert version == Version(1, 2, 3)
+@fixture(scope="module")
+def version_from_str() -> Version:
+    return Version.from_str("1.2.3", project_name="alexlib")
+
+
+def test_version_from_str_init(version_from_str: Version):
+    assert version_from_str.major == 1
+    assert version_from_str.minor == 2
+    assert version_from_str.patch == 3
+    assert version_from_str == Version(1, 2, 3)
+
+
+def test_version_from_str_repr(version_from_str: Version):
+    assert repr(version_from_str) == "alexlib v1.2.3"
 
 
 def test_module_path_on_syspath(module_path_string: str):
     assert module_path_string in path
-
-
-def test_core_path(core_path: Path):
-    assert isinstance(core_path, Path)
-    assert core_path.exists()
-
-
-def test_core_string(core_string: str):
-    assert isinstance(core_string, str)
-    assert bool(core_string)
