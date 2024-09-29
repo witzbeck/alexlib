@@ -1,7 +1,6 @@
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from functools import cached_property
 from itertools import chain
 from logging import INFO, basicConfig
@@ -12,7 +11,6 @@ from random import choice
 from pandas import DataFrame
 
 from alexlib.constants import (
-    DATE_FORMAT,
     DATETIME_FORMAT,
     DOTENV_PATH,
     LOG_FORMAT,
@@ -20,6 +18,8 @@ from alexlib.constants import (
     PROJECT_PATH,
 )
 from alexlib.core import chktype, flatten_dict, path_istype, show_dict, to_clipboard
+from alexlib.files.sizes import FileSize
+from alexlib.files.times import CreatedTimestamp, ModifiedTimestamp
 from alexlib.files.utils import (
     is_dotenv,
     is_json,
@@ -31,77 +31,6 @@ from alexlib.files.utils import (
 )
 
 __sysobj_names__ = ("Directory", "File", "SystemObject")
-
-
-@dataclass(frozen=True)
-class SystemTimestamp:
-    """class for system timestamps"""
-
-    timestamp: float
-
-    @property
-    def datetime(self) -> datetime:
-        """gets timestamp datetime"""
-        return datetime.fromtimestamp(self.timestamp)
-
-    @property
-    def strfdate(self) -> str:
-        """gets timestamp strfdate"""
-        return self.datetime.strftime(DATE_FORMAT)
-
-    @property
-    def strfdatetime(self) -> str:
-        """gets timestamp strfdatetime"""
-        return self.datetime.strftime(DATETIME_FORMAT)
-
-    @property
-    def delta(self) -> timedelta:
-        """gets timestamp delta"""
-        return datetime.now() - self.datetime
-
-    def is_new_enough(self, min_delta: timedelta) -> bool:
-        """checks if timestamp is new enough"""
-        if not isinstance(min_delta, timedelta):
-            raise TypeError(f"{min_delta} is not a timedelta")
-        return self.delta < min_delta
-
-    def __repr__(self) -> str:
-        """gets timestamp representation"""
-        return f"{self.__class__.__name__}({self.strfdatetime})"
-
-    def __str__(self) -> str:
-        """gets timestamp string"""
-        return self.strfdatetime
-
-    @classmethod
-    def from_stat_result(cls, stat: stat_result) -> "SystemTimestamp":
-        """creates system timestamp from stat result"""
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @classmethod
-    def from_path(cls, path: Path) -> "SystemTimestamp":
-        """creates system timestamp from path"""
-        return cls.from_stat_result(path.stat())
-
-
-@dataclass(frozen=True)
-class CreatedTimestamp(SystemTimestamp):
-    """class for created timestamps"""
-
-    @classmethod
-    def from_stat_result(cls, stat: stat_result) -> "CreatedTimestamp":
-        """creates created timestamp from stat result"""
-        return cls(stat.st_ctime)
-
-
-@dataclass(frozen=True)
-class ModifiedTimestamp(SystemTimestamp):
-    """class for modified timestamps"""
-
-    @classmethod
-    def from_stat_result(cls, stat: stat_result) -> "ModifiedTimestamp":
-        """creates modified timestamp from stat result"""
-        return cls(stat.st_mtime)
 
 
 @dataclass
@@ -130,10 +59,10 @@ class SystemObject:
         """gets path stat"""
         return self.path.stat()
 
-    @property
-    def size(self) -> int:
+    @cached_property
+    def size(self) -> FileSize:
         """gets path size"""
-        return self.stat.st_size
+        return FileSize(self.stat.st_size)
 
     @cached_property
     def modified_timestamp(self) -> ModifiedTimestamp:
@@ -449,10 +378,10 @@ class Directory(SystemObject):
             chain.from_iterable([x.allchildfiles for x in self.dirlist])
         )
 
-    @property
-    def size(self) -> int:
+    @cached_property
+    def size(self) -> FileSize:
         """gets directory size"""
-        return sum(x.size for x in self.allchildfiles)
+        return FileSize(sum(x.size for x in self.allchildfiles))
 
     @property
     def allchilddirs(self) -> list[SystemObject]:

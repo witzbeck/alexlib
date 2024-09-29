@@ -3,7 +3,7 @@ from pathlib import Path
 from random import choice
 
 from matplotlib.figure import Figure
-from pytest import fixture, mark, raises
+from pytest import FixtureRequest, fixture, mark, raises, skip
 
 from alexlib.files import (
     CreatedTimestamp,
@@ -13,9 +13,18 @@ from alexlib.files import (
     ModifiedTimestamp,
     SettingsFile,
     SystemObject,
-    SystemTimestamp,
     TomlFile,
     __sysobj_names__,
+)
+from alexlib.files.sizes import (
+    NBYTES_LABEL_MAP,
+    FileSize,
+)
+from alexlib.files.times import SystemTimestamp
+from alexlib.files.types import (
+    SUFFIX_FILETYPE_MAP,
+    CommentSyntax,
+    FileType,
 )
 from alexlib.files.utils import (
     eval_parents,
@@ -383,3 +392,153 @@ def test_file_obj_str(text_file_obj: File):
 
 def test_file_clipboard(text_file_obj: File):
     assert isinstance(text_file_obj.clip(), str)
+
+
+@mark.parametrize("label, scale", NBYTES_LABEL_MAP.items())
+def test_map_has_expected_values(label, scale):
+    assert isinstance(label, str)
+    assert isinstance(scale, int)
+    assert label[-1] == "B" or label == "bytes"
+    assert scale >= 0
+
+
+def test_file_size_init(file_obj: File):
+    assert isinstance(file_obj.size, FileSize)
+    assert isinstance(file_obj.size.nbytes, int)
+    assert isinstance(file_obj.size.min_scale_level, int)
+    assert isinstance(file_obj.size.roundto, int)
+
+
+def test_file_size_repr(file_obj: File):
+    assert isinstance(repr(file_obj.size), str)
+
+
+def test_file_size_str(file_obj: File):
+    assert isinstance(str(file_obj.size), str)
+
+
+def test_file_size_lt(file_obj: File):
+    assert file_obj.size < FileSize(1e6)
+
+
+def test_file_size_gt(file_obj: File):
+    assert file_obj.size > FileSize(1e1)
+
+
+def test_file_size_from_path(file_obj: File):
+    assert isinstance(FileSize.from_path(file_obj.path), FileSize)
+
+
+def test_file_size_from_system_object(file_obj: File):
+    assert isinstance(FileSize.from_system_object(file_obj), FileSize)
+
+
+def test_file_size_from_system_object_not_pathlike(file_obj: File):
+    with raises(TypeError):
+        FileSize.from_system_object("notpathlike")
+
+
+@fixture(
+    scope="module",
+    params=SUFFIX_FILETYPE_MAP.values(),
+)
+def filetype(request: FixtureRequest) -> FileType:
+    return request.param
+
+
+def test_filetype_init(filetype: FileType):
+    assert isinstance(filetype, FileType)
+
+
+def test_filetype_repr(filetype: FileType):
+    assert isinstance(repr(filetype), str)
+
+
+def test_filetype_str(filetype: FileType):
+    assert isinstance(str(filetype), str)
+
+
+def test_filetype_name_str(filetype: FileType):
+    assert isinstance(filetype.name, str)
+
+
+def test_filetype_suffix_str(filetype: FileType):
+    assert isinstance(filetype.suffix, str)
+
+
+def test_filetype_suffix_in_map(filetype: FileType):
+    assert isinstance(SUFFIX_FILETYPE_MAP[filetype.suffix], FileType)
+
+
+def test_filetype_from_suffix(filetype: FileType):
+    assert FileType.from_suffix(filetype.suffix, SUFFIX_FILETYPE_MAP) == filetype
+
+
+def test_line_comment_chars(filetype: FileType):
+    assert isinstance(filetype.comment_syntax, CommentSyntax)
+    if filetype.comment_syntax.line_comment is None:
+        skip("No line comment chars for this filetype")
+    assert filetype.comment_syntax.line_comment is not None
+    assert isinstance(filetype.comment_syntax.line_comment, (str, list))
+
+
+def test_multiline_comment_chars(filetype: FileType):
+    assert isinstance(filetype.comment_syntax, CommentSyntax)
+    if filetype.comment_syntax.multiline_comment is None:
+        skip("No multiline comment chars for this filetype")
+    assert isinstance(filetype.comment_syntax.multiline_comment, tuple)
+    assert all(isinstance(c, str) for c in filetype.comment_syntax.multiline_comment)
+    assert len(filetype.comment_syntax.multiline_comment) == 2
+
+
+@fixture(scope="module")
+def file_obj_type(file_obj: File):
+    return FileType.from_suffix(file_obj.path.suffix, SUFFIX_FILETYPE_MAP)
+
+
+def test_file_obj_has_created_timestamp(file_obj: File):
+    assert isinstance(file_obj.created_timestamp, CreatedTimestamp)
+
+
+def test_file_obj_has_modified_timestamp(file_obj: File):
+    assert isinstance(file_obj.modified_timestamp, ModifiedTimestamp)
+
+
+def test_file_obj_created_timestamp_datetime(file_obj: File):
+    assert isinstance(file_obj.created_timestamp.datetime, datetime)
+
+
+def test_file_obj_created_timestamp_strfdatetime(file_obj: File):
+    assert isinstance(file_obj.created_timestamp.strfdatetime, str)
+
+
+def test_file_obj_created_timestamp_strfdate(file_obj: File):
+    assert isinstance(file_obj.created_timestamp.strfdate, str)
+
+
+def test_file_obj_created_timestamp_delta(file_obj: File):
+    assert isinstance(file_obj.created_timestamp.delta, timedelta)
+
+
+def test_file_obj_created_timestamp_is_new_enough(file_obj: File):
+    assert file_obj.created_timestamp.is_new_enough(timedelta(days=1))
+
+
+def test_file_obj_modified_timestamp_datetime(file_obj: File):
+    assert isinstance(file_obj.modified_timestamp.datetime, datetime)
+
+
+def test_file_obj_modified_timestamp_strfdatetime(file_obj: File):
+    assert isinstance(file_obj.modified_timestamp.strfdatetime, str)
+
+
+def test_file_obj_modified_timestamp_strfdate(file_obj: File):
+    assert isinstance(file_obj.modified_timestamp.strfdate, str)
+
+
+def test_file_obj_modified_timestamp_delta(file_obj: File):
+    assert isinstance(file_obj.modified_timestamp.delta, timedelta)
+
+
+def test_file_obj_modified_timestamp_is_new_enough(file_obj: File):
+    assert file_obj.modified_timestamp.is_new_enough(timedelta(days=1))
