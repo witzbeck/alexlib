@@ -62,7 +62,7 @@ class SystemObject:
     @cached_property
     def size(self) -> FileSize:
         """gets path size"""
-        return FileSize(self.stat.st_size)
+        return FileSize.from_path(self.path)
 
     @cached_property
     def modified_timestamp(self) -> ModifiedTimestamp:
@@ -377,11 +377,6 @@ class Directory(SystemObject):
         return self.filelist + list(
             chain.from_iterable([x.allchildfiles for x in self.dirlist])
         )
-
-    @cached_property
-    def size(self) -> FileSize:
-        """gets directory size"""
-        return FileSize(sum(x.size for x in self.allchildfiles))
 
     @property
     def allchilddirs(self) -> list[SystemObject]:

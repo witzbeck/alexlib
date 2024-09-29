@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from os import stat_result
 from pathlib import Path
@@ -20,6 +21,8 @@ from alexlib.files import (
 from alexlib.files.sizes import (
     NBYTES_LABEL_MAP,
     FileSize,
+    get_nbytes_scaled_comprehension,
+    get_nbytes_scaled_min_cycles,
 )
 from alexlib.files.times import SystemTimestamp
 from alexlib.files.types import (
@@ -35,6 +38,7 @@ from alexlib.files.utils import (
     read_json,
     read_toml,
 )
+from alexlib.times import timeit
 
 
 @fixture(scope="module")
@@ -454,25 +458,90 @@ def test_file_size_str(file_obj: File):
     assert isinstance(str(file_obj.size), str)
 
 
+@mark.parametrize("val", (1e1, 10))
+def test_file_size_lt_numeric_comp(val: int | float, file_obj: File):
+    assert file_obj.size > val
+
+
+@mark.parametrize("val", (1e6, 1_000_000))
+def test_file_size_gt_numeric_comp(val: int | float, file_obj: File):
+    assert file_obj.size < val
+
+
 def test_file_size_lt(file_obj: File):
-    assert file_obj.size < FileSize(1e6)
+    assert file_obj.size < FileSize.from_nbytes(1e6)
 
 
 def test_file_size_gt(file_obj: File):
-    assert file_obj.size > FileSize(1e1)
+    assert file_obj.size > FileSize.from_nbytes(1e1)
 
 
-def test_file_size_from_path(file_obj: File):
-    assert isinstance(FileSize.from_path(file_obj.path), FileSize)
+def test_file_size_eq(file_obj: File):
+    assert file_obj.size == int(file_obj.size.nbytes)
+    assert file_obj.size == FileSize.from_nbytes(file_obj.size.nbytes)
 
 
-def test_file_size_from_system_object(file_obj: File):
-    assert isinstance(FileSize.from_system_object(file_obj), FileSize)
-
-
-def test_file_size_from_system_object_not_pathlike(file_obj: File):
+def test_file_size_lt_typeerror(file_obj: File):
     with raises(TypeError):
-        FileSize.from_system_object("notpathlike")
+        assert file_obj.size < "string"
+
+
+def test_file_size_gt_typeerror(file_obj: File):
+    with raises(TypeError):
+        assert file_obj.size > "string"
+
+
+def test_file_size_eq_typeerror(file_obj: File):
+    with raises(TypeError):
+        assert file_obj.size == "string"
+
+
+def test_file_size_from_file_path(file_path: Path):
+    assert isinstance(FileSize.from_path(file_path), FileSize)
+
+
+def test_file_size_from_dir_path(dir_path: Path):
+    assert isinstance(FileSize.from_path(dir_path), FileSize)
+
+
+def test_file_size_from_path_not_exists():
+    with raises(TypeError):
+        FileSize.from_path("doesnotexist.txt")
+
+
+@mark.parametrize(
+    "nbytes, min_scale_level, roundto, exp_label, exp_scaled",
+    (
+        (1e0, 0, 0, "bytes", 1),  # small size in bytes
+        (512, 0, 0, "bytes", 512),  # no scaling, raw bytes
+        (1e3, 100, 2, "KB", 1.0),  # small KB scale
+        (1e6, 100, 1, "MB", 1.0),  # 1 MB
+        (1e9, 100, 1, "GB", 1.0),  # scaling past expected limits
+        (1e6, 1000, 1, "KB", 1000.0),  # scaling 1 MB with different precision
+        (5e6, 100, 2, "MB", 5.0),  # scaling 5 MB with different precision
+        (2.5e9, 100, 1, "GB", 2.5),  # slightly larger scaling for GB
+        (5e12, 100, 1, "TB", 5.0),  # scaling for TB
+        (1e15, 100, 3, "PB", 1.0),  # 1 PB exact scaling
+        (1e18, 100, 2, "EB", 1.0),  # 1 EB exact scaling
+        (1e21, 100, 2, "ZB", 1.0),  # 1 ZB exact scaling
+        (1e24, 100, 2, "YB", 1.0),  # 1 YB exact scaling
+        (7.5e24, 100, 1, "YB", 7.5),  # fractional YB with rounding
+    ),
+)
+def test_file_size_get_nbytes_scaled(
+    nbytes: int, min_scale_level: int, roundto: int, exp_label: str, exp_scaled: float
+):
+    label, scaled = get_nbytes_scaled_min_cycles(
+        nbytes, min_scale_level=min_scale_level, roundto=roundto
+    )
+    assert isinstance(label, str), f"{label} is {type(label)}"
+    assert isinstance(scaled, (int, float)), f"{scaled} is {type(scaled)}"
+    labels_match = label == exp_label
+    scales_match = scaled == exp_scaled
+    error_msg = (
+        f"{scaled} {label} != {exp_scaled} {exp_label} for {int(nbytes):,} bytes"
+    )
+    assert labels_match and scales_match, error_msg
 
 
 @fixture(
@@ -584,3 +653,65 @@ def test_file_obj_modified_timestamp_is_new_enough(file_obj: File):
 def test_system_timestamp_repr(this_file_st_ctime: float):
     sys_ts = SystemTimestamp(this_file_st_ctime)
     assert isinstance(repr(sys_ts), str)
+
+
+@fixture(scope="module")
+def timeit_size_label_bytes():
+    return "TB", int(1e12)
+
+
+@fixture(scope="module")
+def timeit_size_decorator() -> Callable:
+    return timeit(niter=1000, toprint=False)
+
+
+@fixture(scope="module")
+def timeit_size_comp_func(
+    timeit_size_label_bytes: tuple, timeit_size_decorator: Callable
+) -> Callable:
+    _, BYTES = timeit_size_label_bytes
+
+    @timeit_size_decorator
+    def bytes_comp(nbytes: int = BYTES) -> str:
+        """returns the scale of the nbytes using a comprehension"""
+        return get_nbytes_scaled_comprehension(nbytes)
+
+    return bytes_comp
+
+
+@fixture(scope="module")
+def timeit_size_cycles_func(
+    timeit_size_label_bytes: tuple, timeit_size_decorator: Callable
+) -> Callable:
+    _, BYTES = timeit_size_label_bytes
+
+    @timeit_size_decorator
+    def bytes_cycles(nbytes: int = BYTES) -> str:
+        """returns the scale of the nbytes using cycles"""
+        return get_nbytes_scaled_min_cycles(nbytes)
+
+    return bytes_cycles
+
+
+def test_timeit_size_label_bytes(timeit_size_label_bytes: tuple):
+    label, nbytes = timeit_size_label_bytes
+    assert isinstance(label, str)
+    assert isinstance(nbytes, int)
+
+
+def test_timeit_size_comp_func(timeit_size_comp_func: Callable):
+    assert callable(timeit_size_comp_func)
+    assert timeit_size_comp_func()[0] == ("TB", 1.0)
+
+
+def test_timeit_size_cycles_func(timeit_size_cycles_func: Callable):
+    assert callable(timeit_size_cycles_func)
+    assert timeit_size_cycles_func()[0] == ("TB", 1.0)
+
+
+def test_timeit_size_comp_cycles_match(
+    timeit_size_comp_func: Callable, timeit_size_cycles_func: Callable
+):
+    comp_results = timeit_size_comp_func()
+    cycles_results = timeit_size_cycles_func()
+    assert comp_results == cycles_results
