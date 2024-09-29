@@ -12,6 +12,7 @@ from alexlib.times import (
     CustomTimedelta,
     Timer,
     TimerLabel,
+    __custom_dt_attrs__,
     get_local_tz,
     get_rand_datetime,
     get_rand_timedelta,
@@ -196,3 +197,7 @@ def test_timeit():
 
     to_time_func()
     assert True
+
+
+def test_times_attrs():
+    assert all(isinstance(x, str) for x in __custom_dt_attrs__)
