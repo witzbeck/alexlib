@@ -57,8 +57,7 @@ from alexlib.core import chkenv, ping
 from alexlib.db.objects import Name
 from alexlib.db.sql import SQL
 from alexlib.df import get_distinct_col_vals
-from alexlib.files import SettingsFile
-from alexlib.files.objects import Directory, File
+from alexlib.files import Directory, File, SettingsFile
 
 
 def create_memory_db() -> SQLiteConnection:

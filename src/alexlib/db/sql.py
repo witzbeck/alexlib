@@ -23,12 +23,11 @@ from re import sub
 from pandas import DataFrame
 from sqlalchemy import TextClause, text
 
-from alexlib.constants import COLUMN_SUB_PATH
+from alexlib.constants import COLUMN_SUB_MAP
 from alexlib.core import to_clipboard
 from alexlib.db.objects import Name
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.files.objects import File
-from alexlib.files.utils import read_json
+from alexlib.files import File
 
 LOGICALS = ("and", "or")
 
@@ -39,10 +38,9 @@ DOUBLE_MAP = {"=": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge
 DOUBLE_OPS = list(DOUBLE_MAP.keys())
 
 
-def sanitize_col_name(col: str) -> str:
+def sanitize_column_name(column_name: str) -> str:
     """sanitizes column name"""
-    COL_SUBS = read_json(COLUMN_SUB_PATH)
-    "".join([COL_SUBS[x] if x in COL_SUBS else x for x in col])
+    "".join([COLUMN_SUB_MAP[x] if x in COLUMN_SUB_MAP else x for x in column_name])
 
 
 @dataclass(init=False, frozen=True)
@@ -165,7 +163,7 @@ def mk_view_text(name: str, sql: SQL) -> SQL:
 
 def mk_onehot_case_col(col: str) -> str:
     """makes column header for onehot encoding row"""
-    return f"is_{sanitize_col_name(col)}"
+    return f"is_{sanitize_column_name(col)}"
 
 
 def mk_onehot_case_row(col: str, val: str) -> str:
