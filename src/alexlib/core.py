@@ -52,7 +52,7 @@ def istrue(w: str | int) -> bool:
         ret = False
     elif isinstance(w, bool):
         ret = w is True
-    elif isinstance(w, int):
+    elif isinstance(w, (int, float)):
         ret = bool(w)
     elif isinstance(w, str):
         processed_str = w.strip().lower()

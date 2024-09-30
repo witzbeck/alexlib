@@ -533,6 +533,11 @@ ISTRUE_TRUE = (
     "t",
     "T",
     "1",
+    "on",
+    1,
+    1.0,
+    "yes",
+    "y",
 )
 ISTRUE_FALSE = (
     False,
@@ -543,6 +548,11 @@ ISTRUE_FALSE = (
     "0",
     "",
     None,
+    0,
+    "no",
+    "off",
+    "n",
+    0.0,
 )
 ISNONE_TRUE = (
     "None",
