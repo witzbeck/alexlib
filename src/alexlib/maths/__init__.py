@@ -192,7 +192,11 @@ def get_props(series: Series) -> DataFrame:
     freqs = [sum(series == x) for x in dist_vals]
     props = [sum(series == x) / n_all_vals for x in dist_vals]
     return DataFrame.from_dict(
-        {"value": dist_vals, "frequency": freqs, "proportion": props}
+        {
+            "value": dist_vals,
+            "frequency": freqs,
+            "proportion": props,
+        }
     )
 
 

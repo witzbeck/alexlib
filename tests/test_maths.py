@@ -4,6 +4,7 @@ from pytest import FixtureRequest, fixture, mark, raises
 
 from alexlib.maths import (
     VariableBaseNumber,
+    euclidean_distance,
     get_phi_by_precision,
     get_primes,
     interpolate,
@@ -131,3 +132,8 @@ def variable_base_number(request: FixtureRequest):
 
 def test_variable_base_number(variable_base_number):
     assert repr(variable_base_number)
+
+
+@mark.parametrize("values", ((-5, 4), (25, 10), (2, 2), (40.5, 20), (12, 346, 568568)))
+def test_euclidean_algorithm(values):
+    assert isinstance(euclidean_distance(values), float)
