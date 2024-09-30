@@ -32,12 +32,14 @@ from alexlib.files.types import (
     FileType,
 )
 from alexlib.files.utils import (
+    chkhash,
     eval_parents,
     figsave,
     get_parent,
     path_search,
     read_json,
     read_toml,
+    sha256sum,
 )
 from alexlib.times import timeit
 
@@ -731,3 +733,28 @@ def test_file_rename_with_overwrite(text_file_obj: File):
     text_file_obj.rename(new_name, overwrite=True)
     assert text_file_obj.path.name == new_name
     assert text_file_obj.path.exists()
+
+
+@fixture(scope="module")
+def this_file_hash(this_file_path: Path) -> str:
+    return sha256sum(this_file_path)
+
+
+def test_sha256sum(this_file_hash: str):
+    assert isinstance(this_file_hash, str)
+    assert len(this_file_hash) == 64
+    assert this_file_hash.isalnum()
+
+
+def test_sha256sum_not_found():
+    with raises(FileNotFoundError):
+        sha256sum(Path("notfound.txt"))
+
+
+def test_sha256sum_not_path():
+    with raises(TypeError):
+        sha256sum("notapath")
+
+
+def test_chkhash(this_file_path: Path, this_file_hash: str):
+    assert chkhash(this_file_path, this_file_hash)
