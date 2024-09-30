@@ -138,9 +138,7 @@ def chkenv(
         ret = val
     elif (isblank or isnone_) and ifnotnone:
         ret = ifnull
-    elif isnone_ and need:
-        raise ValueError(envname)
-    elif isblank and need:
+    elif (isblank or isnone_) and need:
         raise ValueError(envname)
     elif isblank or isnone_:
         ret = None

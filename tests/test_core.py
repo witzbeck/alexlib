@@ -374,6 +374,21 @@ def test_chktype_path_not_exist() -> None:
         chktype(test_path, Path)
 
 
+@mark.parametrize(
+    "path, suffix",
+    (
+        (Path("test.txt"), ".json"),
+        (Path("test.json"), ".txt"),
+        (Path(".env"), ".json"),
+        (Path("test.json"), ".env"),
+    ),
+)
+def test_chktype_path_suffix_raises(path: Path, suffix: str) -> None:
+    """Test chktype function with Path object."""
+    with raises(ValueError):
+        chktype(path, Path, suffix=suffix, mustexist=False)
+
+
 def test_isplatform() -> None:
     """Test isplatform function."""
     assert any((iswindows(), islinux(), ismacos()))
@@ -434,16 +449,21 @@ def test_chktype_correct(value: int, type_: type) -> None:
     assert chktype(value, type_) == value
 
 
-def test_default_for_non_existing_variable() -> None:
+def test_chkenv_default_for_non_existing_variable() -> None:
     """Test chkenv function with non existing variable."""
     assert chkenv("NON_EXISTING_VAR", need=False) is None
 
 
-def test_default_for_empty_variable() -> None:
+def test_chkenv_default_for_empty_variable() -> None:
     """Test chkenv function with empty variable."""
     assert chkenv("EMPTY_VAR", need=False, ifnull="default") == "default"
     with raises(ValueError):
         chkenv("EMPTY_VAR", need=True)
+
+
+def test_chkenv_existing_variable(rand_env: str) -> None:
+    """Test chkenv function with existing variable."""
+    assert chkenv(rand_env) == environ[rand_env]
 
 
 @mark.parametrize(
@@ -633,6 +653,12 @@ def test_istrue_true(value: Any) -> None:
 def test_istrue_false(value: Any) -> None:
     """Test istrue function."""
     assert istrue(value) is False
+
+
+def test_istrue_raises_typeerror(now: datetime) -> None:
+    """Test istrue function."""
+    with raises(TypeError):
+        istrue(now)
 
 
 @mark.fast
