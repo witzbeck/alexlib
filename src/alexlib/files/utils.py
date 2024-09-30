@@ -207,7 +207,7 @@ def dump_envs(
     path = normalize_path(path) if path else Path.cwd() / ".env"
     if path.exists() and not force:
         raise FileExistsError(f"{path} already exists. Use force=True to overwrite.")
-    pairs = pairs if pairs is not None else environ
+    pairs = pairs if pairs is not None else dict(environ)
     if is_dotenv(path):
         content = "\n".join(f"{key}={value}" for key, value in pairs.items())
         path.write_text(content)

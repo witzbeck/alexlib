@@ -1,9 +1,11 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from os import stat_result
+from json import dumps, loads
+from os import environ, stat_result
 from pathlib import Path
 from random import choice
 from sys import version_info
+from unittest.mock import MagicMock
 
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
@@ -33,6 +35,7 @@ from alexlib.files.types import (
 )
 from alexlib.files.utils import (
     chkhash,
+    dump_envs,
     eval_parents,
     figsave,
     get_parent,
@@ -758,3 +761,184 @@ def test_sha256sum_not_path():
 
 def test_chkhash(this_file_path: Path, this_file_hash: str):
     assert chkhash(this_file_path, this_file_hash)
+
+
+def test_dump_envs_dotenv(tmp_path, monkeypatch):
+    """Test dumping environment variables to a .env file."""
+    # Create a temporary .env file path
+    env_file = tmp_path / ".env"
+
+    # Mock logger
+    mock_logger = MagicMock()
+    monkeypatch.setattr("alexlib.files.utils.logger", mock_logger)
+
+    # Call the function
+    dump_envs(path=env_file)
+
+    # Assert that the file was created
+    assert env_file.exists()
+
+    # Read the content and verify
+    content = env_file.read_text()
+    expected_content = "\n".join(f"{key}={value}" for key, value in environ.items())
+    assert content == expected_content
+
+    # Verify logger info was called
+    mock_logger.info.assert_called_once_with(
+        f"Dumped {len(environ)} environment variables to {env_file}"
+    )
+
+
+def test_dump_envs_json(tmp_path, monkeypatch):
+    """Test dumping environment variables to a .json file."""
+    # Create a temporary .json file path
+    json_file = tmp_path / "env.json"
+
+    # Mock logger
+    mock_logger = MagicMock()
+    monkeypatch.setattr("alexlib.files.utils.logger", mock_logger)
+
+    # Call the function
+    dump_envs(path=json_file, force=True)
+
+    # Assert that the file was created
+    assert json_file.exists()
+
+    # Read the content and verify
+    content = json_file.read_text()
+    expected_content = dumps(dict(environ), indent=4)
+    assert loads(content) == loads(expected_content)
+
+    # Verify logger info was called
+    mock_logger.info.assert_called_once_with(
+        f"Dumped {len(environ)} environment variables to {json_file}"
+    )
+
+
+def test_dump_envs_file_exists(tmp_path, monkeypatch):
+    """Test that FileExistsError is raised when file exists and force is False."""
+    # Create a temporary file path
+    env_file = tmp_path / ".env"
+    env_file.touch()  # Create the file to simulate existence
+
+    # Mock 'normalize_path' to return the path as is
+    monkeypatch.setattr("alexlib.files.utils.normalize_path", lambda x: x)
+
+    # Mock 'is_dotenv' to return True
+    monkeypatch.setattr("alexlib.files.utils.is_dotenv", lambda x: True)
+
+    # Call the function and expect an error
+    with raises(FileExistsError) as exc_info:
+        dump_envs(path=env_file, force=False)
+
+    # Verify the error message
+    assert (
+        str(exc_info.value)
+        == f"{env_file} already exists. Use force=True to overwrite."
+    )
+
+
+def test_dump_envs_force_overwrite(tmp_path, monkeypatch):
+    """Test that the file is overwritten when force is True."""
+    # Create a temporary file path
+    env_file = tmp_path / ".env"
+    env_file.write_text("OLD_CONTENT")  # Write old content
+
+    # Mock 'normalize_path' to return the path as is
+    monkeypatch.setattr("alexlib.files.utils.normalize_path", lambda x: x)
+
+    # Call the function with force=True
+    dump_envs(path=env_file, force=True)
+
+    # Read the content and verify it's updated
+    content = env_file.read_text()
+    expected_content = "\n".join(f"{key}={value}" for key, value in environ.items())
+    assert content == expected_content
+
+
+def test_dump_envs_unsupported_file_type(tmp_path, monkeypatch):
+    """Test that ValueError is raised for unsupported file types."""
+    # Create a temporary file path with unsupported extension
+    unsupported_file = tmp_path / "env.txt"
+
+    # Mock 'normalize_path' to return the path as is
+    monkeypatch.setattr("alexlib.files.utils.normalize_path", lambda x: x)
+
+    # Mock 'is_dotenv' and 'is_json' to return False
+    monkeypatch.setattr("alexlib.files.utils.is_dotenv", lambda x: False)
+    monkeypatch.setattr("alexlib.files.utils.is_json", lambda x: False)
+
+    # Call the function and expect an error
+    with raises(ValueError) as exc_info:
+        dump_envs(path=unsupported_file)
+
+    # Verify the error message
+    assert str(exc_info.value) == f"Unsupported file type: {unsupported_file.suffix}"
+
+
+def test_dump_envs_default_path(tmp_path, monkeypatch):
+    """Test that the default path is used when path is None."""
+    # Change current working directory to tmp_path
+    monkeypatch.chdir(tmp_path)
+
+    # Call the function without specifying path
+    dump_envs()
+
+    # The default path should be cwd/.env
+    env_file = Path.cwd() / ".env"
+
+    # Assert that the file was created
+    assert env_file.exists()
+    if env_file.exists():
+        env_file.unlink()
+
+
+def test_dump_envs_default_pairs(tmp_path, monkeypatch):
+    """Test that the default pairs are used when pairs is None."""
+    # Create a temporary .env file path
+    env_file = tmp_path / ".env"
+
+    # Mock 'normalize_path' to return the path as is
+    monkeypatch.setattr("alexlib.files.utils.normalize_path", lambda x: x)
+
+    # Mock 'is_dotenv' to return True
+    monkeypatch.setattr("alexlib.files.utils.is_dotenv", lambda x: True)
+
+    # Mock 'environ' to return a specific dict
+    mock_environ = {"DEFAULT_VAR": "default_value"}
+    monkeypatch.setattr("alexlib.files.utils.environ", mock_environ)
+
+    # Call the function without specifying pairs
+    dump_envs(path=env_file)
+
+    # Read the content and verify
+    content = env_file.read_text()
+    expected_content = "\n".join(
+        f"{key}={value}" for key, value in mock_environ.items()
+    )
+    assert content == expected_content
+
+
+def test_dump_envs_custom_pairs(tmp_path, monkeypatch):
+    """Test that custom pairs are used when provided."""
+    # Create a temporary .env file path
+    env_file = tmp_path / ".env"
+
+    # Mock 'normalize_path' to return the path as is
+    monkeypatch.setattr("alexlib.files.utils.normalize_path", lambda x: x)
+
+    # Mock 'is_dotenv' to return True
+    monkeypatch.setattr("alexlib.files.utils.is_dotenv", lambda x: True)
+
+    # Custom pairs to write
+    custom_pairs = {"CUSTOM_VAR": "custom_value"}
+
+    # Call the function with custom pairs
+    dump_envs(path=env_file, pairs=custom_pairs)
+
+    # Read the content and verify
+    content = env_file.read_text()
+    expected_content = "\n".join(
+        f"{key}={value}" for key, value in custom_pairs.items()
+    )
+    assert content == expected_content
