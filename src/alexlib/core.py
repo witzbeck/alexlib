@@ -321,8 +321,6 @@ def to_clipboard(text: str) -> None:
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
             process.communicate(input=text.encode("utf-8"))
             return success
-    except FileNotFoundError as e:
-        raise OSError("Clipboard command not found.") from e
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
 
@@ -331,7 +329,7 @@ def copy_file_to_clipboard(path: Path) -> bool:
     """Copies file to the clipboard. Returns True if successful, False otherwise."""
     chktype(path, Path, mustexist=True)
     if not path.is_file():
-        raise ValueError(f"{path} is not a file")
+        raise IsADirectoryError(f"{path} is not a file")
     to_clipboard(path.read_text())
     logger.info(f"File content from {path} copied to clipboard.")
     return True
@@ -356,7 +354,7 @@ def invert_dict(dict_: dict) -> dict[Hashable, Hashable]:
     return {v: k for k, v in dict_.items()}
 
 
-def get_curent_version(tag: str) -> str:
+def clean_version_tag(tag: str) -> str:
     """returns current version"""
     if tag.startswith("v"):
         tag = tag[1:]

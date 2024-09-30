@@ -16,6 +16,7 @@ from alexlib.core import (
     chkenv,
     chktext,
     chktype,
+    clean_version_tag,
     copy_file_to_clipboard,
     envcast,
     get_attrs,
@@ -30,6 +31,7 @@ from alexlib.core import (
     iswindows,
     mk_dictvals_distinct,
     ping,
+    show_environ,
     to_clipboard,
 )
 from alexlib.files.utils import dump_envs, is_dotenv, is_json, sha256sum
@@ -261,6 +263,15 @@ def test_to_clipboard_typeerror(value):
 def test_copy_non_existing_file():
     with raises(FileNotFoundError):
         copy_file_to_clipboard(Path("/fake/path"))
+
+
+def test_copy_dir(dir_path: Path):
+    with raises(IsADirectoryError):
+        copy_file_to_clipboard(dir_path)
+
+
+def test_chkcmd():
+    assert chkcmd("python") or chkcmd("python3")
 
 
 def test_copy_existing_file(copy_path, copy_text):
@@ -827,77 +838,51 @@ def test_ishidden_true(value: Any) -> None:
     assert ishidden(value) is True
 
 
-def test_ping_port_open(monkeypatch):
-    """Check if the function returns True when the port is open"""
+@mark.parametrize(
+    "connect_ex_return_value, astext, expected_result, expected_log",
+    [
+        (0, False, True, "127.0.0.1:8080 is open"),
+        (1, False, False, "127.0.0.1:8080 is not open"),
+        (0, True, "127.0.0.1:8080 is open", "127.0.0.1:8080 is open"),
+        (1, True, "127.0.0.1:8080 is not open", "127.0.0.1:8080 is not open"),
+    ],
+)
+def test_ping(
+    monkeypatch, caplog, connect_ex_return_value, astext, expected_result, expected_log
+):
+    """Test the ping function with different scenarios using parametrization."""
 
-    def mock_connect_ex(addr, port):
-        return 0  # Simulate port being open
-
-    # Monkeypatch the socket's connect_ex method
-    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
-
-    result = ping("127.0.0.1", 8080)
-
-    # Asserting the function returns True
-    assert result is True
-
-
-def test_ping_port_closed(monkeypatch):
-    """Check if the function returns False when the port is closed"""
-
-    def mock_connect_ex(addr, port):
-        return 1  # Simulate port being closed
+    def mock_connect_ex(self, address):
+        return connect_ex_return_value  # Simulate port being open or closed
 
     # Monkeypatch the socket's connect_ex method
     monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
 
-    result = ping("127.0.0.1", 8080)
+    with caplog.at_level("DEBUG"):
+        result = ping("127.0.0.1", 8080, astext=astext)
 
-    # Asserting the function returns False
-    assert result is False
+    # Assert the function returns the expected result
+    assert result == expected_result
 
-
-def test_ping_port_open_astext(monkeypatch):
-    """Check if the function returns the correct text when astext is True and the port is open"""
-
-    def mock_connect_ex(addr, port):
-        return 0  # Simulate port being open
-
-    # Monkeypatch the socket's connect_ex method
-    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
-
-    result = ping("127.0.0.1", 8080, astext=True)
-
-    # Asserting the function returns the correct text
-    assert result == "127.0.0.1:8080 is open"
+    # Assert that the correct log message was generated
+    assert expected_log in caplog.text
 
 
-def test_ping_port_closed_astext(monkeypatch):
-    """Check if the function returns the correct text when astext is True and the port is closed"""
+@mark.parametrize(
+    "tag, expected",
+    (
+        ("v1.2.3", "1.2.3"),
+        ("v1.2.3-alpha", "1.2.3"),
+        ("v1.2.3-alpha.1", "1.2.3"),
+        ("v1.2.3-alpha.1+build.1", "1.2.3"),
+        ("3", "3"),
+    ),
+)
+def test_clean_version_tag(tag: str, expected: str) -> None:
+    """Test get_current_version function."""
+    assert clean_version_tag(tag) == expected
 
-    def mock_connect_ex(addr, port):
-        return 1  # Simulate port being closed
 
-    # Monkeypatch the socket's connect_ex method
-    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
-
-    result = ping("127.0.0.1", 8080, astext=True)
-
-    # Asserting the function returns the correct text
-    assert result == "127.0.0.1:8080 is not open"
-
-
-def test_ping_logger(monkeypatch, caplog):
-    """Check if the function logs the correct message when the port is closed"""
-
-    def mock_connect_ex(addr, port):
-        return 1  # Simulate port being closed
-
-    # Monkeypatch the socket's connect_ex method
-    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
-
-    with caplog.at_level("DEBUG"):  # Capture log output at DEBUG level
-        ping("127.0.0.1", 8080)
-
-    # Asserting that logger.debug was called with the correct message
-    assert "127.0.0.1:8080 is not open" in caplog.text
+def test_show_environ():
+    """Test the `show_environ` function."""
+    assert show_environ() is None
