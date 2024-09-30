@@ -6,11 +6,12 @@ from pathlib import Path
 from subprocess import Popen
 from typing import Any
 
-from pytest import FixtureRequest, fixture, mark, raises, skip
+from pytest import FixtureRequest, fixture, mark, raises
 
 from alexlib.core import (
     asdict,
     aslist,
+    chkcmd,
     chkenv,
     chktext,
     chktype,
@@ -137,13 +138,16 @@ def test_copy_non_existing_file():
 
 
 def test_copy_existing_file(copy_path, copy_text):
-    if not islinux():
+    if iswindows() or ismacos():
         assert copy_file_to_clipboard(copy_path)
     else:
-        try:
+        assert islinux()
+        has = chkcmd("xclip") or chkcmd("xsel")
+        if has:
             assert copy_file_to_clipboard(copy_path)
-        except OSError:
-            skip("pbcopy/pbpaste not available on this system")
+        else:
+            with raises(OSError):
+                copy_file_to_clipboard(copy_path)
 
 
 def test_to_clipboard_success(copy_text):
@@ -153,21 +157,26 @@ def test_to_clipboard_success(copy_text):
             == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
         )
     else:
-        try:
+        has = chkcmd("xclip") or chkcmd("xsel")
+        if has:
             assert (
                 to_clipboard(copy_text)
-                == Popen(["pbpaste"], stdout=-1).communicate()[0].decode()
+                == Popen(["xclip", "-selection", "clipboard", "-o"], stdout=-1)
+                .communicate()[0]
+                .decode()
             )
-        except OSError:
-            skip("pbcopy/pbpaste not available on this system")
+        else:
+            with raises(OSError):
+                to_clipboard(copy_text)
 
 
 def test_copy_path_not_a_file():
     try:
         with raises(FileNotFoundError):
             copy_file_to_clipboard(Path("/fake/path"))
-    except OSError:
-        skip("pbcopy/pbpaste not available on this system")
+    except OSError as e:
+        with raises(OSError):
+            assert copy_file_to_clipboard(Path("/fake/path")), e
 
 
 ATTRS = (

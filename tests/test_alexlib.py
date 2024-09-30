@@ -1,6 +1,6 @@
 from sys import path, version_info
 
-from pytest import fixture
+from pytest import fixture, raises
 
 from alexlib import Version
 from alexlib.constants import MODULE_PATH
@@ -16,11 +16,6 @@ def version_from_sys() -> Version:
     return Version.from_sys()
 
 
-@fixture(scope="session")
-def version_from_pyproject() -> Version:
-    return Version.from_pyproject()
-
-
 def test_version_from_sys(version_from_sys: Version):
     assert version_from_sys.major == version_info.major
     assert version_from_sys.minor == version_info.minor
@@ -28,21 +23,31 @@ def test_version_from_sys(version_from_sys: Version):
     assert version_from_sys.project_name == "Python"
 
 
-def test_version_from_pyproject(version_from_pyproject: Version):
-    assert isinstance(
-        version_from_pyproject.major, int
-    ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
-    assert isinstance(
-        version_from_pyproject.minor, int
-    ), f"minor: {version_from_pyproject.minor} is {type(version_from_pyproject.minor)}"
-    assert isinstance(
-        version_from_pyproject.patch, int
-    ), f"patch: {version_from_pyproject.patch} is {type(version_from_pyproject.patch)}"
-    assert version_from_pyproject.project_name == "alexlib"
+def test_version_from_pyproject():
+    if version_info.minor <= 10:
+        with raises(ImportError):
+            Version.from_pyproject()
+    else:
+        version_from_pyproject = Version.from_pyproject()
+        assert isinstance(
+            version_from_pyproject.major, int
+        ), f"major: {version_from_pyproject.major} is {type(version_from_pyproject.major)}"
+        assert isinstance(
+            version_from_pyproject.minor, int
+        ), f"minor: {version_from_pyproject.minor} is {type(version_from_pyproject.minor)}"
+        assert isinstance(
+            version_from_pyproject.patch, int
+        ), f"patch: {version_from_pyproject.patch} is {type(version_from_pyproject.patch)}"
+        assert version_from_pyproject.project_name == "alexlib"
 
 
-def test_version_eq(version_from_sys: Version, version_from_pyproject: Version):
-    assert version_from_sys != version_from_pyproject
+def test_version_eq(version_from_sys: Version):
+    if version_info.minor <= 10:
+        with raises(ImportError):
+            Version.from_pyproject()
+    else:
+        version_from_pyproject = Version.from_pyproject()
+        assert version_from_sys != version_from_pyproject
 
 
 @fixture(scope="module")
