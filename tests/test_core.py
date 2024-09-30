@@ -3,6 +3,7 @@
 from datetime import datetime
 from os import environ
 from pathlib import Path
+from socket import socket
 from subprocess import Popen
 from typing import Any
 
@@ -28,6 +29,7 @@ from alexlib.core import (
     istrue,
     iswindows,
     mk_dictvals_distinct,
+    ping,
     to_clipboard,
 )
 from alexlib.files.utils import dump_envs, is_dotenv, is_json, sha256sum
@@ -65,6 +67,8 @@ def test_core_datetime(core_datetime: datetime):
     [
         ("a,b,c", ",", ["a", "b", "c"]),
         ("a|b|c", "|", ["a", "b", "c"]),
+        ("a b c", " ", ["a", "b", "c"]),
+        ("", ",", []),
     ],
 )
 def test_aslist(string: str, sep: str, expected: list[str]) -> None:
@@ -80,14 +84,136 @@ def _testclass():
             self.a = 1
             self.b = 2
             self._c = 3
+            self.__d__ = 4
 
     return TestClass()
 
 
-def test_asdict(_testclass):
-    dct = asdict(_testclass)
+@mark.parametrize(
+    "key, value, include_hidden, include_dunder, isin",
+    (
+        (
+            "a",
+            1,
+            False,
+            False,
+            True,
+        ),
+        (
+            "b",
+            2,
+            False,
+            False,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            False,
+            False,
+            False,
+        ),
+        (
+            "__d__",
+            4,
+            False,
+            False,
+            False,
+        ),
+        (
+            "a",
+            1,
+            True,
+            False,
+            True,
+        ),
+        (
+            "b",
+            2,
+            True,
+            False,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            True,
+            False,
+            True,
+        ),
+        (
+            "__d__",
+            4,
+            True,
+            False,
+            False,
+        ),
+        (
+            "a",
+            1,
+            False,
+            True,
+            True,
+        ),
+        (
+            "b",
+            2,
+            False,
+            True,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            False,
+            True,
+            False,
+        ),
+        (
+            "__d__",
+            4,
+            False,
+            True,
+            True,
+        ),
+        (
+            "a",
+            1,
+            True,
+            True,
+            True,
+        ),
+        (
+            "b",
+            2,
+            True,
+            True,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            True,
+            True,
+            True,
+        ),
+        (
+            "__d__",
+            4,
+            True,
+            True,
+            True,
+        ),
+    ),
+)
+def test_asdict(_testclass, key, value, include_hidden, include_dunder, isin):
+    dct = asdict(
+        _testclass, include_hidden=include_hidden, include_dunder=include_dunder
+    )
     assert isinstance(dct, dict)
-    assert dct == {"a": 1, "b": 2}
+    assert (key in dct) == isin
+    if isin:
+        assert dct[key] == value
 
 
 def test_sha256sum_on_path(file_path: Path):
@@ -326,6 +452,7 @@ def test_with_specific_attribute() -> None:
 @mark.parametrize(
     "string, type_, expected",
     [
+        ("1", "int", 1),
         ("1", int, 1),
         ("1.0", float, 1.0),
         ("True", bool, True),
@@ -344,6 +471,7 @@ def test_with_specific_attribute() -> None:
         ("no", bool, False),
         ("n", bool, False),
         ("off", bool, False),
+        ("[]", "list", []),
         ("[]", list, []),
         ("[1,2,3]", list, [1, 2, 3]),
         ("['a','b','c']", list, ["a", "b", "c"]),
@@ -358,13 +486,16 @@ def test_envcast_trues(string: str, type_: type, expected: bool) -> None:
 
 
 @mark.parametrize(
-    "value",
-    ("None", "none", ""),
+    "value, type_, error",
+    (
+        ("None", str, ValueError),
+        ("none", 1, TypeError),
+    ),
 )
-def test_envcast_falses(value: str) -> None:
+def test_envcast_falses(value: str, type_: type, error: type) -> None:
     """Test envcast function for falses."""
-    with raises(ValueError):
-        envcast(value, list, need=True)
+    with raises(error):
+        envcast(value, type_, need=True)
 
 
 def test_chktype_path_not_exist() -> None:
@@ -694,3 +825,79 @@ def test_isdunder_false(value: Any) -> None:
 def test_ishidden_true(value: Any) -> None:
     """Test ishidden function."""
     assert ishidden(value) is True
+
+
+def test_ping_port_open(monkeypatch):
+    """Check if the function returns True when the port is open"""
+
+    def mock_connect_ex(addr, port):
+        return 0  # Simulate port being open
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    result = ping("127.0.0.1", 8080)
+
+    # Asserting the function returns True
+    assert result is True
+
+
+def test_ping_port_closed(monkeypatch):
+    """Check if the function returns False when the port is closed"""
+
+    def mock_connect_ex(addr, port):
+        return 1  # Simulate port being closed
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    result = ping("127.0.0.1", 8080)
+
+    # Asserting the function returns False
+    assert result is False
+
+
+def test_ping_port_open_astext(monkeypatch):
+    """Check if the function returns the correct text when astext is True and the port is open"""
+
+    def mock_connect_ex(addr, port):
+        return 0  # Simulate port being open
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    result = ping("127.0.0.1", 8080, astext=True)
+
+    # Asserting the function returns the correct text
+    assert result == "127.0.0.1:8080 is open"
+
+
+def test_ping_port_closed_astext(monkeypatch):
+    """Check if the function returns the correct text when astext is True and the port is closed"""
+
+    def mock_connect_ex(addr, port):
+        return 1  # Simulate port being closed
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    result = ping("127.0.0.1", 8080, astext=True)
+
+    # Asserting the function returns the correct text
+    assert result == "127.0.0.1:8080 is not open"
+
+
+def test_ping_logger(monkeypatch, caplog):
+    """Check if the function logs the correct message when the port is closed"""
+
+    def mock_connect_ex(addr, port):
+        return 1  # Simulate port being closed
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    with caplog.at_level("DEBUG"):  # Capture log output at DEBUG level
+        ping("127.0.0.1", 8080)
+
+    # Asserting that logger.debug was called with the correct message
+    assert "127.0.0.1:8080 is not open" in caplog.text

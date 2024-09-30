@@ -22,7 +22,7 @@ from datetime import datetime
 from functools import partial
 from json import JSONDecodeError, dumps
 from json import loads as json_loads
-from logging import debug, getLogger
+from logging import getLogger
 from os import environ, getenv
 from pathlib import Path
 from shutil import which
@@ -218,10 +218,7 @@ def envcast(
         ret = astype(val)
     if isnone(val) and need:
         raise ValueError(f"input must be {astype}")
-    try:
-        return chktype(ret, astype, mustexist=need)
-    except TypeError:
-        return ret
+    return chktype(ret, astype, mustexist=need)
 
 
 def flatten_dict(
@@ -374,5 +371,5 @@ def ping(host: str, port: int, astext: bool = False) -> bool | str:
         isopen = sock.connect_ex((host, port)) == 0
         text = "" if isopen else "not "
         text = f"{host}:{port} is {text}open"
-        debug(text)
+        logger.debug(text)
         return text if astext else isopen
