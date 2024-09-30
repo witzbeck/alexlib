@@ -22,6 +22,7 @@ sqlalchemy = "^2.0"
 sqlalchemy-utils = "^0.41"
 statsmodels = "^0.14.3"
 duckdb = "^1.1.0"
+scikit-learn = "^1.5.2"
 
 [tool.poetry.group.docs.dependencies]
 reportlab = "^4.0"

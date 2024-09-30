@@ -3,6 +3,7 @@
 from datetime import datetime
 from os import environ
 from pathlib import Path
+from socket import socket
 from subprocess import Popen
 from typing import Any
 
@@ -15,6 +16,7 @@ from alexlib.core import (
     chkenv,
     chktext,
     chktype,
+    clean_version_tag,
     copy_file_to_clipboard,
     envcast,
     get_attrs,
@@ -28,6 +30,8 @@ from alexlib.core import (
     istrue,
     iswindows,
     mk_dictvals_distinct,
+    ping,
+    show_environ,
     to_clipboard,
 )
 from alexlib.files.utils import dump_envs, is_dotenv, is_json, sha256sum
@@ -65,6 +69,8 @@ def test_core_datetime(core_datetime: datetime):
     [
         ("a,b,c", ",", ["a", "b", "c"]),
         ("a|b|c", "|", ["a", "b", "c"]),
+        ("a b c", " ", ["a", "b", "c"]),
+        ("", ",", []),
     ],
 )
 def test_aslist(string: str, sep: str, expected: list[str]) -> None:
@@ -80,14 +86,136 @@ def _testclass():
             self.a = 1
             self.b = 2
             self._c = 3
+            self.__d__ = 4
 
     return TestClass()
 
 
-def test_asdict(_testclass):
-    dct = asdict(_testclass)
+@mark.parametrize(
+    "key, value, include_hidden, include_dunder, isin",
+    (
+        (
+            "a",
+            1,
+            False,
+            False,
+            True,
+        ),
+        (
+            "b",
+            2,
+            False,
+            False,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            False,
+            False,
+            False,
+        ),
+        (
+            "__d__",
+            4,
+            False,
+            False,
+            False,
+        ),
+        (
+            "a",
+            1,
+            True,
+            False,
+            True,
+        ),
+        (
+            "b",
+            2,
+            True,
+            False,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            True,
+            False,
+            True,
+        ),
+        (
+            "__d__",
+            4,
+            True,
+            False,
+            False,
+        ),
+        (
+            "a",
+            1,
+            False,
+            True,
+            True,
+        ),
+        (
+            "b",
+            2,
+            False,
+            True,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            False,
+            True,
+            False,
+        ),
+        (
+            "__d__",
+            4,
+            False,
+            True,
+            True,
+        ),
+        (
+            "a",
+            1,
+            True,
+            True,
+            True,
+        ),
+        (
+            "b",
+            2,
+            True,
+            True,
+            True,
+        ),
+        (
+            "_c",
+            3,
+            True,
+            True,
+            True,
+        ),
+        (
+            "__d__",
+            4,
+            True,
+            True,
+            True,
+        ),
+    ),
+)
+def test_asdict(_testclass, key, value, include_hidden, include_dunder, isin):
+    dct = asdict(
+        _testclass, include_hidden=include_hidden, include_dunder=include_dunder
+    )
     assert isinstance(dct, dict)
-    assert dct == {"a": 1, "b": 2}
+    assert (key in dct) == isin
+    if isin:
+        assert dct[key] == value
 
 
 def test_sha256sum_on_path(file_path: Path):
@@ -135,6 +263,15 @@ def test_to_clipboard_typeerror(value):
 def test_copy_non_existing_file():
     with raises(FileNotFoundError):
         copy_file_to_clipboard(Path("/fake/path"))
+
+
+def test_copy_dir(dir_path: Path):
+    with raises(IsADirectoryError):
+        copy_file_to_clipboard(dir_path)
+
+
+def test_chkcmd():
+    assert chkcmd("python") or chkcmd("python3")
 
 
 def test_copy_existing_file(copy_path, copy_text):
@@ -326,6 +463,7 @@ def test_with_specific_attribute() -> None:
 @mark.parametrize(
     "string, type_, expected",
     [
+        ("1", "int", 1),
         ("1", int, 1),
         ("1.0", float, 1.0),
         ("True", bool, True),
@@ -344,6 +482,7 @@ def test_with_specific_attribute() -> None:
         ("no", bool, False),
         ("n", bool, False),
         ("off", bool, False),
+        ("[]", "list", []),
         ("[]", list, []),
         ("[1,2,3]", list, [1, 2, 3]),
         ("['a','b','c']", list, ["a", "b", "c"]),
@@ -358,13 +497,16 @@ def test_envcast_trues(string: str, type_: type, expected: bool) -> None:
 
 
 @mark.parametrize(
-    "value",
-    ("None", "none", ""),
+    "value, type_, error",
+    (
+        ("None", str, ValueError),
+        ("none", 1, TypeError),
+    ),
 )
-def test_envcast_falses(value: str) -> None:
+def test_envcast_falses(value: str, type_: type, error: type) -> None:
     """Test envcast function for falses."""
-    with raises(ValueError):
-        envcast(value, list, need=True)
+    with raises(error):
+        envcast(value, type_, need=True)
 
 
 def test_chktype_path_not_exist() -> None:
@@ -372,6 +514,21 @@ def test_chktype_path_not_exist() -> None:
     test_path = Path("non_existing_file.txt")  # Assume this file does not exist
     with raises(FileNotFoundError):
         chktype(test_path, Path)
+
+
+@mark.parametrize(
+    "path, suffix",
+    (
+        (Path("test.txt"), ".json"),
+        (Path("test.json"), ".txt"),
+        (Path(".env"), ".json"),
+        (Path("test.json"), ".env"),
+    ),
+)
+def test_chktype_path_suffix_raises(path: Path, suffix: str) -> None:
+    """Test chktype function with Path object."""
+    with raises(ValueError):
+        chktype(path, Path, suffix=suffix, mustexist=False)
 
 
 def test_isplatform() -> None:
@@ -434,16 +591,21 @@ def test_chktype_correct(value: int, type_: type) -> None:
     assert chktype(value, type_) == value
 
 
-def test_default_for_non_existing_variable() -> None:
+def test_chkenv_default_for_non_existing_variable() -> None:
     """Test chkenv function with non existing variable."""
     assert chkenv("NON_EXISTING_VAR", need=False) is None
 
 
-def test_default_for_empty_variable() -> None:
+def test_chkenv_default_for_empty_variable() -> None:
     """Test chkenv function with empty variable."""
     assert chkenv("EMPTY_VAR", need=False, ifnull="default") == "default"
     with raises(ValueError):
         chkenv("EMPTY_VAR", need=True)
+
+
+def test_chkenv_existing_variable(rand_env: str) -> None:
+    """Test chkenv function with existing variable."""
+    assert chkenv(rand_env) == environ[rand_env]
 
 
 @mark.parametrize(
@@ -533,6 +695,11 @@ ISTRUE_TRUE = (
     "t",
     "T",
     "1",
+    "on",
+    1,
+    1.0,
+    "yes",
+    "y",
 )
 ISTRUE_FALSE = (
     False,
@@ -543,6 +710,11 @@ ISTRUE_FALSE = (
     "0",
     "",
     None,
+    0,
+    "no",
+    "off",
+    "n",
+    0.0,
 )
 ISNONE_TRUE = (
     "None",
@@ -625,6 +797,12 @@ def test_istrue_false(value: Any) -> None:
     assert istrue(value) is False
 
 
+def test_istrue_raises_typeerror(now: datetime) -> None:
+    """Test istrue function."""
+    with raises(TypeError):
+        istrue(now)
+
+
 @mark.fast
 @mark.parametrize("value", ISNONE_TRUE)
 def test_isnone_true(value: Any) -> None:
@@ -658,3 +836,53 @@ def test_isdunder_false(value: Any) -> None:
 def test_ishidden_true(value: Any) -> None:
     """Test ishidden function."""
     assert ishidden(value) is True
+
+
+@mark.parametrize(
+    "connect_ex_return_value, astext, expected_result, expected_log",
+    [
+        (0, False, True, "127.0.0.1:8080 is open"),
+        (1, False, False, "127.0.0.1:8080 is not open"),
+        (0, True, "127.0.0.1:8080 is open", "127.0.0.1:8080 is open"),
+        (1, True, "127.0.0.1:8080 is not open", "127.0.0.1:8080 is not open"),
+    ],
+)
+def test_ping(
+    monkeypatch, caplog, connect_ex_return_value, astext, expected_result, expected_log
+):
+    """Test the ping function with different scenarios using parametrization."""
+
+    def mock_connect_ex(self, address):
+        return connect_ex_return_value  # Simulate port being open or closed
+
+    # Monkeypatch the socket's connect_ex method
+    monkeypatch.setattr(socket, "connect_ex", mock_connect_ex)
+
+    with caplog.at_level("DEBUG"):
+        result = ping("127.0.0.1", 8080, astext=astext)
+
+    # Assert the function returns the expected result
+    assert result == expected_result
+
+    # Assert that the correct log message was generated
+    assert expected_log in caplog.text
+
+
+@mark.parametrize(
+    "tag, expected",
+    (
+        ("v1.2.3", "1.2.3"),
+        ("v1.2.3-alpha", "1.2.3"),
+        ("v1.2.3-alpha.1", "1.2.3"),
+        ("v1.2.3-alpha.1+build.1", "1.2.3"),
+        ("3", "3"),
+    ),
+)
+def test_clean_version_tag(tag: str, expected: str) -> None:
+    """Test get_current_version function."""
+    assert clean_version_tag(tag) == expected
+
+
+def test_show_environ():
+    """Test the `show_environ` function."""
+    assert show_environ() is None

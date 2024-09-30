@@ -22,7 +22,7 @@ from datetime import datetime
 from functools import partial
 from json import JSONDecodeError, dumps
 from json import loads as json_loads
-from logging import debug, getLogger
+from logging import getLogger
 from os import environ, getenv
 from pathlib import Path
 from shutil import which
@@ -52,7 +52,7 @@ def istrue(w: str | int) -> bool:
         ret = False
     elif isinstance(w, bool):
         ret = w is True
-    elif isinstance(w, int):
+    elif isinstance(w, (int, float)):
         ret = bool(w)
     elif isinstance(w, str):
         processed_str = w.strip().lower()
@@ -64,10 +64,7 @@ def istrue(w: str | int) -> bool:
         )
         ret = bool(int(w)) if w.isnumeric() else ret
     else:
-        try:
-            ret = bool(w)
-        except TypeError:
-            ret = False
+        raise TypeError(f"input is {type(w)}, which is not supported")
     return ret
 
 
@@ -141,9 +138,7 @@ def chkenv(
         ret = val
     elif (isblank or isnone_) and ifnotnone:
         ret = ifnull
-    elif isnone_ and need:
-        raise ValueError(envname)
-    elif isblank and need:
+    elif (isblank or isnone_) and need:
         raise ValueError(envname)
     elif isblank or isnone_:
         ret = None
@@ -223,10 +218,7 @@ def envcast(
         ret = astype(val)
     if isnone(val) and need:
         raise ValueError(f"input must be {astype}")
-    try:
-        return chktype(ret, astype, mustexist=need)
-    except TypeError:
-        return ret
+    return chktype(ret, astype, mustexist=need)
 
 
 def flatten_dict(
@@ -329,8 +321,6 @@ def to_clipboard(text: str) -> None:
         with Popen(topipe, stdin=PIPE, close_fds=True) as process:
             process.communicate(input=text.encode("utf-8"))
             return success
-    except FileNotFoundError as e:
-        raise OSError("Clipboard command not found.") from e
     except SubprocessError as e:
         raise OSError(f"Error copying text to clipboard: {e}") from e
 
@@ -339,7 +329,7 @@ def copy_file_to_clipboard(path: Path) -> bool:
     """Copies file to the clipboard. Returns True if successful, False otherwise."""
     chktype(path, Path, mustexist=True)
     if not path.is_file():
-        raise ValueError(f"{path} is not a file")
+        raise IsADirectoryError(f"{path} is not a file")
     to_clipboard(path.read_text())
     logger.info(f"File content from {path} copied to clipboard.")
     return True
@@ -364,7 +354,7 @@ def invert_dict(dict_: dict) -> dict[Hashable, Hashable]:
     return {v: k for k, v in dict_.items()}
 
 
-def get_curent_version(tag: str) -> str:
+def clean_version_tag(tag: str) -> str:
     """returns current version"""
     if tag.startswith("v"):
         tag = tag[1:]
@@ -379,5 +369,5 @@ def ping(host: str, port: int, astext: bool = False) -> bool | str:
         isopen = sock.connect_ex((host, port)) == 0
         text = "" if isopen else "not "
         text = f"{host}:{port} is {text}open"
-        debug(text)
+        logger.debug(text)
         return text if astext else isopen

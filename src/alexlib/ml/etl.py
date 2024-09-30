@@ -18,12 +18,11 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from alexlib.core import chkenv, datetime
 from alexlib.db import Connection
 from alexlib.df import filter_df, get_distinct_col_vals
-from alexlib.files.config import DotEnv
+from alexlib.files import DotenvFile
 from alexlib.iters import keys, link
 from alexlib.maths import discrete_exp_dist
 
-config = DotEnv()
-cnxn = Connection()
+config = DotenvFile()
 
 model_types = chkenv("MODEL_TYPES", type=list)
 
@@ -375,7 +374,7 @@ class Parameters:
                     "clf__penalty": [None, "l2"],
                     "clf__C": expon(scale=0.1),
                     "clf__warm_start": [False],
-                    "clf__max_iter": [i for i in range(30, 150)],
+                    "clf__max_iter": list(range(30, 150)),
                     "clf__random_state": [self.random_state],
                     "clf__n_jobs": [self.n_jobs],
                 },
@@ -408,34 +407,34 @@ class Parameters:
             "svc": {
                 "clf__C": expon(scale=0.1),
                 "clf__kernel": ["linear", "rbf", "poly", "sigmoid"],
-                "clf__degree": [i for i in range(1, 5)],
+                "clf__degree": list(range(1, 5)),
                 "clf__probability": [True],
                 "clf__gamma": ["auto", "scale"],
                 "clf__random_state": [self.random_state],
             },
             "knn": {
-                "clf__n_neighbors": [i for i in range(2, 6)],
+                "clf__n_neighbors": list(range(2, 6)),
                 "clf__weights": ["uniform", "distance"],
                 "clf__algorithm": ["auto", "ball_tree", "kd_tree", "brute"],
-                "clf__leaf_size": [i for i in range(10, 100)],
-                "clf__p": [i for i in range(1, 5)],
+                "clf__leaf_size": list(range(10, 100)),
+                "clf__p": list(range(1, 5)),
                 "clf__n_jobs": [self.n_jobs],
             },
             "dtree": {
                 "clf__criterion": ["gini", "entropy", "log_loss"],
                 "clf__splitter": ["best", "random"],
-                "clf__max_depth": [i for i in range(10, 100)],
-                "clf__min_samples_leaf": [i for i in range(1, 10)],
-                "clf__min_samples_split": [i for i in range(2, 100)],
+                "clf__max_depth": list(range(10, 100)),
+                "clf__min_samples_leaf": list(range(1, 10)),
+                "clf__min_samples_split": list(range(2, 100)),
                 "clf__max_features": [None, "sqrt", "log2"],
                 "clf__random_state": [self.random_state],
             },
             "etree": {
                 "clf__criterion": ["gini", "entropy", "log_loss"],
-                "clf__n_estimators": [i for i in range(10, 200)],
+                "clf__n_estimators": list(range(10, 200)),
                 "clf__max_features": [None, "sqrt", "log2"],
-                "clf__min_samples_split": [i for i in range(2, 10)],
-                "clf__min_samples_leaf": [i for i in range(1, 10)],
+                "clf__min_samples_split": list(range(2, 10)),
+                "clf__min_samples_leaf": list(range(1, 10)),
                 "clf__bootstrap": [True],
                 "clf__oob_score": [True],
                 "clf__warm_start": _bool,
@@ -445,9 +444,9 @@ class Parameters:
             },
             "rforest": {
                 "clf__criterion": ["gini", "entropy", "log_loss"],
-                "clf__n_estimators": [i for i in range(10, 200)],
-                "clf__min_samples_split": [i for i in range(2, 10)],
-                "clf__min_samples_leaf": [i for i in range(1, 10)],
+                "clf__n_estimators": list(range(10, 200)),
+                "clf__min_samples_split": list(range(2, 10)),
+                "clf__min_samples_leaf": list(range(1, 10)),
                 "clf__max_features": [None, "sqrt", "log2"],
                 "clf__bootstrap": [True],
                 "clf__oob_score": [True],
@@ -457,14 +456,14 @@ class Parameters:
                 "clf__n_jobs": [self.n_jobs],
             },
             "mlp": {
-                "clf__hidden_layer_sizes": [i for i in range(10, 200)],
+                "clf__hidden_layer_sizes": list(range(10, 200)),
                 "clf__activation": ["identity", "logistic", "tanh", "relu"],
                 "clf__solver": ["adam", "lbfgs", "sgd"],
                 "clf__learning_rate": ["constant", "adaptive", "invscaling"],
                 "clf__learning_rate_init": expon(scale=0.01),
                 "clf__power_t": expon(scale=0.1),
                 "clf__alpha": expon(scale=0.01),
-                "clf__max_iter": [i for i in range(30, 150)],
+                "clf__max_iter": list(range(30, 150)),
                 "clf__warm_start": _bool,
                 "clf__early_stopping": _bool,
                 "clf__random_state": [self.random_state],
@@ -472,12 +471,12 @@ class Parameters:
             "hxg_boost": {
                 "clf__random_state": [self.random_state],
                 "clf__learning_rate": expon(scale=0.01),
-                "clf__max_iter": [i for i in range(30, 150)],
-                "clf__max_depth": [i for i in range(10, 100)],
-                "clf__max_bins": [i for i in range(100, 256)],
+                "clf__max_iter": list(range(30, 150)),
+                "clf__max_depth": list(range(10, 100)),
+                "clf__max_bins": list(range(100, 256)),
                 "clf__warm_start": _bool,
                 "clf__l2_regularization": uniform(),
-                "clf__min_samples_leaf": [i for i in range(1, 10)],
+                "clf__min_samples_leaf": list(range(1, 10)),
                 "clf__interaction_cst": ["pairwise", "no_interactions"],
             },
             "ada_boost": {

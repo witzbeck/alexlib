@@ -120,7 +120,10 @@ class Rate:
         labels: list[int],
     ) -> list[bool]:
         """Get the alignment of predictions and labels."""
-        return [pred == lab == affirm_val for pred, lab in zip(predictions, labels)]
+        return [
+            pred == lab == affirm_val
+            for pred, lab in zip(predictions, labels, strict=False)
+        ]
 
     def get_rate(self, threshold: float):
         predictions = self.get_predictions(
