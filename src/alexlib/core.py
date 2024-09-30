@@ -64,10 +64,7 @@ def istrue(w: str | int) -> bool:
         )
         ret = bool(int(w)) if w.isnumeric() else ret
     else:
-        try:
-            ret = bool(w)
-        except TypeError:
-            ret = False
+        raise TypeError(f"input is {type(w)}, which is not supported")
     return ret
 
 
