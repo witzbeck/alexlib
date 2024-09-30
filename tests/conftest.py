@@ -181,9 +181,19 @@ def sysobj(file_path: Path):
 
 
 @fixture(scope="function")
-def text_file_path(dir_path: Path) -> Path:
+def text_filename(faker: Faker) -> str:
+    return f"{faker.file_name()}.txt"
+
+
+@fixture(scope="function")
+def json_filename(faker: Faker) -> str:
+    return f"{faker.file_name()}.json"
+
+
+@fixture(scope="function")
+def text_file_path(text_filename: str, dir_path: Path) -> Path:
     """Create a text file and return its path."""
-    text_file = dir_path / "test.txt"
+    text_file = dir_path / text_filename
     text_file.resolve()
     text_file.write_text("Line 1\nLine 2")
     return text_file
@@ -195,12 +205,12 @@ def text_file_obj(text_file_path: Path) -> File:
     return File.from_path(text_file_path)
 
 
-@fixture(scope="module")
-def json_path(temp_dir: Path):
-    return temp_dir / "test.json"
+@fixture(scope="function")
+def json_path(json_filename: str, temp_dir: Path):
+    return temp_dir / json_filename
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def json_file(json_path: Path):
     write_json({"key": "value"}, json_path)
     return JsonFile.from_path(json_path)

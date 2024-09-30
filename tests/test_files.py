@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from os import stat_result
 from pathlib import Path
 from random import choice
+from sys import version_info
 
 from matplotlib.figure import Figure
 from pytest import FixtureRequest, fixture, mark, raises, skip
@@ -148,7 +149,11 @@ def test_toml_file_init(toml_file: TomlFile):
 
 def test_read_toml(toml_file: TomlFile):
     """Test reading a TOML file"""
-    assert read_toml(toml_file.path) == {"key": "value"}
+    if version_info.minor <= 10:
+        with raises(ImportError):
+            assert read_toml(toml_file.path) == {"key": "value"}
+    else:
+        assert read_toml(toml_file.path) == {"key": "value"}
 
 
 def test_read_json(json_file: JsonFile):
@@ -716,3 +721,13 @@ def test_timeit_size_comp_cycles_match(
     comp_results = timeit_size_comp_func()
     cycles_results = timeit_size_cycles_func()
     assert comp_results == cycles_results
+
+
+def test_file_rename_with_overwrite(text_file_obj: File):
+    new_name = "newfile.txt"
+    new_path = text_file_obj.path.with_name(new_name)
+    new_path.touch()
+    assert new_path.exists()
+    text_file_obj.rename(new_name, overwrite=True)
+    assert text_file_obj.path.name == new_name
+    assert text_file_obj.path.exists()

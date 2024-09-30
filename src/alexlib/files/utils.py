@@ -61,7 +61,11 @@ try:
         return toml_loads(path.read_text())
 
 except ImportError as e:  # pragma: no cover
-    read_toml = None
+
+    def read_toml(path: Path, e=e) -> dict[str, str]:
+        """reads toml file"""
+        raise ImportError("toml support requires tomllib package") from e
+
     logger.debug(f"toml support only available ^3.11: {e}")
 
 
