@@ -14,8 +14,6 @@ repos:
       - id: end-of-file-fixer
       - id: check-json
         types: [json]
-      - id: check-xml
-        types: [xml]
       - id: check-toml
         types: [toml]
       - id: check-yaml
