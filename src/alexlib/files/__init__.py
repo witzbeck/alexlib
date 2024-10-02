@@ -122,13 +122,9 @@ class SystemObject:
 class File(SystemObject):
     """class for files"""
 
-    name: str = field(default=None)
-    path: Path = field(default=None, repr=False)
-    encrypted: bool = field(default=False, repr=False)
-
     def __repr__(self) -> str:
         """gets file representation"""
-        return f"{self.__class__.__name__}({self.name})"
+        return f"{self.__class__.__name__}({self.path.name})"
 
     def rename(self, name: str, overwrite: bool = False) -> None:
         """renames file"""
@@ -230,11 +226,6 @@ class File(SystemObject):
 class Directory(SystemObject):
     """class for directories"""
 
-    name: str = field(default=None)
-    path: Path = field(default=None, repr=False)
-    test: bool = field(default=False)
-    levels: int = field(default=1, repr=False)
-
     @property
     def contents(self) -> list[Path]:
         """gets directory contents"""
@@ -283,7 +274,9 @@ class Directory(SystemObject):
     def tree(self) -> dict[str:SystemObject]:
         """dictionary representation of directory"""
         return {
-            self.name: {obj.name: Directory._tree_item(obj) for obj in self.objlist}
+            self.path.name: {
+                obj.path.name: Directory._tree_item(obj) for obj in self.objlist
+            }
         }
 
     def show_tree(self, flat: bool = False) -> None:
@@ -292,10 +285,6 @@ class Directory(SystemObject):
         if flat:
             d = flatten_dict(d)
         return show_dict(d)
-
-    def __repr__(self) -> str:
-        """gets directory representation"""
-        return f"{self.__class__.__name__}({self.name})"
 
     @staticmethod
     def _get_type_filelist(
@@ -379,14 +368,14 @@ class Directory(SystemObject):
         )
 
     @property
-    def allchilddirs(self) -> list[SystemObject]:
+    def allchilddirs(self) -> list["Directory"]:
         """gets all child directories"""
         return self.dirlist + list(
             chain.from_iterable([x.allchilddirs for x in self.dirlist])
         )
 
     @property
-    def childdirswithfiles(self) -> list[SystemObject]:
+    def childdirswithfiles(self) -> list["Directory"]:
         """gets child directories with files"""
         return [x for x in self.allchilddirs if not x.hasnofiles]
 
@@ -487,7 +476,8 @@ class ConfigFile(File):
 
     def __repr__(self) -> str:
         """Returns a string representation of the object"""
-        return f"{self.clsname}({self.path.drive}/.../{self.name})"
+        clsname = self.__class__.__name__
+        return f"{clsname}({self.path.drive}/.../{self.path.name})"
 
     def __len__(self) -> int:
         """Returns the number of environment variables"""
@@ -551,7 +541,6 @@ class ConfigFile(File):
 class DotenvFile(ConfigFile):
     """A class to handle dotenv files"""
 
-    name: str = field(default=".env")
     path: Path = field(default=DOTENV_PATH)
 
     def get_envdict(self) -> dict:
@@ -562,7 +551,6 @@ class DotenvFile(ConfigFile):
 class SettingsFile(ConfigFile, JsonFile):
     """A class to handle settings files"""
 
-    name: str = field(default="settings.json")
     path: Path = field(default=PROJECT_PATH / "settings.json")
 
     def get_envdict(self) -> dict[str, str]:

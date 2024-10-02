@@ -330,13 +330,11 @@ class SecretStore(File):
     def from_dict(
         cls,
         dict_: dict[str:str],
-        name: Path = None,
         path: Path = None,
     ) -> "SecretStore":
         """creates a SecretStore object from a dict"""
         return cls(
             secrets=cls.encode_str_dict(dict_),
-            name=name,
             path=path,
         )
 
