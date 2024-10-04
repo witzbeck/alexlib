@@ -276,7 +276,7 @@ def timeit(niter: int = None, toprint: bool = True) -> Callable:
 def get_rand_datetime() -> datetime:
     """Generate a random datetime object."""
     return datetime(
-        randint(1000, 2500),
+        randint(1800, 2100),
         randint(1, 12),
         randint(1, 28),
         randint(0, 23),
@@ -298,9 +298,11 @@ def get_rand_timedelta() -> timedelta:
     )
 
 
-def get_holidays() -> list[date]:
+def get_holidays(start: date = None, end: date = None) -> list[date]:
     """Get a list of US Federal Holidays."""
-    dts = list(USFederalHolidayCalendar().holidays().to_pydatetime())
+    dts = list(
+        USFederalHolidayCalendar().holidays(start=start, end=end).to_pydatetime()
+    )
     return {dt.date() for dt in dts}
 
 
