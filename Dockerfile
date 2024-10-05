@@ -1,4 +1,4 @@
-# Use an official Python runtime as a parent image, ensuring it's compatible with your project's Python version.
+# Use an official Python runtime as a parent image.
 FROM python:3.12-slim
 
 # Set environment variables to avoid Python buffering and enable unattended installation.
