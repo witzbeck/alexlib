@@ -25,7 +25,7 @@ sqlalchemy-utils = "^0.41"
 statsmodels      = "^0.14.3"
 
 [tool.poetry.group.docs.dependencies]
-reportlab = "^4.0"
+reportlab = "^4.2"
 
 [tool.poetry.group.ml.dependencies]
 openai = "^1.51"
