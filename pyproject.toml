@@ -40,7 +40,7 @@ ruff         = "^0.6.7"
 [tool.poetry.group.dev.dependencies]
 ipykernel  = "^6.29"
 pre-commit = "^3.0"
-sqlfluff   = "^3.0"
+sqlfluff   = "^3.2"
 
 
 [tool.pytest.ini_options]
