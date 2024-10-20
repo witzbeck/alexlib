@@ -14,7 +14,7 @@ version = "1.1.0"
 [tool.poetry.dependencies]
 cryptography     = "^43.0"
 duckdb           = "^1.1.0"
-faker            = "^30.0.0"
+faker            = "^30.3.0"
 matplotlib       = "^3.8"
 pandas           = "^2.2"
 python           = "^3.10"
@@ -22,25 +22,25 @@ requests         = "^2.32"
 scikit-learn     = "^1.5.2"
 sqlalchemy       = "^2.0"
 sqlalchemy-utils = "^0.41"
-statsmodels      = "^0.14.3"
+statsmodels      = "^0.14.4"
 
 [tool.poetry.group.docs.dependencies]
-reportlab = "^4.0"
+reportlab = "^4.2"
 
 [tool.poetry.group.ml.dependencies]
-openai = "^1.46"
+openai = "^1.51"
 scipy  = "^1.13"
 
 [tool.poetry.group.test.dependencies]
 pytest       = "^8.1"
 pytest-cov   = "^5.0"
 pytest-xdist = "^3.6.1"
-ruff         = "^0.6.7"
+ruff         = "^0.6.9"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel  = "^6.29"
-pre-commit = "^3.0"
-sqlfluff   = "^3.0"
+pre-commit = "^4.0"
+sqlfluff   = "^3.2"
 
 
 [tool.pytest.ini_options]
