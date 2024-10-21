@@ -40,7 +40,6 @@ from random import choice
 from string import ascii_uppercase
 from typing import Callable, Iterable
 
-from numpy import array
 from pandas import DataFrame, Series
 
 
@@ -174,15 +173,9 @@ def get_rect_area(heights: list, widths: list, absolute: bool = True) -> float:
     return sum(abs(x) for x in rect_areas) if absolute else sum(rect_areas)
 
 
-def combine_domains(x1: list, x2: list, toarray: bool = True) -> array:
+def combine_domains(x1: list, x2: list) -> list[float]:
     """returns a combined domain from two lists"""
-    x1.extend(x2)
-    if toarray:
-        domain = array(x1).unique()
-    else:
-        domain = list(set(x1))
-    domain.sort()
-    return domain
+    return sorted(set(x1).union(set(x2)))
 
 
 def get_props(series: Series) -> DataFrame:
