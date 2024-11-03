@@ -8,10 +8,24 @@ spec:
   template:
     spec:
       repository: witzbeck/alexlib
-      containers:
-        - name: runner
-          image: ghcr.io/summerwind/actions-runner:latest
       labels:
         - self-hosted
         - kubernetes
         - python
+      containers:
+        - name: runner
+          image: ghcr.io/summerwind/actions-runner:latest
+          env:
+            - name: RUNNER_NAME
+              value: "alexlib-runner-$(POD_NAME)"
+            - name: RUNNER_LABELS
+              value: "self-hosted,kubernetes,python"
+            - name: RUNNER_GROUP
+              value: "Default"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
