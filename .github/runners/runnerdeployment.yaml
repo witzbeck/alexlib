@@ -8,3 +8,10 @@ spec:
   template:
     spec:
       repository: witzbeck/alexlib
+      containers:
+        - name: runner
+          image: ghcr.io/summerwind/actions-runner:latest
+      labels:
+        - self-hosted
+        - kubernetes
+        - python
