@@ -9,8 +9,43 @@ on:
       - main
 
 jobs:
-  test:
+  test-arc-runner-set:
     runs-on: arc-runner-set
     steps:
       - name: Run a simple command
-        run: echo "Hello from Kubernetes runner!"
+        run: echo "Hello from Kubernetes runner on arc-runner-set!"
+  test-self-hosted:
+    runs-on: self-hosted
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on self-hosted!"
+  test-gha-runner-scale-set-controller:
+    runs-on: gha-runner-scale-set-controller
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on gha-runner-scale-set-controller!"
+  test-gha-runner-set:
+    runs-on: gha-runner-set
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on gha-runner-set!"
+  test-gha-runner:
+    runs-on: gha-runner
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on gha-runner!"
+  test-arc-runner:
+    runs-on: arc-runner
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on arc-runner!"
+  test-arc-runner-controller:
+    runs-on: arc-runner-controller
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on arc-runner-controller!"
+  test-arc-runner-controller-set:
+    runs-on: arc-runner-controller-set
+    steps:
+      - name: Run a simple command
+        run: echo "Hello from Kubernetes runner on arc-runner-controller-set!"
