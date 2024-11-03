@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, kubernetes, python]
+    runs-on: [self-hosted]
     strategy:
       matrix:
         python-version: ['3.13', '3.12', '3.11', '3.10', '3.9', '3.8']
