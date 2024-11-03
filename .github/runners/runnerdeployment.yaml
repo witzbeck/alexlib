@@ -2,7 +2,7 @@ apiVersion: actions.summerwind.dev/v1alpha1
 kind: RunnerDeployment
 metadata:
   name: alexlib-runner-deployment
-  namespace: actions-runner-system
+  namespace: actions-runners
 spec:
   replicas: 3
   template:
