@@ -4,7 +4,7 @@ metadata:
   name: alexlib-runner-deployment
   namespace: actions-runner-system
 spec:
-  replicas: 2
+  replicas: 3
   template:
     spec:
       repository: witzbeck/alexlib
