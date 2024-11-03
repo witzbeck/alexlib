@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    runs-on: arc-runner-set-alexlib
+    runs-on: arc-runner-set
     steps:
       - name: Run a simple command
         run: echo "Hello from Kubernetes runner!"
