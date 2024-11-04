@@ -33,7 +33,7 @@ scipy  = "^1.13"
 
 [tool.poetry.group.test.dependencies]
 pytest       = "^8.1"
-pytest-cov   = "^5.0"
+pytest-cov   = "^6.0"
 pytest-xdist = "^3.6.1"
 ruff         = "^0.7.0"
 
