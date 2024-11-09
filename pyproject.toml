@@ -35,7 +35,7 @@ scipy  = "^1.13"
 pytest       = "^8.1"
 pytest-cov   = "^6.0"
 pytest-xdist = "^3.6.1"
-ruff         = "^0.7.0"
+ruff         = "^0.7.3"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel  = "^6.29"
