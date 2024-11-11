@@ -28,7 +28,7 @@ statsmodels      = "^0.14.4"
 reportlab = "^4.2"
 
 [tool.poetry.group.ml.dependencies]
-openai = "^1.53"
+openai = "^1.54"
 scipy  = "^1.13"
 
 [tool.poetry.group.test.dependencies]
