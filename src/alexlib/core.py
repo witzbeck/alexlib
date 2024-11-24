@@ -363,7 +363,7 @@ def clean_version_tag(tag: str) -> str:
     return tag
 
 
-def ping(host: str, port: int, astext: bool = False) -> bool | str:
+def ping(host: str, port: int, astext: bool = False) -> Union[bool, str]:
     """checks if socket is open"""
     with socket(AF_INET, SOCK_STREAM) as sock:
         isopen = sock.connect_ex((host, port)) == 0
