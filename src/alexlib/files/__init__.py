@@ -226,6 +226,11 @@ class File(SystemObject):
 class Directory(SystemObject):
     """class for directories"""
 
+    def make_subdir(self, name: str) -> Path:
+        """Make a subdirectory."""
+        (path := self.path / name).mkdir(exist_ok=True)
+        return path
+
     @property
     def contents(self) -> list[Path]:
         """gets directory contents"""
