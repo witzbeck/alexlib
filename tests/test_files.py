@@ -119,6 +119,13 @@ def test_dir_obj_utility_methods(dir_obj: Directory):
     assert isinstance(dir_obj.tree, dict)
     assert isinstance(dir_obj.maxtreedepth, int)
 
+def test_dir_obj_make_subdir(dir_obj: Directory):
+    """Test making a subdirectory."""
+    subdir_name = "subdir"
+    subdir_path = dir_obj.path / subdir_name
+    dir_subdir = dir_obj.make_subdir(subdir_name)
+    assert subdir_path.is_dir()
+    assert dir_subdir == subdir_path
 
 @mark.parametrize(
     "path, include, exclude, expected",
