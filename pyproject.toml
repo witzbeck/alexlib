@@ -22,7 +22,7 @@ description = "Packages created as part of the author's Master of Science in Sta
 license = { text = "MIT" }
 name = "alexlib"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 version = "1.2.0"
 
 [dependency-groups]

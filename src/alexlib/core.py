@@ -29,7 +29,7 @@ from shutil import which
 from socket import AF_INET, SOCK_STREAM, socket
 from subprocess import PIPE, CalledProcessError, Popen, SubprocessError, run
 from sys import platform
-from typing import Any, Hashable, Union
+from typing import Any, Hashable
 
 from alexlib.constants import CLIPBOARD_COMMANDS_MAP
 
@@ -46,7 +46,7 @@ def isnone(w: str) -> bool:
     return ret
 
 
-def istrue(w: Union[str, int]) -> bool:
+def istrue(w: str | int) -> bool:
     """checks if input is True or 1"""
     if isnone(w):
         ret = False
@@ -363,7 +363,7 @@ def clean_version_tag(tag: str) -> str:
     return tag
 
 
-def ping(host: str, port: int, astext: bool = False) -> Union[bool, str]:
+def ping(host: str, port: int, astext: bool = False) -> bool | str:
     """checks if socket is open"""
     with socket(AF_INET, SOCK_STREAM) as sock:
         isopen = sock.connect_ex((host, port)) == 0
