@@ -44,8 +44,8 @@ addopts = [
     "--cov-fail-under=75",
     "--cov-branch",
     "--durations=10",
-    "-n",
-    "auto",
+    #"-n",
+    #"auto",
 ]
 markers = [
     "slow: mark test as slow to run",

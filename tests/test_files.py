@@ -414,6 +414,7 @@ def rand_file_in_parent():
     return choice(choices)
 
 
+@mark.slow
 def test_system_obj_from_parent(rand_file_in_parent: Path):
     obj = SystemObject.from_parent(
         rand_file_in_parent.name, Path(__file__).parent, notexistok=False
@@ -563,6 +564,7 @@ def filetype(request: FixtureRequest) -> FileType:
     return request.param
 
 
+@mark.slow
 def test_filetype_init(filetype: FileType):
     assert isinstance(filetype, FileType)
 
@@ -571,6 +573,7 @@ def test_filetype_repr(filetype: FileType):
     assert isinstance(repr(filetype), str)
 
 
+@mark.slow
 def test_filetype_str(filetype: FileType):
     assert isinstance(str(filetype), str)
 
@@ -583,10 +586,12 @@ def test_filetype_suffix_str(filetype: FileType):
     assert isinstance(filetype.suffix, str)
 
 
+@mark.slow
 def test_filetype_suffix_in_map(filetype: FileType):
     assert isinstance(SUFFIX_FILETYPE_MAP[filetype.suffix], FileType)
 
 
+@mark.slow
 def test_filetype_from_suffix(filetype: FileType):
     assert FileType.from_suffix(filetype.suffix, SUFFIX_FILETYPE_MAP) == filetype
 
@@ -710,6 +715,7 @@ def test_timeit_size_label_bytes(timeit_size_label_bytes: tuple):
     assert isinstance(nbytes, int)
 
 
+@mark.slow
 def test_timeit_size_comp_func(timeit_size_comp_func: Callable):
     assert callable(timeit_size_comp_func)
     assert timeit_size_comp_func()[0] == ("TB", 1.0)
