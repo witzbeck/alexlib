@@ -184,10 +184,12 @@ def auth_object(auth_template: dict[str, str]) -> dict[str, Auth]:
     return Auth.from_dict(auth_key, template)
 
 
+@mark.slow
 def test_auth_generator_init(auth_generator: AuthGenerator):
     assert isinstance(auth_generator, AuthGenerator)
 
 
+@mark.slow
 def test_auth_template_path(auth_generator: AuthGenerator, auth_template_path: Path):
     assert auth_generator.path == auth_template_path
     assert isinstance(auth_generator.path, Path)
@@ -202,6 +204,7 @@ def test_auth_templates(auth_template: tuple[str, dict[str, str]]):
     assert len(template) == 7
 
 
+@mark.slow
 def test_auth_object_is_auth(auth_object: Auth):
     assert isinstance(auth_object, Auth)
 
@@ -213,11 +216,13 @@ def test_auth_object_attrs(attr: str, auth_object: Auth):
     assert isinstance(getattr(auth_object, attr), SecretValue)
 
 
+@mark.slow
 def test_auth_part(auth_part: AuthPart):
     assert issubclass(auth_part.__class__, AuthPart)
     assert len(auth_part.name) == len(auth_part)
 
 
+@mark.slow
 def test_auth_part_repr(auth_part: AuthPart):
     assert auth_part.__class__.__name__ in repr(auth_part)
 
@@ -434,6 +439,7 @@ def test_secret_store_sensor_input(secret_store: SecretStore, value: str):
     assert "*" in sensored_value
 
 
+@mark.slow
 def test_authpart_str_method(auth_part: AuthPart):
     """Test the __str__ method for the AuthPart class."""
     assert isinstance(str(auth_part), str)

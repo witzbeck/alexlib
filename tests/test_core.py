@@ -274,6 +274,7 @@ def test_chkcmd():
     assert chkcmd("python") or chkcmd("python3")
 
 
+@mark.slow
 def test_copy_existing_file(copy_path, copy_text):
     if iswindows() or ismacos():
         assert copy_file_to_clipboard(copy_path)
@@ -287,6 +288,7 @@ def test_copy_existing_file(copy_path, copy_text):
                 copy_file_to_clipboard(copy_path)
 
 
+@mark.slow
 def test_to_clipboard_success(copy_text):
     if not islinux():
         assert (
@@ -536,6 +538,7 @@ def test_isplatform() -> None:
     assert any((iswindows(), islinux(), ismacos()))
 
 
+@mark.slow
 @mark.parametrize(
     "text, kwargs, expected",
     (
